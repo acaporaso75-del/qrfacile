@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{ title or "QRfacile" }}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">QRFACILE <span class="badge">{{ badge or "Admin" }}</span></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a class="btn btn-ghost" href="/admin">Admin</a>
+        <a class="btn btn-ghost" href="/admin/overview">Overview</a>
+        <a class="btn btn-ghost" href="/admin/credits">Crediti</a>
+        <a class="btn btn-ghost" href="/admin/events">Stand Digitale</a>
+      </div>
+    </div>
+    {% block content %}{% endblock %}
+    <div class="footer muted">© QRFACILE — servizio erogato da Enolab Srl</div>
+  </div>
+</body>
+</html>
+

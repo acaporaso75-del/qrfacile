@@ -1,0 +1,18 @@
+{% extends "base_public.html" %}
+{% set title="QRFACILE" %}
+{% block content %}
+  <div class="hero">
+    <h1>QR dinamici professionali.<br>Specializzati per etichetta digitale vino.</h1>
+    <p class="sub">Enterprise · Versioning · Analytics · Stand Digitale Fiere</p>
+    <div class="chips">
+      <span class="chip chip-wine">Vino (cantina)</span>
+      <span class="chip">Generico (external)</span>
+      <span class="chip">Stand Digitale</span>
+      <span class="chip">Stats riservate</span>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+      <a class="btn" href="/admin">Apri pannello</a>
+      <a class="btn btn-ghost" href="/health">Health</a>
+    </div>
+  </div>
+{% endblock %}

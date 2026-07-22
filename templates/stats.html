@@ -1,0 +1,50 @@
+{% extends "base_public.html" %}
+{% set title = "Stats Evento" %}
+{% set top_right = "Riservato" %}
+{% block content %}
+
+<div class="card">
+  <h2 style="margin:0 0 6px;">{{ event.event_name }}</h2>
+  <div class="muted">{{ event.location or "" }}</div>
+  <div class="muted">QR evento: <span class="mono">{{ event.qr_slug_event }}</span></div>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="grid-3">
+  <div class="card">
+    <div class="metric">{{ scans_total }}</div>
+    <div class="metric-label">Scans totali (evento)</div>
+  </div>
+  <div class="card">
+    <div class="metric">{{ leads_total }}</div>
+    <div class="metric-label">Lead totali (evento)</div>
+  </div>
+  <div class="card">
+    <div class="metric">{{ scans_today }}</div>
+    <div class="metric-label">Scans oggi</div>
+  </div>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="card">
+  <h2>Ultimi 14 giorni</h2>
+  <div class="mini-chart">
+    {% for d in scans_last14 %}
+      {% set v = d.scans or 0 %}
+      <div class="bar" title="{{d.day}}: {{v}}" style="height: {{ 6 + (v*6) }}px"></div>
+    {% endfor %}
+  </div>
+  <p class="muted">Numeri aggregati. Nessun dato personale.</p>
+</div>
+
+{% if expired %}
+  <div style="height:14px;"></div>
+  <div class="card">
+    <h2>Link scaduto</h2>
+    <p class="muted">Questo link non è più valido. La cantina può rigenerarlo dal pannello.</p>
+  </div>
+{% endif %}
+
+{% endblock %}

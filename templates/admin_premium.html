@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>QRfacile Admin</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">QRfacile <span class="badge">Admin</span></div>
+      <div class="top-actions">
+        <a class="btn btn-ghost" href="/">Home</a>
+        <a class="btn btn-ghost" href="/admin/export-scans-daily.csv">Export scans CSV</a>
+      </div>
+    </div>
+
+    <div class="grid-2">
+	<div class="card">
+  	<h2>Bulk QR External (CSV → ZIP)</h2>
+  	<form method="post" action="/admin/bulk-external">
+    	<p class="muted">Colonne CSV: title,url,winery_id</p>
+    	<textarea name="file" class="jsonbox" placeholder="title,url,winery_id&#10;Promo1,https://example.com,0"></textarea>
+    	<button class="btn" type="submit" style="margin-top:10px;">Genera ZIP</button>
+  	   </form>
+	</div>
+      <div class="card">
+        <h2>Cantine</h2>
+        <form class="form" method="post" action="/admin/create-winery">
+          <div class="row">
+            <label>Nome cantina</label>
+            <input name="name" required placeholder="Es. Cantina Demo">
+          </div>
+          <button class="btn" type="submit">Crea cantina</button>
+        </form>
+
+        <div class="pillbox">
+          {% for w in wineries %}
+            <span class="pill">#{{w.id}} {{w.name}}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h2>Crea QR External (URL)</h2>
+        <form class="form" method="post" action="/admin/create-external">
+          <div class="row">
+            <label>Titolo</label>
+            <input name="title" required>
+          </div>
+          <div class="row">
+            <label>URL</label>
+            <input name="url" required placeholder="https://...">
+          </div>
+          <div class="row">
+            <label>Winery ID (opzionale)</label>
+            <input name="winery_id" placeholder="0">
+          </div>
+          <button class="btn" type="submit">Crea</button>
+          <p class="muted">DB: qr_type=<b>external</b> · status=<b>attiva</b></p>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Crea QR Cantina (Vino)</h2>
+        <form class="form" method="post" action="/admin/create-cantina">
+          <div class="row">
+            <label>Nome vino</label>
+            <input name="title" required>
+          </div>
+          <div class="row">
+            <label>Winery ID</label>
+            <input name="winery_id" required placeholder="Es. 12">
+          </div>
+          <div class="row">
+            <label>Annata (opzionale)</label>
+            <input name="year" placeholder="2023">
+          </div>
+          <div class="row">
+            <label>Lotto (opzionale)</label>
+            <input name="lot" placeholder="L001">
+          </div>
+          <button class="btn" type="submit">Crea</button>
+          <p class="muted">DB: qr_type=<b>cantina</b> · status=<b>attiva</b></p>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>QR recenti</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Slug</th>
+              <th>Titolo</th>
+              <th>Tipo</th>
+              <th>Status</th>
+              <th>Winery</th>
+              <th>Anno/Lotto</th>
+              <th>Azioni</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in qrs %}
+              <tr>
+                <td>
+                  <div class="mono"><b>{{r.slug}}</b></div>
+                  <div class="muted">id {{r.id}}</div>
+                </td>
+                <td>{{r.title}}</td>
+                <td><span class="tag">{{r.qr_type}}</span></td>
+                <td>{{r.status}}</td>
+                <td>{{r.winery_id or ""}}</td>
+                <td class="muted">{{r.year or ""}} {{r.lot or ""}}</td>
+                <td class="muted">
+                  <a href="/r/{{r.slug}}">test</a> ·
+                  <a href="/qr/{{r.slug}}.png">png</a> ·
+                  <a href="/e/{{r.slug}}">e-label</a> ·
+                  <a href="/admin/edit/{{r.slug}}">edit</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="muted">Per produzione: con EDGE metteremo APP_BASE_URL=https://qrfacile.it</p>
+    </div>
+  </div>
+</body>
+</html>

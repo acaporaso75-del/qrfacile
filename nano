@@ -1,0 +1,10 @@
+import os
+import psycopg
+from psycopg.rows import dict_row
+
+def pg():
+    dsn = os.getenv("DATABASE_URL", "")
+    if not dsn:
+        raise RuntimeError("DATABASE_URL mancante in /opt/qrfacile/.env")
+    return psycopg.connect(dsn, row_factory=dict_row)
+

@@ -1,0 +1,47 @@
+{% extends "base_admin.html" %}
+{% set title="Stand Digitale" %}
+{% set badge="Eventi" %}
+{% block content %}
+
+<div class="card">
+  <h2>Nuovo evento fiera</h2>
+  <p class="muted">Prima fiera: trial. Dalla seconda: 1 credito events (se no frozen).</p>
+  <form method="post" action="/app/events/create">
+    <label>Nome evento</label>
+    <input name="event_name" required placeholder="Vinitaly 2026">
+    <label>Location</label>
+    <input name="location" placeholder="Verona">
+    <button class="btn" type="submit" style="margin-top:10px;">Crea evento</button>
+  </form>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="card">
+  <h2>Eventi</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ID</th><th>Evento</th><th>Status</th><th>QR</th><th>Lead</th><th>Scans30</th><th>Conv%</th><th>Azioni</th></tr></thead>
+      <tbody>
+      {% for e in events %}
+        <tr>
+          <td class="mono">{{e.id}}</td>
+          <td>{{e.event_name}}</td>
+          <td><span class="tag">{{e.status}}</span></td>
+          <td class="mono">{{e.qr_slug_event}}</td>
+          <td>{{e.lead_count}}</td>
+          <td>{{e.scans_30}}</td>
+          <td>{{e.conv_rate}}%</td>
+          <td class="muted">
+            <a href="/fair/{{e.id}}">pagina</a> ·
+            <a href="/stats/{{e.stats_token}}">stats</a> ·
+            <a href="/admin/events/leads.csv?event_id={{e.id}}">export</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

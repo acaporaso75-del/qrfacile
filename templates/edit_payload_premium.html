@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Edit {{slug}}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">QRfacile <span class="badge">Edit</span></div>
+      <div class="top-actions">
+        <a class="btn btn-ghost" href="/admin">← Admin</a>
+        <a class="btn btn-ghost" href="/e/{{slug}}">Vedi e-label</a>
+        <a class="btn btn-ghost" href="/qr/{{slug}}.png">PNG</a>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h2>Editor payload (JSON)</h2>
+        <p class="muted">Ogni salvataggio aggiorna <b>qr_items.payload</b> e crea uno snapshot in <b>qr_history</b> (versioning 25 anni).</p>
+        <form method="post" action="/admin/save/{{slug}}">
+          <textarea class="jsonbox" name="payload">{{payload_pretty}}</textarea>
+          <button class="btn" type="submit" style="margin-top:10px;">Salva e crea snapshot</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Info QR</h2>
+        <div class="kv"><span>Slug</span><span class="mono">{{slug}}</span></div>
+        <div class="kv"><span>Tipo</span><span>{{qr.qr_type}}</span></div>
+        <div class="kv"><span>Status</span><span>{{qr.status}}</span></div>
+        <div class="kv"><span>Winery ID</span><span>{{qr.winery_id or ""}}</span></div>
+        <div class="kv"><span>Anno</span><span>{{qr.year or ""}}</span></div>
+        <div class="kv"><span>Lotto</span><span>{{qr.lot or ""}}</span></div>
+
+        <h3 style="margin-top:16px;">Ultimi snapshot</h3>
+        <div class="muted">Mostro gli ultimi 20 eventi di history.</div>
+        <div class="history">
+          {% for h in history %}
+            <div class="hist-item">
+              <div class="mono">history_id {{h.id}}</div>
+              <div class="muted">created_at {{h.created_at}} · actor {{h.actor_user_id}}</div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

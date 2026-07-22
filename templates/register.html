@@ -1,0 +1,18 @@
+{% extends "base_public.html" %}
+{% set title="Registrazione" %}
+{% block content %}
+<div class="card">
+  <h2>Crea account cantina</h2>
+  <form method="post" action="/register">
+    <label>Nome cantina</label>
+    <input name="winery_name" required placeholder="Es. Cantina Rossi">
+    <label>Email</label>
+    <input name="email" type="email" required>
+    <label>Password</label>
+    <input name="password" type="password" required>
+    <button class="btn" type="submit" style="margin-top:10px;">Crea account</button>
+  </form>
+  <p class="muted" style="margin-top:10px;">Hai già un account? <a href="/login">Accedi</a></p>
+  {% if error %}<p class="muted" style="color:#b91c1c;">{{error}}</p>{% endif %}
+</div>
+{% endblock %}

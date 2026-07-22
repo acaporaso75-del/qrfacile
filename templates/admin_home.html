@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>QRfacile Admin</title>
+  <style>
+    body{font-family:system-ui;margin:20px;color:#111}
+    .card{border:1px solid #eee;border-radius:14px;padding:14px;max-width:980px;margin-bottom:14px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    td,th{border-bottom:1px solid #f2f2f2;padding:8px;font-size:14px;text-align:left}
+    .small{color:#666;font-size:12px}
+    input{padding:10px;border:1px solid #ddd;border-radius:10px;width:100%}
+    button{padding:10px 14px;border:1px solid #111;border-radius:10px;background:#111;color:#fff;cursor:pointer}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    a{color:#111}
+    code{background:#f6f6f6;padding:2px 6px;border-radius:8px}
+  </style>
+</head>
+<body>
+  <h1>QRfacile – Admin</h1>
+
+  <div class="card">
+    <h3>Crea QR (URL)</h3>
+    <form method="post" action="/admin/create-url" class="grid">
+      <div>
+        <div class="small">Titolo</div>
+        <input name="title" required placeholder="Es: Promo Febbraio">
+      </div>
+      <div>
+        <div class="small">URL</div>
+        <input name="url" required placeholder="https://...">
+      </div>
+      <div>
+        <div class="small">Winery ID (opzionale)</div>
+        <input name="winery_id" placeholder="0">
+      </div>
+      <div style="grid-column:1 / -1">
+        <button type="submit">Crea</button>
+      </div>
+    </form>
+    <p class="small">Test: <code>/r/SLUG</code> — PNG: <code>/qr/SLUG.png</code></p>
+  </div>
+
+  <div class="card">
+    <h3>Crea QR (VINO)</h3>
+    <form method="post" action="/admin/create-wine" class="grid">
+      <div>
+        <div class="small">Nome vino / Titolo</div>
+        <input name="title" required placeholder="Es: Aglianico 2023">
+      </div>
+      <div>
+        <div class="small">Winery ID (obbligatorio)</div>
+        <input name="winery_id" required placeholder="Es: 12">
+      </div>
+      <div>
+        <div class="small">Annata (opzionale)</div>
+        <input name="year" placeholder="2023">
+      </div>
+      <div>
+        <div class="small">Lotto (opzionale)</div>
+        <input name="lot" placeholder="L123">
+      </div>
+      <div style="grid-column:1 / -1">
+        <button type="submit">Crea</button>
+      </div>
+    </form>
+    <p class="small">La scheda vino è su <code>/e/SLUG</code> e viene aggiornata via payload+history.</p>
+    <p><a href="/admin/export-scans-daily.csv">Esporta scansioni giornaliere CSV</a></p>
+  </div>
+
+  <div class="card">
+    <h3>Ultimi QR</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Slug</th><th>Titolo</th><th>Tipo</th><th>Status</th><th>Winery</th><th>Anno/Lotto</th><th>Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td><b>{{r.slug}}</b><br><span class="small">id {{r.id}}</span></td>
+          <td>{{r.title}}</td>
+          <td>{{r.qr_type}}</td>
+          <td>{{r.status}}</td>
+          <td>{{r.winery_id}}</td>
+          <td class="small">{{r.year or ""}} {{r.lot or ""}}</td>
+          <td class="small">
+            <a href="/r/{{r.slug}}">test</a> •
+            <a href="/qr/{{r.slug}}.png">png</a> •
+            <a href="/e/{{r.slug}}">e-label</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

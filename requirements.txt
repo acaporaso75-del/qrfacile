@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+psycopg[binary]
+python-multipart
+qrcode
+segno
+pillow
+aiosmtplib
+reportlab
+passlib[bcrypt]
+requests

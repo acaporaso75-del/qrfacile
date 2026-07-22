@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Admin Crediti</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="container">
+  <div class="topbar">
+    <div class="brand">QRfacile <span class="badge">Crediti</span></div>
+    <div>
+      <a class="btn btn-ghost" href="/admin">Admin</a>
+      <a class="btn btn-ghost" href="/admin/overview">Overview</a>
+      <a class="btn btn-ghost" href="/admin/events">Eventi</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Assegna / Vendi / Regala crediti</h2>
+    <p class="muted">Scrive su <b>credit_events</b>. Il saldo è la somma dei movimenti (free+paid).</p>
+
+    <form method="post" action="/admin/credits/apply" class="form">
+      <div class="row">
+        <label>User ID</label>
+        <input name="user_id" required value="{{ prefill_user_id or '' }}" placeholder="es. 12">
+      </div>
+
+      <div class="row">
+        <label>Kind (tipo credito)</label>
+        <input name="kind" required placeholder="labels | events | generic" value="events">
+      </div>
+
+      <div class="grid-3" style="margin-top:10px;">
+        <div>
+          <label>Delta FREE</label>
+          <input name="delta_free" required value="0">
+        </div>
+        <div>
+          <label>Delta PAID</label>
+          <input name="delta_paid" required value="0">
+        </div>
+        <div>
+          <label>Ref (ordine/fattura/op)</label>
+          <input name="ref" placeholder="es. ORDER123">
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <label>Reason (obbligatorio consigliato)</label>
+        <input name="reason" placeholder="es. Omaggio Vinitaly / Pagamento / Rettifica">
+      </div>
+
+      <button class="btn" type="submit">Applica movimento</button>
+    </form>
+  </div>
+
+  <div style="height:14px;"></div>
+
+  <div class="card">
+    <h2>Saldo crediti (ledger)</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Email</th>
+            <th>Kind</th>
+            <th>Free</th>
+            <th>Paid</th>
+            <th>Totale</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in balances %}
+            <tr>
+              <td class="mono">u{{b.user_id}}</td>
+              <td class="muted">{{b.email}}</td>
+              <td><span class="tag">{{b.kind}}</span></td>
+              <td>{{b.free}}</td>
+              <td>{{b.paid}}</td>
+              <td class="mono"><b>{{b.total}}</b></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="height:14px;"></div>
+
+  <div class="card">
+    <h2>Ultimi movimenti</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>User</th>
+            <th>Kind</th>
+            <th>Δ Free</th>
+            <th>Δ Paid</th>
+            <th>Reason</th>
+            <th>Ref</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in events %}
+            <tr>
+              <td class="muted">{{e.created_at}}</td>
+              <td class="mono">u{{e.user_id}}</td>
+              <td><span class="tag">{{e.kind}}</span></td>
+              <td>{{e.delta_free}}</td>
+              <td>{{e.delta_paid}}</td>
+              <td class="muted">{{e.reason or ""}}</td>
+              <td class="muted">{{e.ref or ""}}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
+

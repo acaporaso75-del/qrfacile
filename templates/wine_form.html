@@ -1,0 +1,107 @@
+{% extends "base_admin.html" %}
+{% set title="Nuova Etichetta Vino" %}
+{% set badge="Vino" %}
+{% block content %}
+
+<div class="card">
+  <h2>Nuovo QR Etichetta Vino</h2>
+  <p class="muted">
+    Compila i campi guidati. Il sistema salva lo storico in <b>qr_history</b>.
+    5 QR gratis per cantina, poi crediti <span class="mono">labels</span>.
+  </p>
+
+  <form method="post" action="/admin/wine/create">
+    <label>Winery ID</label>
+    <select name="winery_id" required>
+      {% for w in wineries %}
+        <option value="{{w.id}}">#{{w.id}} — {{w.name}}</option>
+      {% endfor %}
+    </select>
+
+    <div style="height:10px;"></div>
+
+    <div class="grid-2">
+      <div>
+        <label>Nome vino</label>
+        <input name="wine_name" required placeholder="Es. Aglianico 2023">
+      </div>
+      <div>
+        <label>Annata (opzionale)</label>
+        <input name="vintage" placeholder="2023">
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div>
+        <label>Lotto (opzionale)</label>
+        <input name="lot" placeholder="L001">
+      </div>
+      <div>
+        <label>Denominazione (opzionale)</label>
+        <input name="denomination" placeholder="DOC / IGT / ...">
+      </div>
+    </div>
+
+    <div style="height:10px;"></div>
+
+    <div class="card" style="box-shadow:none;">
+      <h3>Ingredienti (spunta ciò che serve)</h3>
+      <label><input type="checkbox" name="ing_uva" value="1"> Uve</label>
+      <label><input type="checkbox" name="ing_mcr" value="1"> Mosto concentrato rettificato</label>
+      <label><input type="checkbox" name="ing_so2" value="1"> Anidride solforosa</label>
+      <label><input type="checkbox" name="ing_lieviti" value="1"> Lieviti</label>
+      <label><input type="checkbox" name="ing_tannini" value="1"> Tannini</label>
+      <label><input type="checkbox" name="ing_tartarico" value="1"> Acido tartarico</label>
+      <label><input type="checkbox" name="ing_citrico" value="1"> Acido citrico</label>
+
+      <label>Altro (opzionale)</label>
+      <input name="ingredients_other" placeholder="Es. gomma arabica...">
+    </div>
+
+    <div style="height:10px;"></div>
+
+    <div class="card" style="box-shadow:none;">
+      <h3>Allergeni</h3>
+      <label><input type="checkbox" name="all_solfiti" value="1"> Contiene solfiti</label>
+      <label><input type="checkbox" name="all_latte" value="1"> Può contenere proteine del latte</label>
+      <label><input type="checkbox" name="all_uovo" value="1"> Può contenere uovo</label>
+      <label><input type="checkbox" name="all_none" value="1"> Nessuno</label>
+    </div>
+
+    <div style="height:10px;"></div>
+
+    <div class="card" style="box-shadow:none;">
+      <h3>Valori nutrizionali (per 100 ml)</h3>
+      <div class="grid-3">
+        <div><label>Energia</label><input name="n_energy" placeholder="350 kJ / 84 kcal"></div>
+        <div><label>Carboidrati (g)</label><input name="n_carbs" placeholder="2"></div>
+        <div><label>Zuccheri (g)</label><input name="n_sugars" placeholder="1"></div>
+      </div>
+      <div class="grid-3">
+        <div><label>Grassi (g)</label><input name="n_fat" placeholder="0"></div>
+        <div><label>Proteine (g)</label><input name="n_protein" placeholder="0"></div>
+        <div><label>Sale (g)</label><input name="n_salt" placeholder="0"></div>
+      </div>
+    </div>
+
+    <div style="height:10px;"></div>
+
+    <div class="card" style="box-shadow:none;">
+      <h3>Riciclabilità</h3>
+      <p class="muted">Inserisci i codici (es. GL70, FOR51, C/ALU90, PAP20…).</p>
+      <div class="grid-2">
+        <div><label>Bottiglia</label><input name="rc_bottle" placeholder="GL70"></div>
+        <div><label>Tappo</label><input name="rc_closure" placeholder="FOR51"></div>
+      </div>
+      <div class="grid-2">
+        <div><label>Capsula</label><input name="rc_capsule" placeholder="C/ALU90"></div>
+        <div><label>Scatola</label><input name="rc_box" placeholder="PAP20"></div>
+      </div>
+    </div>
+
+    <button class="btn" type="submit" style="margin-top:12px;">Crea QR Etichetta</button>
+  </form>
+</div>
+
+{% endblock %}
+
