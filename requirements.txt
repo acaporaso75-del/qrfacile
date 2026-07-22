@@ -7,9 +7,5 @@ segno
 pillow
 aiosmtplib
 reportlab
-
-passlib[bcrypt]
-requests
-
 passlib[bcrypt]
 requests
