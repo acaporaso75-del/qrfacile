@@ -27,6 +27,15 @@ def _clean_legacy_content(html: str) -> str:
 def legacy_page(legacy_slug: str):
     slug = (legacy_slug or "").strip().strip("/")
 
+    # PostgreSQL non accetta byte NUL nei campi testuali.
+    # Blocchiamo input anomali prima di passarli alla query.
+    if "\x00" in slug:
+        raise HTTPException(400, "Invalid slug")
+
+    # Limite difensivo per evitare input eccessivamente lunghi.
+    if len(slug) > 255:
+        raise HTTPException(404, "Not found")
+
     # Evita collisioni con le rotte reali dell'app.
     blocked = {
         "app",
