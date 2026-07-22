@@ -17,8 +17,9 @@ app.state.app_base_url = os.getenv("APP_BASE_URL", "").rstrip("/")
 # -----------------------------
 # Static
 # -----------------------------
-STATIC_DIR = "/opt/qrfacile/static"
-UPLOADS_DIR = "/opt/qrfacile/uploads"
+APP_ROOT = os.getenv("APP_ROOT", "/opt/qrfacile")
+STATIC_DIR = os.getenv("STATIC_DIR", f"{APP_ROOT}/static")
+UPLOADS_DIR = os.getenv("UPLOADS_DIR", f"{APP_ROOT}/uploads")
 
 try:
     if os.path.isdir(STATIC_DIR):
