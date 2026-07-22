@@ -1,0 +1,16 @@
+{% extends "base_public.html" %}
+{% set title="Login" %}
+{% block content %}
+<div class="card">
+  <h2>Accedi</h2>
+  <form method="post" action="/login">
+    <label>Email</label>
+    <input name="email" type="email" required>
+    <label>Password</label>
+    <input name="password" type="password" required>
+    <button class="btn" type="submit" style="margin-top:10px;">Login</button>
+  </form>
+  <p class="muted" style="margin-top:10px;">Non hai un account? <a href="/register">Registrati</a></p>
+  {% if error %}<p class="muted" style="color:#b91c1c;">{{error}}</p>{% endif %}
+</div>
+{% endblock %}

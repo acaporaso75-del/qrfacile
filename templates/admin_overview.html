@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Admin Overview</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="container">
+  <div class="topbar">
+    <div class="brand">QRfacile <span class="badge">Overview</span></div>
+    <div>
+      <a class="btn btn-ghost" href="/admin">Admin</a>
+      <a class="btn btn-ghost" href="/admin/credits">Crediti</a>
+      <a class="btn btn-ghost" href="/admin/events">Eventi</a>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="card">
+      <div class="metric">{{ kpi.total_wineries }}</div>
+      <div class="metric-label">Cantine</div>
+    </div>
+    <div class="card">
+      <div class="metric">{{ kpi.total_qr }}</div>
+      <div class="metric-label">QR totali</div>
+    </div>
+    <div class="card">
+      <div class="metric">{{ kpi.scans_30 }}</div>
+      <div class="metric-label">Scans ultimi 30 giorni</div>
+    </div>
+  </div>
+
+  <div style="height:14px;"></div>
+
+  <div class="card">
+    <h2>Panoramica cantine</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Cantina</th>
+            <th>User</th>
+            <th>QR</th>
+            <th>Scans 30g</th>
+            <th>Eventi</th>
+            <th>Lead</th>
+            <th>Crediti (labels/events/generic)</th>
+            <th>Azioni</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for w in wineries %}
+            <tr>
+              <td><b>#{{w.winery_id}}</b> {{w.winery_name}}</td>
+              <td class="muted">u{{w.user_id}}<br>{{w.user_email}}</td>
+              <td>{{w.qr_count}}</td>
+              <td>{{w.scans_30}}</td>
+              <td>{{w.events_count}}</td>
+              <td>{{w.leads_count}}</td>
+              <td class="mono">
+                {{w.credits_labels}} /
+                {{w.credits_events}} /
+                {{w.credits_generic}}
+              </td>
+              <td class="muted">
+                <a href="/admin/credits?user_id={{w.user_id}}">crediti</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">I crediti sono calcolati da <b>credit_events</b> (ledger). Nessun disallineamento.</p>
+  </div>
+
+</div>
+</body>
+</html>
+

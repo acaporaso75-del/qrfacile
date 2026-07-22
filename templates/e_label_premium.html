@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{payload.get("wine_name","Etichetta digitale")}}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="container narrow">
+    <div class="etop">
+      <div class="brand">Etichetta digitale</div>
+      <div class="muted">QR: <span class="mono">{{slug}}</span></div>
+    </div>
+
+    <div class="hero-card">
+      <h1>{{payload.get("wine_name","—")}}</h1>
+      <div class="sub">
+        <div>{{payload.get("winery_name","")}}</div>
+        {% if qr.year %}<div class="muted">Annata {{qr.year}}</div>{% endif %}
+        {% if qr.lot %}<div class="muted">Lotto {{qr.lot}}</div>{% endif %}
+      </div>
+      <div class="chips">
+        <span class="chip">Info ufficiali</span>
+        <span class="chip">Nessun contenuto marketing</span>
+        <span class="chip">Mobile-first</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Ingredienti</h2>
+      <p class="text">{{payload.get("ingredients","—")}}</p>
+    </div>
+
+    <div class="card">
+      <h2>Valori nutrizionali (per 100 ml)</h2>
+      {% set n = payload.get("nutrition", {}) %}
+      <div class="kv"><span>Energia</span><span>{{n.get("energy","—")}}</span></div>
+      <div class="kv"><span>Carboidrati</span><span>{{n.get("carbs","—")}}</span></div>
+      <div class="kv"><span>di cui zuccheri</span><span>{{n.get("sugars","—")}}</span></div>
+      <div class="kv"><span>Grassi</span><span>{{n.get("fat","—")}}</span></div>
+      <div class="kv"><span>Proteine</span><span>{{n.get("protein","—")}}</span></div>
+      <div class="kv"><span>Sale</span><span>{{n.get("salt","—")}}</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Allergeni</h2>
+      <p class="text">{{payload.get("allergens","—")}}</p>
+    </div>
+
+    <div class="card">
+      <h2>Smaltimento imballaggi</h2>
+      {% set r = payload.get("recycling", []) %}
+      {% if r and r|length>0 %}
+        {% for item in r %}
+          <div class="kv"><span>{{item.get("part","")}}</span><span class="mono">{{item.get("code","")}}</span></div>
+        {% endfor %}
+        <p class="muted" style="margin-top:10px;">Verifica le disposizioni del tuo Comune.</p>
+      {% else %}
+        <p class="text">—</p>
+      {% endif %}
+    </div>
+
+    <div class="footer muted">
+      <div>Pagina informativa priva di contenuti promozionali.</div>
+      <div class="mono">/e/{{slug}}</div>
+    </div>
+  </div>
+</body>
+</html>

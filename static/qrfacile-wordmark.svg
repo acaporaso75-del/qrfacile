@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 180">
+  <rect width="760" height="180" rx="34" fill="#ffffff"/>
+  <g transform="translate(24 24)">
+    <rect width="132" height="132" rx="30" fill="#ecfdf5" stroke="#14b8a6" stroke-width="6"/>
+    <rect x="24" y="24" width="22" height="22" rx="5" fill="#0f766e"/>
+    <rect x="55" y="24" width="14" height="14" rx="3" fill="#0f766e"/>
+    <rect x="86" y="24" width="22" height="22" rx="5" fill="#0f766e"/>
+    <rect x="24" y="58" width="15" height="15" rx="3" fill="#0f766e"/>
+    <rect x="53" y="52" width="30" height="30" rx="7" fill="#14b8a6"/>
+    <rect x="91" y="61" width="17" height="17" rx="4" fill="#0f766e"/>
+    <rect x="24" y="86" width="22" height="22" rx="5" fill="#0f766e"/>
+    <rect x="61" y="91" width="15" height="15" rx="3" fill="#0f766e"/>
+    <path d="M65 78l17 17 38-46" fill="none" stroke="#14b8a6" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="180" y="88" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="900" fill="#0f172a" letter-spacing="-1">QRFACILE</text>
+  <text x="184" y="124" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#0f766e">etichette digitali vino · QR dinamici</text>
+</svg>

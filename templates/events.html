@@ -1,0 +1,73 @@
+{% extends "base_admin.html" %}
+{% set title="Stand Digitale" %}
+{% set badge="Stand Digitale" %}
+{% block content %}
+
+<div class="card">
+  <h2>Crea evento fiera</h2>
+  <p class="muted">Prima fiera = trial attivo. Dalla seconda serve 1 credito <span class="mono">events</span> (scalato). Senza crediti → frozen.</p>
+
+  <form method="post" action="/admin/events/create" class="form">
+    <label>Cantina</label>
+    <select name="winery_id" required>
+      {% for w in wineries %}
+        <option value="{{w.id}}">#{{w.id}} — {{w.name}}</option>
+      {% endfor %}
+    </select>
+
+    <label>Nome evento</label>
+    <input name="event_name" required placeholder="Vinitaly 2026">
+
+    <label>Location</label>
+    <input name="location" placeholder="Verona">
+
+    <button class="btn" type="submit" style="margin-top:10px;">Crea evento</button>
+  </form>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="card">
+  <h2>Eventi</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th><th>Cantina</th><th>Evento</th><th>Status</th><th>QR evento</th><th>Stats</th><th>Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in events %}
+          <tr>
+            <td class="mono">{{e.id}}</td>
+            <td>{{e.winery_name}}</td>
+            <td>{{e.event_name}}</td>
+            <td><span class="tag">{{e.status}}</span></td>
+            <td class="mono">{{e.qr_slug_event}}</td>
+            <td class="muted"><a href="/stats/{{e.stats_token}}">link</a></td>
+            <td class="muted">
+              <a href="/fair/{{e.id}}">pagina</a> ·
+              <a href="/qr/{{e.qr_slug_event}}.png">png</a> ·
+              <a href="/admin/events/regen/{{e.id}}">rigenera stats</a> ·
+              <a href="/admin/events/leads.csv?event_id={{e.id}}">export lead</a>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="7" class="muted">
+              <form method="post" action="/admin/events/upload-catalog" enctype="multipart/form-data" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <input type="hidden" name="event_id" value="{{e.id}}">
+                <input type="file" name="pdf" accept="application/pdf" required style="max-width:320px;">
+                <button class="btn btn-ghost" type="submit">Upload catalogo PDF</button>
+                {% if e.catalog_path %}
+                  <span>· <a href="/catalog/{{e.id}}">download</a></span>
+                {% endif %}
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

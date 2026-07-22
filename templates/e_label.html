@@ -1,0 +1,58 @@
+{% extends "base_public.html" %}
+{% set title = "Etichetta digitale" %}
+{% set top_right = "QR: " ~ slug %}
+{% block content %}
+
+<div class="card">
+  <h1 style="margin:0 0 8px;">{{ payload.get("wine_name","Etichetta digitale") }}</h1>
+  <div class="muted">{{ payload.get("winery_name","") }}</div>
+  <div class="chips">
+    <span class="chip chip-wine">Info ufficiali</span>
+    <span class="chip">Nessun contenuto marketing</span>
+    <span class="chip">Mobile-first</span>
+  </div>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="card">
+  <h2>Ingredienti</h2>
+  <p>{{ payload.get("ingredients","—") }}</p>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="card">
+  <h2>Valori nutrizionali (per 100 ml)</h2>
+  {% set n = payload.get("nutrition", {}) %}
+  <div class="kv"><span>Energia</span><span>{{ n.get("energy","—") }}</span></div>
+  <div class="kv"><span>Carboidrati</span><span>{{ n.get("carbs","—") }}</span></div>
+  <div class="kv"><span>di cui zuccheri</span><span>{{ n.get("sugars","—") }}</span></div>
+  <div class="kv"><span>Grassi</span><span>{{ n.get("fat","—") }}</span></div>
+  <div class="kv"><span>Proteine</span><span>{{ n.get("protein","—") }}</span></div>
+  <div class="kv"><span>Sale</span><span>{{ n.get("salt","—") }}</span></div>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="card">
+  <h2>Allergeni</h2>
+  <p>{{ payload.get("allergens","—") }}</p>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="card">
+  <h2>Smaltimento imballaggi</h2>
+  {% set r = payload.get("recycling", []) %}
+  {% if r and r|length>0 %}
+    {% for item in r %}
+      <div class="kv"><span>{{ item.get("part","") }}</span><span class="mono">{{ item.get("code","") }}</span></div>
+    {% endfor %}
+    <p class="muted" style="margin-top:10px;">Verifica le disposizioni del tuo Comune.</p>
+  {% else %}
+    <p>—</p>
+  {% endif %}
+</div>
+
+{% endblock %}

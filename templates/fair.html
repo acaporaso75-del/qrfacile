@@ -1,0 +1,54 @@
+{% extends "base_public.html" %}
+{% set title="Stand Digitale" %}
+{% set top_right=event.event_name %}
+{% block content %}
+<div class="card">
+  <h1 style="margin:0 0 8px;">{{ winery.name }}</h1>
+  <div class="muted">{{ event.location or "" }}</div>
+  <div class="chips">
+    <span class="chip">Fiera</span>
+    <span class="chip">Catalogo</span>
+    <span class="chip">Contatto rapido</span>
+  </div>
+</div>
+
+{% if frozen %}
+  <div style="height:14px;"></div>
+  <div class="card">
+    <h2>Modalità fiera non attiva</h2>
+    <p class="muted">Catalogo e raccolta contatti sono congelati. Contatta QRFACILE per riattivare.</p>
+  </div>
+{% endif %}
+
+<div style="height:14px;"></div>
+
+<div class="card">
+  <h2>Catalogo</h2>
+  {% if (not frozen) and event.catalog_path %}
+    <a class="btn btn-ghost" href="/catalog/{{ event.id }}">Scarica catalogo PDF</a>
+  {% else %}
+    <p class="muted">Catalogo non disponibile.</p>
+  {% endif %}
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="card">
+  <h2>Lascia il contatto</h2>
+  {% if (not frozen) and event.lead_enabled %}
+    <form method="post" action="/fair/{{event.id}}/lead">
+      <label>Email (obbligatoria)</label><input name="email" required placeholder="nome@azienda.com">
+      <label>Nome</label><input name="name">
+      <label>Azienda</label><input name="company">
+      <label>Ruolo</label><input name="role" placeholder="Importatore / Distributore / Ristorante / Privato">
+      <label>Paese</label><input name="country" placeholder="IT">
+      <label><input type="checkbox" name="consent" value="1" required> Acconsento al trattamento dei dati per essere ricontattato.</label>
+      <button class="btn" type="submit" style="margin-top:10px;">Invia</button>
+      <p class="muted">Dati usati solo per ricontatto. Nessun contenuto promozionale.</p>
+    </form>
+  {% else %}
+    <p class="muted">Raccolta contatti non disponibile.</p>
+  {% endif %}
+</div>
+{% endblock %}
+

@@ -1,0 +1,19 @@
+{% extends "base_admin.html" %}
+{% set title="Crediti" %}
+{% set badge="Crediti" %}
+{% block content %}
+
+<div class="grid-3">
+  <div class="card"><div class="metric">{{ credits.labels }}</div><div class="metric-label">labels</div></div>
+  <div class="card"><div class="metric">{{ credits.events }}</div><div class="metric-label">events</div></div>
+  <div class="card"><div class="metric">{{ credits.generic }}</div><div class="metric-label">generic</div></div>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="card">
+  <h2>Acquisto crediti</h2>
+  <p class="muted">Checkout PayPal/Stripe lo colleghiamo dopo. Per ora l’admin può caricare crediti e tu vedi subito saldo.</p>
+</div>
+
+{% endblock %}

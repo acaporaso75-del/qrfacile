@@ -1,0 +1,45 @@
+{% extends "base_admin.html" %}
+{% set title="Area Cliente" %}
+{% set badge="Cliente" %}
+{% block content %}
+
+<div class="grid-3">
+  <div class="card">
+    <div class="metric">{{ credits.labels }}</div>
+    <div class="metric-label">Crediti Labels (etichette)</div>
+  </div>
+  <div class="card">
+    <div class="metric">{{ credits.events }}</div>
+    <div class="metric-label">Crediti Events (fiere)</div>
+  </div>
+  <div class="card">
+    <div class="metric">{{ credits.generic }}</div>
+    <div class="metric-label">Crediti Generic</div>
+  </div>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>Etichette Vino</h2>
+    <p class="muted">Crea e gestisci QR retro etichetta vino.</p>
+    <a class="btn" href="/app/labels">Vai</a>
+  </div>
+  <div class="card">
+    <h2>Stand Digitale</h2>
+    <p class="muted">Crea eventi fiera, catalogo, lead, stats.</p>
+    <a class="btn" href="/app/events">Vai</a>
+  </div>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="card">
+  <h2>Account</h2>
+  <div class="muted">Email: {{ user.email }} · Cantina: {{ winery.name }}</div>
+  <div style="height:10px;"></div>
+  <a class="btn btn-ghost" href="/logout">Logout</a>
+</div>
+
+{% endblock %}

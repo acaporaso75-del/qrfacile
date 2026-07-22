@@ -1,0 +1,45 @@
+{% extends "base_admin.html" %}
+{% set title="Portale Cantina" %}
+{% set badge="Cantina" %}
+{% block content %}
+
+<div class="grid-3">
+  <div class="card">
+    <div class="metric">{{ credits.events }}</div>
+    <div class="metric-label">Crediti Events</div>
+  </div>
+  <div class="card">
+    <div class="metric">{{ credits.labels }}</div>
+    <div class="metric-label">Crediti Labels</div>
+  </div>
+  <div class="card">
+    <div class="metric">{{ credits.generic }}</div>
+    <div class="metric-label">Crediti Generic</div>
+  </div>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="card">
+  <h2>{{ winery.name }}</h2>
+  <div class="muted">Portale riservato (token). Valido fino a: <span class="mono">{{ token_exp }}</span></div>
+  <div class="muted">Per sicurezza: puoi rigenerare il link dal pannello Admin.</div>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>Stand Digitale (Fiere)</h2>
+    <p class="muted">Crea eventi fiera, carica catalogo, raccogli lead, condividi stats riservate.</p>
+    <a class="btn" href="/c/{{ token }}/events">Gestisci eventi</a>
+  </div>
+
+  <div class="card">
+    <h2>Acquista crediti</h2>
+    <p class="muted">Qui collegheremo il checkout (PayPal/Stripe). Per ora, l’admin può caricare crediti e tu vedi il saldo.</p>
+    <p class="muted">Consiglio: Events = fiere / Labels = etichette / Generic = QR generici.</p>
+  </div>
+</div>
+
+{% endblock %}

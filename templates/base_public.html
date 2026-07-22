@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{ title or "QRFACILE" }}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="container narrow">
+    <div class="topbar">
+      <div class="brand">QRFACILE</div>
+      <div class="muted">{{ top_right or "" }}</div>
+    </div>
+
+    {% block content %}{% endblock %}
+
+    <div class="footer muted">© QRFACILE — servizio erogato da Enolab Srl</div>
+  </div>
+</body>
+</html>
+

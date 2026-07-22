@@ -1,0 +1,35 @@
+{% extends "base_admin.html" %}
+{% set title="Etichette Vino" %}
+{% set badge="Etichette" %}
+{% block content %}
+
+<div class="card">
+  <h2>Nuova etichetta vino</h2>
+  <p class="muted">Userai il form guidato già pronto in admin (stessa logica crediti labels).</p>
+  <a class="btn" href="/admin/wine/new">Crea nuova etichetta</a>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="card">
+  <h2>QR Etichette della cantina</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Slug</th><th>Titolo</th><th>Azioni</th></tr></thead>
+      <tbody>
+      {% for q in qrs %}
+        <tr>
+          <td class="mono">{{q.slug}}</td>
+          <td>{{q.title}}</td>
+          <td class="muted">
+            <a href="/e/{{q.slug}}">e-label</a> ·
+            <a href="/qr/{{q.slug}}.png">png</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

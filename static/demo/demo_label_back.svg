@@ -1,0 +1,25 @@
+<svg width="620" height="920" viewBox="0 0 620 920" xmlns="http://www.w3.org/2000/svg">
+  <rect width="620" height="920" rx="34" fill="#fbfaf5"/>
+  <rect x="42" y="42" width="536" height="836" rx="24" fill="#fffdf8" stroke="#d8c9a3" stroke-width="4"/>
+  <text x="310" y="110" text-anchor="middle" font-family="Georgia, serif" font-size="34" font-weight="700" fill="#0f172a">Falanghina del Taburno</text>
+  <text x="310" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#0f766e" letter-spacing="3">RETRO ETICHETTA</text>
+  <foreignObject x="92" y="195" width="436" height="160">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,sans-serif;font-size:23px;line-height:1.45;color:#334155;text-align:center;">
+      Vino bianco elegante e fresco, espressione del territorio del Taburno.
+      Profumi di agrumi, fiori bianchi e finale sapido.
+    </div>
+  </foreignObject>
+  <rect x="100" y="405" width="420" height="78" rx="18" fill="#ecfdf5" stroke="#bbf7d0"/>
+  <text x="310" y="437" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="800" fill="#0f766e">Ingredienti: uve, mosto d’uva, solfiti</text>
+  <text x="310" y="465" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="800" fill="#0f766e">Allergeni: contiene solfiti</text>
+  <rect x="215" y="535" width="190" height="190" rx="18" fill="#fff" stroke="#0f172a" stroke-width="6"/>
+  <rect x="242" y="562" width="42" height="42" fill="#0f172a"/>
+  <rect x="336" y="562" width="42" height="42" fill="#0f172a"/>
+  <rect x="242" y="656" width="42" height="42" fill="#0f172a"/>
+  <rect x="302" y="622" width="22" height="22" fill="#0f172a"/>
+  <rect x="336" y="636" width="42" height="22" fill="#0f172a"/>
+  <rect x="302" y="680" width="76" height="18" fill="#0f172a"/>
+  <text x="310" y="762" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#64748b">Scansiona il QR per informazioni digitali</text>
+  <text x="310" y="825" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#334155">Imbottigliato da Tenuta Colle del Vento</text>
+  <text x="310" y="852" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#64748b">Campoli del Monte Taburno (BN) · Italia</text>
+</svg>

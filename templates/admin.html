@@ -1,0 +1,84 @@
+{% extends "base_admin.html" %}
+{% set title="Admin" %}
+{% set badge="Admin" %}
+{% block content %}
+
+<div class="grid-3">
+  <div class="card">
+    <div class="metric">{{ kpi.qr_total }}</div>
+    <div class="metric-label">QR Totali</div>
+  </div>
+  <div class="card">
+    <div class="metric">{{ kpi.scans_14 }}</div>
+    <div class="metric-label">Scans ultimi 14 giorni</div>
+  </div>
+  <div class="card">
+    <div class="metric">{{ kpi.qr_active }}</div>
+    <div class="metric-label">QR Attivi</div>
+  </div>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>Stand Digitale</h2>
+    <p class="muted">Eventi fiera con trial + crediti events, catalogo PDF, lead, stats token 1 anno revocabile.</p>
+    <a class="btn" href="/admin/events">Apri Stand Digitale</a>
+  </div>
+
+  <div class="card">
+    <h2>Crea QR External</h2>
+    <form method="post" action="/admin/create-external">
+      <label>Titolo</label>
+      <input name="title" required>
+      <label>URL</label>
+      <input name="url" required placeholder="https://...">
+      <button class="btn" type="submit" style="margin-top:10px;">Crea</button>
+    </form>
+    <p class="muted">DB: qr_type=external · status=attiva</p>
+  </div>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="card">
+  <h2>Bulk External (CSV → ZIP)</h2>
+  <p class="muted">Incolla CSV con colonne <span class="mono">title,url</span></p>
+  <form method="post" action="/admin/bulk-external">
+    <textarea name="csv_text" placeholder="title,url&#10;Promo1,https://google.com"></textarea>
+    <button class="btn" type="submit" style="margin-top:10px;">Genera ZIP</button>
+  </form>
+</div>
+
+<div style="height:14px;"></div>
+
+<div class="card">
+  <h2>QR Recenti</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Slug</th><th>Titolo</th><th>Tipo</th><th>Status</th><th>Azioni</th></tr>
+      </thead>
+      <tbody>
+        {% for r in qrs %}
+        <tr>
+          <td><b>{{ r.slug }}</b><div class="muted mono">id {{ r.id }}</div></td>
+          <td>{{ r.title or "" }}</td>
+          <td><span class="tag">{{ r.qr_type }}</span></td>
+          <td>{{ r.status }}</td>
+          <td class="muted">
+            <a href="/r/{{ r.slug }}">test</a> ·
+            <a href="/qr/{{ r.slug }}.png">png</a> ·
+            <a href="/e/{{ r.slug }}">e-label</a> ·
+            <a href="/analytics/{{ r.slug }}">analytics</a> ·
+            <a href="/admin/edit/{{ r.slug }}">edit</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
