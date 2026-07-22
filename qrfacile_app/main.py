@@ -7,11 +7,14 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from qrfacile_app.security_middleware import SecurityHeadersMiddleware
+
 logger = logging.getLogger("qrfacile.main")
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="QRFACILE")
 app.state.app_base_url = os.getenv("APP_BASE_URL", "").rstrip("/")
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 # -----------------------------
@@ -104,6 +107,7 @@ include_router_safe("qrfacile_app.auth_routes")
 include_router_safe("qrfacile_app.landing_routes")
 include_router_safe("qrfacile_app.pricing_ui")
 include_router_safe("qrfacile_app.legal_pages")
+include_router_safe("qrfacile_app.compliance_ui")
 include_router_safe("qrfacile_app.guide_pages")
 include_router_safe("qrfacile_app.context_ui")
 include_router_safe("qrfacile_app.health")
