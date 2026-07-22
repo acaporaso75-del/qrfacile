@@ -107,7 +107,7 @@ include_router_safe("qrfacile_app.legal_pages")
 include_router_safe("qrfacile_app.guide_pages")
 include_router_safe("qrfacile_app.context_ui")
 include_router_safe("qrfacile_app.health")
-
+include_router_safe("qrfacile_app.admin_system_ui")
 
 # APP core UI
 include_router_safe("qrfacile_app.start_ui")
