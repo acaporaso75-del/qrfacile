@@ -2,30 +2,23 @@
 
 ## Database
 
-Apply migrations in this order:
+Apply migrations before enabling compliance APIs:
 
 ```bash
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/2026_legal_ai_compliance.sql
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/2026_legal_acceptance_constraints.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/2026_legal_acceptances.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/2026_privacy_requests.sql
 ```
 
 Verify while authenticated as administrator:
 
 ```text
 GET /api/admin/compliance/status
-GET /api/admin/compliance/legal-acceptances
 ```
 
-## Legal document lifecycle
+The response must return `ok: true` and all required tables must be present.
 
-1. Insert each active legal document in `legal_documents` with a stable `document_key`, version, hash and effective date.
-2. The authenticated client calls `GET /api/me/legal-status`.
-3. The user performs an explicit acceptance action.
-4. The client calls `POST /api/me/legal-acceptances` with `document_key` and `document_version`.
-5. QRFacile records timestamp, IP, user-agent, evidence and an audit event.
-6. A new document version requires a new acceptance; prior evidence remains immutable.
-
-## Application controls
+## Application
 
 The branch enables:
 
@@ -36,27 +29,25 @@ The branch enables:
 - protected compliance status endpoint;
 - protected AI usage registration with hashed input/output evidence;
 - mandatory pending human review for every registered AI output;
-- administrative AI review queue;
-- version-specific legal acceptance evidence;
-- retention job with dry-run and explicit apply mode.
+- versioned legal acceptance records;
+- GDPR privacy-request workflow with 30-day due date;
+- compliance-incident register with authority/data-subject notification fields;
+- audit events for legal, privacy, AI and incident operations.
 
 ## E-label privacy gate
 
 Public e-label pages must not include analytics, advertising pixels, profiling or fingerprinting. The regression test scans the public modules for common tracking providers. Any future telemetry on these pages requires a separate legal and technical review and must not identify or track visitors.
 
-## Automated CI
-
-`.github/workflows/compliance-ci.yml` runs on the compliance branch and on pull requests to `staging`. It compiles compliance modules, runs regression tests and checks that SQL migrations are transactional.
-
 ## Release gate
 
 Do not merge to production until:
 
-1. both SQL migrations succeed on staging;
-2. GitHub Compliance CI passes;
+1. all SQL migrations succeed on staging;
+2. `pytest -q` passes;
 3. `/ai-policy` renders correctly;
 4. `/api/admin/compliance/status` returns `ok: true`;
-5. legal status and acceptance APIs work with an authenticated test user;
-6. response headers are verified over HTTPS;
-7. retention is tested first in dry-run;
-8. a human-review workflow approves AI records before publication.
+5. response headers are verified over HTTPS;
+6. `/admin/compliance/ai-review` is admin-only;
+7. privacy requests can be opened, listed and closed with audit evidence;
+8. compliance incidents can be created and updated;
+9. retention runs first in dry-run and only then with `--apply`.
