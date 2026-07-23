@@ -1,41 +1,24 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from psycopg.rows import dict_row
 
 from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.auth_core import require_any_role
-from qrfacile_app.db import pg
+from qrfacile_app.services.ai_review_service import (
+    VALID_REVIEW_DECISIONS,
+    list_pending_ai_reviews,
+    review_ai_output_record,
+)
 
 router = APIRouter(prefix="/admin/compliance", tags=["ai-review"])
-
-
-def _load_pending(limit: int = 100):
-    with pg() as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(
-                """
-                SELECT id, created_at, user_id, use_case, provider, model,
-                       model_version, risk_classification,
-                       contains_personal_data, human_review_status, metadata
-                FROM ai_usage_log
-                WHERE human_review_status = 'pending'
-                ORDER BY created_at ASC
-                LIMIT %s
-                """,
-                (limit,),
-            )
-            return cur.fetchall()
 
 
 @router.get("/ai-review", response_class=HTMLResponse)
 def ai_review_queue(request: Request):
     require_any_role(request, ("admin",))
     try:
-        records = _load_pending()
+        records = list_pending_ai_reviews()
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Schema compliance non disponibile: {exc}")
 
@@ -69,24 +52,17 @@ def ai_review_queue(request: Request):
 @router.post("/ai-review/{record_id}")
 def review_ai_output(request: Request, record_id: int, decision: str = Form(...)):
     user = require_any_role(request, ("admin",))
-    if decision not in {"approved", "rejected"}:
+    if decision not in VALID_REVIEW_DECISIONS:
         raise HTTPException(status_code=422, detail="Decisione non valida")
 
-    with pg() as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(
-                """
-                UPDATE ai_usage_log
-                   SET human_review_status=%s,
-                       reviewer_user_id=%s,
-                       reviewed_at=%s
-                 WHERE id=%s AND human_review_status='pending'
-             RETURNING id, human_review_status
-                """,
-                (decision, int(user["id"]), datetime.now(timezone.utc), record_id),
-            )
-            row = cur.fetchone()
-        conn.commit()
+    try:
+        row = review_ai_output_record(
+            record_id=record_id,
+            reviewer_user_id=int(user["id"]),
+            decision=decision,
+        )
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Decisione non valida")
 
     if not row:
         raise HTTPException(status_code=404, detail="Record non trovato o già revisionato")
