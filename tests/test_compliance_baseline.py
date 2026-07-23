@@ -34,11 +34,23 @@ def test_elabel_public_code_has_no_known_tracking_snippets():
 
 
 def test_ai_policy_requires_human_review():
-    path = ROOT / "qrfacile_app" / "compliance_ui.py"
-    text = path.read_text(encoding="utf-8")
-    assert "human_review_required" in text
-    assert "pending" in text
-    assert "non devono essere pubblicati automaticamente" in text
+    ui_text = (ROOT / "qrfacile_app" / "compliance_ui.py").read_text(encoding="utf-8")
+    service_text = (
+        ROOT / "qrfacile_app" / "services" / "compliance_service.py"
+    ).read_text(encoding="utf-8")
+    assert "human_review_required" in service_text
+    assert "pending" in service_text
+    assert "non devono essere pubblicati automaticamente" in ui_text
+
+
+def test_compliance_routes_delegate_to_service_layer():
+    ui_text = (ROOT / "qrfacile_app" / "compliance_ui.py").read_text(encoding="utf-8")
+    service_path = ROOT / "qrfacile_app" / "services" / "compliance_service.py"
+    assert service_path.exists()
+    assert "get_compliance_status" in ui_text
+    assert "register_ai_usage_record" in ui_text
+    assert "INSERT INTO ai_usage_log" not in ui_text
+    assert "SELECT to_regclass" not in ui_text
 
 
 def test_security_middleware_blocks_framing_and_sniffing():
