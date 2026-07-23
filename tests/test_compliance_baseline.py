@@ -67,6 +67,22 @@ def test_ai_review_routes_delegate_to_service_layer():
     assert "human_review_status = 'pending'" in service_text
 
 
+def test_internal_api_is_versioned_and_token_protected():
+    auth_text = (ROOT / "qrfacile_app" / "internal_auth.py").read_text(encoding="utf-8")
+    api_text = (ROOT / "qrfacile_app" / "internal_api.py").read_text(encoding="utf-8")
+    main_text = (ROOT / "qrfacile_app" / "main.py").read_text(encoding="utf-8")
+
+    assert 'INTERNAL_TOKEN_ENV = "QRFACILE_INTERNAL_API_TOKEN"' in auth_text
+    assert "secrets.compare_digest" in auth_text
+    assert 'prefix="/internal/v1"' in api_text
+    assert "require_internal_token(request)" in api_text
+    assert 'router.get("/health")' in api_text
+    assert 'router.get("/compliance/status")' in api_text
+    assert 'include_router_safe("qrfacile_app.internal_api")' in main_text
+    assert "INSERT INTO" not in api_text
+    assert "UPDATE " not in api_text
+
+
 def test_security_middleware_blocks_framing_and_sniffing():
     path = ROOT / "qrfacile_app" / "security_middleware.py"
     text = path.read_text(encoding="utf-8")
