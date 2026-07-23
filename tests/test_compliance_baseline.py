@@ -53,6 +53,20 @@ def test_compliance_routes_delegate_to_service_layer():
     assert "SELECT to_regclass" not in ui_text
 
 
+def test_ai_review_routes_delegate_to_service_layer():
+    ui_text = (ROOT / "qrfacile_app" / "ai_review_ui.py").read_text(encoding="utf-8")
+    service_path = ROOT / "qrfacile_app" / "services" / "ai_review_service.py"
+    service_text = service_path.read_text(encoding="utf-8")
+
+    assert service_path.exists()
+    assert "list_pending_ai_reviews" in ui_text
+    assert "review_ai_output_record" in ui_text
+    assert "UPDATE ai_usage_log" not in ui_text
+    assert "SELECT id, created_at" not in ui_text
+    assert "VALID_REVIEW_DECISIONS" in service_text
+    assert "human_review_status = 'pending'" in service_text
+
+
 def test_security_middleware_blocks_framing_and_sniffing():
     path = ROOT / "qrfacile_app" / "security_middleware.py"
     text = path.read_text(encoding="utf-8")
