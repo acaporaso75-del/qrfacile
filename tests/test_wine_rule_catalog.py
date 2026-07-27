@@ -1,11 +1,16 @@
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 import qrfacile_app.services.wine_compliance_engine as engine_module
 from qrfacile_app.services.wine_compliance_engine import ERROR, WARNING, run_wine_compliance
-from qrfacile_app.services.wine_rule_catalog import load_wine_rule_catalog, public_rule_catalog
+from qrfacile_app.services.wine_rule_catalog import (
+    WineRuleCatalog,
+    load_wine_rule_catalog,
+    public_rule_catalog,
+)
 
 
 def _payload():
@@ -26,6 +31,18 @@ def _payload():
         "recycle": {"bottle": {"code": "GL 70", "product": "Vetro"}},
         "meta": {},
     }
+
+
+def _catalog_copy(*, score_weights=None, overrides=None):
+    base = load_wine_rule_catalog()
+    rules = dict(base.rules)
+    for rule_id, changes in (overrides or {}).items():
+        rules[rule_id] = replace(rules[rule_id], **changes)
+    return WineRuleCatalog(
+        version=base.version,
+        score_weights=dict(score_weights or base.score_weights),
+        rules=rules,
+    )
 
 
 def test_catalog_is_versioned_and_has_unique_rules():
@@ -63,12 +80,7 @@ def test_public_catalog_contains_governance_metadata():
 
 
 def test_score_uses_catalog_weights(monkeypatch):
-    catalog = load_wine_rule_catalog()
-    monkeypatch.setattr(
-        catalog,
-        "score_weights",
-        {"PASS": 0, "WARNING": 10, "ERROR": 50},
-    )
+    catalog = _catalog_copy(score_weights={"PASS": 0, "WARNING": 10, "ERROR": 50})
     monkeypatch.setattr(engine_module, "load_wine_rule_catalog", lambda: catalog)
 
     payload = _payload()
@@ -79,9 +91,7 @@ def test_score_uses_catalog_weights(monkeypatch):
 
 
 def test_inactive_rule_is_not_executed(monkeypatch):
-    catalog = load_wine_rule_catalog()
-    inactive = catalog.rules["QRF-PACK-001"]
-    object.__setattr__(inactive, "active", False)
+    catalog = _catalog_copy(overrides={"QRF-PACK-001": {"active": False}})
     monkeypatch.setattr(engine_module, "load_wine_rule_catalog", lambda: catalog)
 
     report = run_wine_compliance(_payload())
@@ -89,9 +99,7 @@ def test_inactive_rule_is_not_executed(monkeypatch):
 
 
 def test_only_blocking_errors_stop_publication(monkeypatch):
-    catalog = load_wine_rule_catalog()
-    identity_rule = catalog.rules["QRF-CORE-001"]
-    object.__setattr__(identity_rule, "blocking", False)
+    catalog = _catalog_copy(overrides={"QRF-CORE-001": {"blocking": False}})
     monkeypatch.setattr(engine_module, "load_wine_rule_catalog", lambda: catalog)
 
     payload = _payload()
