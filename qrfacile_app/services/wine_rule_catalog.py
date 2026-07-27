@@ -22,6 +22,7 @@ class WineRuleDefinition:
     human_review_required: bool
     active: bool
     dependencies: tuple[str, ...]
+    knowledge_ids: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -67,6 +68,7 @@ def _parse_rule(raw: dict[str, Any]) -> WineRuleDefinition:
         human_review_required=bool(raw.get("human_review_required", True)),
         active=bool(raw.get("active", True)),
         dependencies=_string_list(raw, "dependencies"),
+        knowledge_ids=_string_list(raw, "knowledge_ids"),
     )
 
 
@@ -109,6 +111,7 @@ def public_rule_catalog() -> dict[str, Any]:
                 "human_review_required": rule.human_review_required,
                 "active": rule.active,
                 "dependencies": list(rule.dependencies),
+                "knowledge_ids": list(rule.knowledge_ids),
             }
             for rule in catalog.rules.values()
         ],
