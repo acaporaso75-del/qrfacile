@@ -1,5 +1,5 @@
 {
-  "catalog_version": "2026.07.3",
+  "catalog_version": "2026.07.4",
   "score_weights": {
     "PASS": 0,
     "WARNING": 35,
@@ -16,7 +16,8 @@
       "legal_basis": [],
       "human_review_required": true,
       "active": true,
-      "dependencies": []
+      "dependencies": [],
+      "knowledge_ids": ["KB-WINE-CORE-IDENTITY"]
     },
     {
       "rule_id": "QRF-ELABEL-ING-001",
@@ -28,7 +29,8 @@
       "legal_basis": ["Regolamento (UE) 2021/2117"],
       "human_review_required": true,
       "active": true,
-      "dependencies": ["QRF-CORE-001"]
+      "dependencies": ["QRF-CORE-001"],
+      "knowledge_ids": ["KB-EU-2021-2117-INGREDIENTS"]
     },
     {
       "rule_id": "QRF-ELABEL-ALL-001",
@@ -40,7 +42,8 @@
       "legal_basis": ["Regolamento (UE) n. 1169/2011"],
       "human_review_required": true,
       "active": true,
-      "dependencies": ["QRF-ELABEL-ING-001"]
+      "dependencies": ["QRF-ELABEL-ING-001"],
+      "knowledge_ids": ["KB-EU-1169-2011-ALLERGENS"]
     },
     {
       "rule_id": "QRF-ELABEL-NUT-001",
@@ -52,7 +55,8 @@
       "legal_basis": ["Regolamento (UE) 2021/2117"],
       "human_review_required": true,
       "active": true,
-      "dependencies": ["QRF-CORE-001"]
+      "dependencies": ["QRF-CORE-001"],
+      "knowledge_ids": ["KB-EU-2021-2117-NUTRITION"]
     },
     {
       "rule_id": "QRF-ELABEL-NUT-002",
@@ -64,7 +68,8 @@
       "legal_basis": ["Controllo tecnico di integrità: valori energetici non negativi"],
       "human_review_required": true,
       "active": true,
-      "dependencies": ["QRF-ELABEL-NUT-001"]
+      "dependencies": ["QRF-ELABEL-NUT-001"],
+      "knowledge_ids": ["KB-TECH-NUTRITION-INTEGRITY"]
     },
     {
       "rule_id": "QRF-ELABEL-NUT-003",
@@ -76,7 +81,8 @@
       "legal_basis": ["Controllo tecnico di coerenza della conversione energetica"],
       "human_review_required": true,
       "active": true,
-      "dependencies": ["QRF-ELABEL-NUT-001"]
+      "dependencies": ["QRF-ELABEL-NUT-001"],
+      "knowledge_ids": ["KB-TECH-NUTRITION-INTEGRITY"]
     },
     {
       "rule_id": "QRF-ELABEL-NUT-004",
@@ -88,7 +94,8 @@
       "legal_basis": ["Regolamento (UE) n. 1169/2011"],
       "human_review_required": true,
       "active": true,
-      "dependencies": ["QRF-ELABEL-NUT-001"]
+      "dependencies": ["QRF-ELABEL-NUT-001"],
+      "knowledge_ids": ["KB-EU-2021-2117-NUTRITION"]
     },
     {
       "rule_id": "QRF-PACK-001",
@@ -100,7 +107,8 @@
       "legal_basis": ["Decisione 97/129/CE"],
       "human_review_required": true,
       "active": true,
-      "dependencies": ["QRF-CORE-001"]
+      "dependencies": ["QRF-CORE-001"],
+      "knowledge_ids": ["KB-EU-97-129-PACKAGING"]
     }
   ]
 }
