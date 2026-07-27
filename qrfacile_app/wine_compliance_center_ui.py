@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.services.wine_compliance_engine import run_wine_compliance
 from qrfacile_app.ui_shell import esc
 from qrfacile_app.wine_compliance_engine_ui import _load_payload
@@ -107,11 +108,12 @@ def _compact_compliance_html(report: dict, wine_id: int) -> str:
 
 @router.get("/app/wine/{wine_id}", response_class=HTMLResponse)
 def wine_hub_with_compliance(request: Request, wine_id: int, tab: str | None = None):
+    user = require_any_role(request, ("winery", "studio", "admin"))
     base_response = wine_hub(request, wine_id, tab)
     if isinstance(base_response, RedirectResponse):
         return base_response
 
-    payload = _load_payload(int(wine_id), request.state.user)
+    payload = _load_payload(int(wine_id), user)
     report = run_wine_compliance(payload)
     compliance_html = _compact_compliance_html(report, int(wine_id))
 
@@ -122,8 +124,4 @@ def wine_hub_with_compliance(request: Request, wine_id: int, tab: str | None = N
     else:
         html = html.replace("</section>", compliance_html + "</section>", 1)
 
-    return HTMLResponse(
-        html,
-        status_code=base_response.status_code,
-        headers=dict(base_response.headers),
-    )
+    return HTMLResponse(html, status_code=base_response.status_code)
