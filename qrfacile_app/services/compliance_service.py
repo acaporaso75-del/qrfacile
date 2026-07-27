@@ -10,12 +10,13 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
 
-AI_POLICY_VERSION = "2026-07-23"
+AI_POLICY_VERSION = "2026-07-27"
 REQUIRED_COMPLIANCE_TABLES = (
     "legal_documents",
     "legal_acceptances",
     "audit_log",
     "ai_usage_log",
+    "ai_system_registry",
     "compliance_incidents",
 )
 
@@ -40,6 +41,7 @@ def get_compliance_status() -> dict[str, Any]:
         "tables": tables,
         "tracking_on_elabel_pages_allowed": False,
         "human_review_required_for_ai": True,
+        "ai_system_registry_required": True,
     }
 
 
