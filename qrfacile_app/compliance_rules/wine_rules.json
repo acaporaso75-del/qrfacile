@@ -1,5 +1,5 @@
 {
-  "catalog_version": "2026.07.1",
+  "catalog_version": "2026.07.2",
   "score_weights": {
     "PASS": 0,
     "WARNING": 35,
