@@ -18,7 +18,7 @@ def _load_payload(wine_id: int, user: dict) -> dict:
             cur.execute(
                 """
                 SELECT qw.id AS wine_id, qw.winery_id, qw.wine_name, qw.vintage, qw.lot,
-                       w.name AS winery_name
+                       w.name AS winery_name, w.owner_user_id
                 FROM qr_wines qw
                 JOIN wineries w ON w.id = qw.winery_id
                 WHERE qw.id=%s
@@ -31,8 +31,26 @@ def _load_payload(wine_id: int, user: dict) -> dict:
                 raise HTTPException(404, "Vino non trovato")
 
             role = str(user.get("role") or "").lower()
-            if role == "winery" and int(user.get("winery_id") or 0) != int(wine["winery_id"]):
+            user_id = int(user.get("id") or 0)
+            winery_id = int(wine["winery_id"])
+
+            if role == "winery" and user_id != int(wine.get("owner_user_id") or 0):
                 raise HTTPException(403, "Accesso negato")
+
+            if role == "studio":
+                cur.execute(
+                    """
+                    SELECT 1
+                    FROM studio_clients
+                    WHERE studio_user_id=%s
+                      AND winery_id=%s
+                      AND can_view=TRUE
+                    LIMIT 1
+                    """,
+                    (user_id, winery_id),
+                )
+                if not cur.fetchone():
+                    raise HTTPException(403, "Accesso negato")
 
             cur.execute(
                 """SELECT energy_kj, energy_kcal, fat, saturates, carbs, sugars, protein, salt
