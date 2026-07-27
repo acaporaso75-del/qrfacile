@@ -1,0 +1,89 @@
+{
+  "knowledge_version": "2026.07.1",
+  "entries": [
+    {
+      "knowledge_id": "KB-WINE-CORE-IDENTITY",
+      "kind": "technical-control",
+      "title": "Identificazione univoca del prodotto",
+      "issuer": "QRFacile",
+      "reference": "Controllo tecnico di completezza del dato prodotto",
+      "article": "",
+      "annex": "",
+      "source_url": "",
+      "summary": "La denominazione del vino deve essere presente per associare in modo univoco dati, etichette e lotto.",
+      "interpretation": "Controllo tecnico interno; non viene presentato come autonoma prescrizione normativa.",
+      "effective_from": "2026-07-01",
+      "status": "active"
+    },
+    {
+      "knowledge_id": "KB-EU-2021-2117-INGREDIENTS",
+      "kind": "regulation",
+      "title": "Elenco degli ingredienti per i prodotti vitivinicoli",
+      "issuer": "Unione europea",
+      "reference": "Regolamento (UE) 2021/2117",
+      "article": "Disposizioni sulle indicazioni obbligatorie dei prodotti vitivinicoli",
+      "annex": "",
+      "source_url": "",
+      "summary": "Base normativa europea per la dichiarazione degli ingredienti e delle informazioni nutrizionali dei prodotti vitivinicoli.",
+      "interpretation": "QRFacile verifica la presenza dei dati, senza sostituire la valutazione professionale sulla corretta formulazione dell’elenco.",
+      "effective_from": "2023-12-08",
+      "status": "active"
+    },
+    {
+      "knowledge_id": "KB-EU-1169-2011-ALLERGENS",
+      "kind": "regulation",
+      "title": "Informazioni sugli allergeni",
+      "issuer": "Unione europea",
+      "reference": "Regolamento (UE) n. 1169/2011",
+      "article": "Articolo 21 e allegato II",
+      "annex": "Allegato II",
+      "source_url": "",
+      "summary": "Disciplina la comunicazione delle sostanze o dei prodotti che provocano allergie o intolleranze.",
+      "interpretation": "L’assenza di allergeni selezionati genera un avviso perché il sistema non può dedurre automaticamente l’assenza effettiva.",
+      "effective_from": "2014-12-13",
+      "status": "active"
+    },
+    {
+      "knowledge_id": "KB-EU-2021-2117-NUTRITION",
+      "kind": "regulation",
+      "title": "Dichiarazione nutrizionale dei prodotti vitivinicoli",
+      "issuer": "Unione europea",
+      "reference": "Regolamento (UE) 2021/2117",
+      "article": "Disposizioni sulle indicazioni obbligatorie dei prodotti vitivinicoli",
+      "annex": "",
+      "source_url": "",
+      "summary": "Base normativa europea per la disponibilità delle informazioni nutrizionali dei prodotti vitivinicoli.",
+      "interpretation": "QRFacile controlla presenza e integrità dei valori; la validazione analitica resta responsabilità dell’operatore.",
+      "effective_from": "2023-12-08",
+      "status": "active"
+    },
+    {
+      "knowledge_id": "KB-TECH-NUTRITION-INTEGRITY",
+      "kind": "technical-control",
+      "title": "Integrità e coerenza tecnica dei valori nutrizionali",
+      "issuer": "QRFacile",
+      "reference": "Controllo tecnico interno",
+      "article": "",
+      "annex": "",
+      "source_url": "",
+      "summary": "I valori negativi e le incoerenze evidenti tra kJ e kcal sono segnalati come anomalie tecniche.",
+      "interpretation": "Il controllo non costituisce calcolo ufficiale e richiede revisione umana sui documenti analitici.",
+      "effective_from": "2026-07-01",
+      "status": "active"
+    },
+    {
+      "knowledge_id": "KB-EU-97-129-PACKAGING",
+      "kind": "decision",
+      "title": "Sistema di identificazione dei materiali di imballaggio",
+      "issuer": "Unione europea",
+      "reference": "Decisione 97/129/CE",
+      "article": "",
+      "annex": "Allegati relativi ai sistemi di numerazione e abbreviazione",
+      "source_url": "",
+      "summary": "Definisce sistemi di identificazione dei materiali utilizzati negli imballaggi.",
+      "interpretation": "QRFacile segnala l’assenza del codice materiale come avviso e richiede verifica con il fornitore dell’imballaggio.",
+      "effective_from": "1997-01-27",
+      "status": "active"
+    }
+  ]
+}
