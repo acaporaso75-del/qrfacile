@@ -21,6 +21,7 @@ class WineRuleDefinition:
     legal_basis: tuple[str, ...]
     human_review_required: bool
     active: bool
+    dependencies: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -43,14 +44,17 @@ def _required_text(raw: dict[str, Any], key: str) -> str:
     return value
 
 
+def _string_list(raw: dict[str, Any], key: str) -> tuple[str, ...]:
+    value = raw.get(key) or []
+    if not isinstance(value, list):
+        raise ValueError(f"{key} deve essere una lista")
+    return tuple(str(item).strip() for item in value if str(item).strip())
+
+
 def _parse_rule(raw: dict[str, Any]) -> WineRuleDefinition:
     severity = _required_text(raw, "default_severity").upper()
     if severity not in _ALLOWED_SEVERITIES:
         raise ValueError(f"Severità non valida: {severity}")
-
-    legal_basis = raw.get("legal_basis") or []
-    if not isinstance(legal_basis, list):
-        raise ValueError("legal_basis deve essere una lista")
 
     return WineRuleDefinition(
         rule_id=_required_text(raw, "rule_id"),
@@ -59,9 +63,10 @@ def _parse_rule(raw: dict[str, Any]) -> WineRuleDefinition:
         default_severity=severity,
         blocking=bool(raw.get("blocking")),
         field=_required_text(raw, "field"),
-        legal_basis=tuple(str(item).strip() for item in legal_basis if str(item).strip()),
+        legal_basis=_string_list(raw, "legal_basis"),
         human_review_required=bool(raw.get("human_review_required", True)),
         active=bool(raw.get("active", True)),
+        dependencies=_string_list(raw, "dependencies"),
     )
 
 
@@ -103,6 +108,7 @@ def public_rule_catalog() -> dict[str, Any]:
                 "legal_basis": list(rule.legal_basis),
                 "human_review_required": rule.human_review_required,
                 "active": rule.active,
+                "dependencies": list(rule.dependencies),
             }
             for rule in catalog.rules.values()
         ],
