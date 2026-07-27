@@ -1,5 +1,5 @@
 {
-  "catalog_version": "2026.07.2",
+  "catalog_version": "2026.07.3",
   "score_weights": {
     "PASS": 0,
     "WARNING": 35,
@@ -15,7 +15,8 @@
       "field": "wine.wine_name",
       "legal_basis": [],
       "human_review_required": true,
-      "active": true
+      "active": true,
+      "dependencies": []
     },
     {
       "rule_id": "QRF-ELABEL-ING-001",
@@ -26,7 +27,8 @@
       "field": "ingredients",
       "legal_basis": ["Regolamento (UE) 2021/2117"],
       "human_review_required": true,
-      "active": true
+      "active": true,
+      "dependencies": ["QRF-CORE-001"]
     },
     {
       "rule_id": "QRF-ELABEL-ALL-001",
@@ -37,7 +39,8 @@
       "field": "allergens",
       "legal_basis": ["Regolamento (UE) n. 1169/2011"],
       "human_review_required": true,
-      "active": true
+      "active": true,
+      "dependencies": ["QRF-ELABEL-ING-001"]
     },
     {
       "rule_id": "QRF-ELABEL-NUT-001",
@@ -48,7 +51,8 @@
       "field": "nutrition.energy",
       "legal_basis": ["Regolamento (UE) 2021/2117"],
       "human_review_required": true,
-      "active": true
+      "active": true,
+      "dependencies": ["QRF-CORE-001"]
     },
     {
       "rule_id": "QRF-ELABEL-NUT-002",
@@ -57,9 +61,10 @@
       "default_severity": "ERROR",
       "blocking": true,
       "field": "nutrition.energy",
-      "legal_basis": [],
+      "legal_basis": ["Controllo tecnico di integrità: valori energetici non negativi"],
       "human_review_required": true,
-      "active": true
+      "active": true,
+      "dependencies": ["QRF-ELABEL-NUT-001"]
     },
     {
       "rule_id": "QRF-ELABEL-NUT-003",
@@ -68,9 +73,10 @@
       "default_severity": "WARNING",
       "blocking": false,
       "field": "nutrition.energy",
-      "legal_basis": [],
+      "legal_basis": ["Controllo tecnico di coerenza della conversione energetica"],
       "human_review_required": true,
-      "active": true
+      "active": true,
+      "dependencies": ["QRF-ELABEL-NUT-001"]
     },
     {
       "rule_id": "QRF-ELABEL-NUT-004",
@@ -81,7 +87,8 @@
       "field": "nutrition",
       "legal_basis": ["Regolamento (UE) n. 1169/2011"],
       "human_review_required": true,
-      "active": true
+      "active": true,
+      "dependencies": ["QRF-ELABEL-NUT-001"]
     },
     {
       "rule_id": "QRF-PACK-001",
@@ -92,7 +99,8 @@
       "field": "recycle",
       "legal_basis": ["Decisione 97/129/CE"],
       "human_review_required": true,
-      "active": true
+      "active": true,
+      "dependencies": ["QRF-CORE-001"]
     }
   ]
 }
