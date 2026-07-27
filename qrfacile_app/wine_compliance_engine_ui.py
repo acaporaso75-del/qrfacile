@@ -6,7 +6,7 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.db import pg
-from qrfacile_app.services.wine_compliance_engine import run_wine_compliance
+from qrfacile_app.services.wine_compliance_explainability import run_explainable_wine_compliance
 from qrfacile_app.ui_shell import esc, page
 
 router = APIRouter(tags=["wine-compliance-engine"])
@@ -106,6 +106,12 @@ def _report_html(report: dict) -> str:
         status = item["status"]
         badge_class = {"PASS": "ok", "WARNING": "warn", "ERROR": "err"}.get(status, "")
         remediation = item.get("remediation") or "—"
+        sources = item.get("knowledge") or []
+        source_html = "".join(
+            f"<div class='ceSource'><b>{esc(source.get('reference') or source.get('title') or '')}</b>"
+            f"<span>{esc(source.get('article') or source.get('summary') or '')}</span></div>"
+            for source in sources
+        ) or "—"
         rows.append(
             f"""
             <tr>
@@ -113,6 +119,7 @@ def _report_html(report: dict) -> str:
               <td><b>{esc(item['title'])}</b><div class='ceRule'>{esc(item['rule_id'])} · {esc(item['version'])}</div></td>
               <td>{esc(item['explanation'])}</td>
               <td>{esc(remediation)}</td>
+              <td>{source_html}</td>
             </tr>
             """
         )
@@ -128,11 +135,12 @@ def _report_html(report: dict) -> str:
       .ceBadge{{display:inline-block;padding:5px 9px;border-radius:999px;font-weight:800;font-size:12px}}
       .ceBadge.ok{{background:#dcfce7;color:#166534}}.ceBadge.warn{{background:#fef3c7;color:#92400e}}.ceBadge.err{{background:#fee2e2;color:#991b1b}}
       .ceRule{{font-size:12px;color:var(--muted);margin-top:4px}}
-      @media(max-width:800px){{.ceGrid{{grid-template-columns:repeat(2,1fr)}}.ceTable{{display:block;overflow:auto}}}}
+      .ceSource{{display:grid;gap:3px;margin-bottom:8px}}.ceSource span{{font-size:12px;color:var(--muted)}}
+      @media(max-width:900px){{.ceGrid{{grid-template-columns:repeat(2,1fr)}}.ceTable{{display:block;overflow:auto}}}}
     </style>
     <div class='card'>
       <div class='h1'>Compliance Engine</div>
-      <div class='p'>Motore deterministico versione {esc(report['engine_version'])}. Il risultato supporta la revisione umana e non costituisce certificazione automatica.</div>
+      <div class='p'>Motore deterministico {esc(report['engine_version'])} · catalogo {esc(report['catalog_version'])} · knowledge {esc(report['knowledge_version'])}. Il risultato supporta la revisione umana e non costituisce certificazione automatica.</div>
       <div class='ceGrid'>
         <div class='ceMetric'><span>Score</span><b>{report['score']}/100</b></div>
         <div class='ceMetric'><span>PASS</span><b>{report['counts']['PASS']}</b></div>
@@ -144,7 +152,7 @@ def _report_html(report: dict) -> str:
     <div class='card' style='margin-top:14px'>
       <div class='h2'>Esiti motivati</div>
       <table class='ceTable'>
-        <thead><tr><th>Esito</th><th>Controllo</th><th>Motivazione</th><th>Azione consigliata</th></tr></thead>
+        <thead><tr><th>Esito</th><th>Controllo</th><th>Motivazione</th><th>Azione consigliata</th><th>Fonte e contesto</th></tr></thead>
         <tbody>{''.join(rows)}</tbody>
       </table>
     </div>
@@ -155,7 +163,7 @@ def _report_html(report: dict) -> str:
 def compliance_report(request: Request, wine_id: int):
     user = require_any_role(request, ("admin", "studio", "winery"))
     payload = _load_payload(wine_id, user)
-    report = run_wine_compliance(payload)
+    report = run_explainable_wine_compliance(payload)
     body = _report_html(report)
     return HTMLResponse(page(request, user, "Compliance Engine", body))
 
@@ -164,4 +172,4 @@ def compliance_report(request: Request, wine_id: int):
 def compliance_report_api(request: Request, wine_id: int):
     user = require_any_role(request, ("admin", "studio", "winery"))
     payload = _load_payload(wine_id, user)
-    return JSONResponse(run_wine_compliance(payload))
+    return JSONResponse(run_explainable_wine_compliance(payload))
