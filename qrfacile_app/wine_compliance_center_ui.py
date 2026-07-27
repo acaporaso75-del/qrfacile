@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from qrfacile_app.auth_core import require_any_role
-from qrfacile_app.services.wine_compliance_engine import run_wine_compliance
+from qrfacile_app.services.wine_compliance_explainability import run_explainable_wine_compliance
 from qrfacile_app.ui_shell import esc
 from qrfacile_app.wine_compliance_engine_ui import _load_payload
 from qrfacile_app.wine_hub_ui import wine_hub
@@ -57,7 +57,10 @@ def _compact_compliance_html(report: dict, wine_id: int) -> str:
           <div class='h2' id='wine-compliance-title'>Stato normativo del lotto</div>
           <div class='p'>Controlli deterministici, motivati e soggetti a revisione umana.</div>
         </div>
-        <a class='btn' href='/app/wine/{int(wine_id)}/compliance-report'>Apri report completo</a>
+        <div class='wineComplianceActions'>
+          <a class='btn' href='/app/wine/{int(wine_id)}/compliance-replays'>Storico replay</a>
+          <a class='btn' href='/app/wine/{int(wine_id)}/compliance-report'>Apri report completo</a>
+        </div>
       </div>
 
       <div class='wineComplianceGrid'>
@@ -72,6 +75,7 @@ def _compact_compliance_html(report: dict, wine_id: int) -> str:
           <span class='wineComplianceDecisionBadge'>{esc(state_title)}</span>
           <b>{errors} errori · {warnings} avvisi · {passes} controlli superati</b>
           <p>{esc(state_text)}</p>
+          <small>Engine {esc(str(report.get('engine_version') or ''))} · catalogo {esc(str(report.get('catalog_version') or ''))} · knowledge {esc(str(report.get('knowledge_version') or ''))}</small>
         </div>
       </div>
 
@@ -81,6 +85,7 @@ def _compact_compliance_html(report: dict, wine_id: int) -> str:
         .wineComplianceCenter{{margin-top:18px;border-left:6px solid #0f766e}}
         .wineComplianceCenter.blocked{{border-left-color:#b91c1c}}
         .wineComplianceHead{{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;flex-wrap:wrap}}
+        .wineComplianceActions{{display:flex;gap:8px;flex-wrap:wrap}}
         .wineComplianceGrid{{display:grid;grid-template-columns:minmax(220px,.75fr) minmax(280px,1.25fr);gap:16px;margin-top:18px}}
         .wineComplianceScore,.wineComplianceDecision{{border:1px solid rgba(2,8,23,.08);border-radius:20px;padding:18px;background:rgba(255,255,255,.72)}}
         .wineComplianceScore>span{{display:block;color:#64748b;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.06em}}
@@ -92,7 +97,8 @@ def _compact_compliance_html(report: dict, wine_id: int) -> str:
         .wineComplianceDecisionBadge{{display:inline-flex;padding:7px 11px;border-radius:999px;background:#dcfce7;color:#166534;font-size:12px;font-weight:900;text-transform:uppercase}}
         .blocked .wineComplianceDecisionBadge{{background:#fee2e2;color:#991b1b}}
         .wineComplianceDecision b{{display:block;margin-top:14px}}
-        .wineComplianceDecision p{{margin:7px 0 0;color:#475569}}
+        .wineComplianceDecision p{{margin:7px 0;color:#475569}}
+        .wineComplianceDecision small{{color:#64748b}}
         .wineComplianceIssues{{list-style:none;padding:0;margin:16px 0 0;display:grid;gap:10px}}
         .wineComplianceIssues li{{display:flex;gap:12px;align-items:flex-start;border-top:1px solid rgba(2,8,23,.07);padding-top:12px}}
         .wineComplianceIssues li div{{display:grid;gap:3px}}
@@ -114,7 +120,7 @@ def wine_hub_with_compliance(request: Request, wine_id: int, tab: str | None = N
         return base_response
 
     payload = _load_payload(int(wine_id), user)
-    report = run_wine_compliance(payload)
+    report = run_explainable_wine_compliance(payload)
     compliance_html = _compact_compliance_html(report, int(wine_id))
 
     html = base_response.body.decode(base_response.charset or "utf-8")
