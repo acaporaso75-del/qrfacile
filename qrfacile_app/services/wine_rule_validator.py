@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
 
 from qrfacile_app.services.wine_rule_catalog import WineRuleCatalog
 
@@ -84,12 +83,6 @@ def validate_wine_rule_catalog(catalog: WineRuleCatalog) -> ValidationReport:
         issues.append(ValidationIssue("weight_order", "Il peso ERROR deve superare WARNING"))
 
     for rule in catalog.rules.values():
-        if rule.blocking and rule.default_severity != "ERROR":
-            issues.append(ValidationIssue(
-                "blocking_severity",
-                "Una regola bloccante deve avere severità predefinita ERROR",
-                rule.rule_id,
-            ))
         if len(rule.dependencies) != len(set(rule.dependencies)):
             issues.append(ValidationIssue(
                 "duplicate_dependency",
