@@ -37,14 +37,25 @@ jobs:
             qrfacile_app/compliance_ui.py \
             qrfacile_app/legal_acceptance_ui.py \
             qrfacile_app/ai_review_ui.py \
+            qrfacile_app/services/ai_registry_service.py \
             scripts/compliance_retention.py
 
       - name: Run compliance regression tests
-        run: pytest -q tests/test_compliance_baseline.py tests/test_legal_acceptance_baseline.py
+        run: |
+          pytest -q \
+            tests/test_compliance_baseline.py \
+            tests/test_legal_acceptance_baseline.py \
+            tests/test_privacy_incident_baseline.py \
+            tests/test_ai_system_registry.py
 
       - name: Check SQL migrations are transactional
         run: |
-          grep -q '^BEGIN;' sql/2026_legal_ai_compliance.sql
-          grep -q '^COMMIT;' sql/2026_legal_ai_compliance.sql
-          grep -q '^BEGIN;' sql/2026_legal_acceptance_constraints.sql
-          grep -q '^COMMIT;' sql/2026_legal_acceptance_constraints.sql
+          for migration in \
+            sql/2026_legal_ai_compliance.sql \
+            sql/2026_legal_acceptance_constraints.sql \
+            sql/2026_privacy_requests.sql \
+            sql/2026_ai_system_registry.sql
+          do
+            grep -q '^BEGIN;' "$migration"
+            grep -q '^COMMIT;' "$migration"
+          done
