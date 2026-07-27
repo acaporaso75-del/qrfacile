@@ -4,7 +4,9 @@ from dataclasses import asdict, dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, Iterable, Mapping
 
-ENGINE_VERSION = "2026.07.1"
+from qrfacile_app.services.wine_rule_catalog import load_wine_rule_catalog
+
+ENGINE_VERSION = "2026.07.2"
 
 PASS = "PASS"
 WARNING = "WARNING"
@@ -163,7 +165,6 @@ def _check_energy(payload: Mapping[str, Any]) -> list[ComplianceResult]:
             evidence={"energy_kj": str(kj), "energy_kcal": str(kcal)},
         ))
 
-    # Controllo tecnico di coerenza, non sostituisce il calcolo ufficiale.
     expected_kcal = kj / Decimal("4.184") if kj >= 0 else Decimal("0")
     tolerance = max(Decimal("2"), expected_kcal * Decimal("0.08"))
     if abs(kcal - expected_kcal) > tolerance:
@@ -205,9 +206,8 @@ def _check_nutrition_values(payload: Mapping[str, Any]) -> list[ComplianceResult
         elif value < 0:
             invalid.append(field)
 
-    results: list[ComplianceResult] = []
     if invalid:
-        results.append(_result(
+        return [_result(
             "QRF-ELABEL-NUT-004",
             ERROR,
             "Valori nutrizionali negativi",
@@ -215,9 +215,9 @@ def _check_nutrition_values(payload: Mapping[str, Any]) -> list[ComplianceResult
             field="nutrition",
             remediation="Correggere i campi indicati.",
             evidence={"invalid_fields": invalid},
-        ))
-    elif missing:
-        results.append(_result(
+        )]
+    if missing:
+        return [_result(
             "QRF-ELABEL-NUT-004",
             WARNING,
             "Valori nutrizionali da verificare",
@@ -225,16 +225,14 @@ def _check_nutrition_values(payload: Mapping[str, Any]) -> list[ComplianceResult
             field="nutrition",
             remediation="Verificare se i valori mancanti debbano essere dichiarati o rappresentati come zero.",
             evidence={"missing_fields": missing},
-        ))
-    else:
-        results.append(_result(
-            "QRF-ELABEL-NUT-004",
-            PASS,
-            "Valori nutrizionali valorizzati",
-            "I principali campi nutrizionali sono presenti e non negativi.",
-            field="nutrition",
-        ))
-    return results
+        )]
+    return [_result(
+        "QRF-ELABEL-NUT-004",
+        PASS,
+        "Valori nutrizionali valorizzati",
+        "I principali campi nutrizionali sono presenti e non negativi.",
+        field="nutrition",
+    )]
 
 
 def _check_recycling(payload: Mapping[str, Any]) -> list[ComplianceResult]:
@@ -273,7 +271,25 @@ def _check_recycling(payload: Mapping[str, Any]) -> list[ComplianceResult]:
     )]
 
 
+def _enrich_result(result: ComplianceResult, catalog) -> dict[str, Any] | None:
+    rule = catalog.get(result.rule_id)
+    if not rule.active:
+        return None
+
+    item = result.to_dict()
+    item.update({
+        "catalog_version": catalog.version,
+        "domain": rule.domain,
+        "blocking": rule.blocking,
+        "legal_basis": list(rule.legal_basis),
+        "human_review_required": rule.human_review_required,
+        "default_severity": rule.default_severity,
+    })
+    return item
+
+
 def run_wine_compliance(payload: Mapping[str, Any]) -> dict[str, Any]:
+    catalog = load_wine_rule_catalog()
     checks: Iterable[list[ComplianceResult]] = (
         _check_identity(payload),
         _check_ingredients(payload),
@@ -282,20 +298,31 @@ def run_wine_compliance(payload: Mapping[str, Any]) -> dict[str, Any]:
         _check_nutrition_values(payload),
         _check_recycling(payload),
     )
-    results = [result for group in checks for result in group]
-    counts = {PASS: 0, WARNING: 0, ERROR: 0}
-    for result in results:
-        counts[result.status] += 1
 
-    max_score = len(results) * 100
-    penalty = counts[ERROR] * 100 + counts[WARNING] * 35
-    score = 100 if not results else max(0, round((max_score - penalty) / len(results)))
+    enriched_results: list[dict[str, Any]] = []
+    for result in (result for group in checks for result in group):
+        enriched = _enrich_result(result, catalog)
+        if enriched is not None:
+            enriched_results.append(enriched)
+
+    counts = {PASS: 0, WARNING: 0, ERROR: 0}
+    for item in enriched_results:
+        counts[item["status"]] += 1
+
+    penalty = sum(int(catalog.score_weights.get(item["status"], 0)) for item in enriched_results)
+    score = 100 if not enriched_results else max(0, round(100 - (penalty / len(enriched_results))))
+    blocking_errors = [
+        item for item in enriched_results
+        if item["status"] == ERROR and bool(item.get("blocking"))
+    ]
 
     return {
         "engine_version": ENGINE_VERSION,
+        "catalog_version": catalog.version,
         "score": score,
-        "publishable": counts[ERROR] == 0,
-        "requires_human_review": True,
+        "publishable": not blocking_errors,
+        "blocking_error_count": len(blocking_errors),
+        "requires_human_review": any(bool(item.get("human_review_required")) for item in enriched_results),
         "counts": counts,
-        "results": [item.to_dict() for item in results],
+        "results": enriched_results,
     }
