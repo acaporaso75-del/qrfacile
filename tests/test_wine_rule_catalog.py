@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from qrfacile_app.services.wine_compliance_engine import run_wine_compliance
+import qrfacile_app.services.wine_compliance_engine as engine_module
+from qrfacile_app.services.wine_compliance_engine import ERROR, WARNING, run_wine_compliance
 from qrfacile_app.services.wine_rule_catalog import load_wine_rule_catalog, public_rule_catalog
 
 
@@ -35,11 +36,18 @@ def test_catalog_is_versioned_and_has_unique_rules():
     assert catalog.score_weights["ERROR"] > catalog.score_weights["WARNING"]
 
 
-def test_every_engine_result_is_registered_in_catalog():
+def test_every_engine_result_is_registered_and_enriched():
     catalog = load_wine_rule_catalog()
     report = run_wine_compliance(_payload())
     unknown = {item["rule_id"] for item in report["results"] if item["rule_id"] not in catalog.rules}
     assert unknown == set()
+    assert report["catalog_version"] == catalog.version
+    for item in report["results"]:
+        assert item["catalog_version"] == catalog.version
+        assert item["domain"]
+        assert isinstance(item["blocking"], bool)
+        assert isinstance(item["legal_basis"], list)
+        assert isinstance(item["human_review_required"], bool)
 
 
 def test_public_catalog_contains_governance_metadata():
@@ -52,6 +60,48 @@ def test_public_catalog_contains_governance_metadata():
         assert isinstance(rule["legal_basis"], list)
         assert isinstance(rule["blocking"], bool)
         assert isinstance(rule["human_review_required"], bool)
+
+
+def test_score_uses_catalog_weights(monkeypatch):
+    catalog = load_wine_rule_catalog()
+    monkeypatch.setattr(
+        catalog,
+        "score_weights",
+        {"PASS": 0, "WARNING": 10, "ERROR": 50},
+    )
+    monkeypatch.setattr(engine_module, "load_wine_rule_catalog", lambda: catalog)
+
+    payload = _payload()
+    payload["allergens"] = []
+    report = run_wine_compliance(payload)
+    expected_penalty = report["counts"][WARNING] * 10 + report["counts"][ERROR] * 50
+    assert report["score"] == max(0, round(100 - expected_penalty / len(report["results"])))
+
+
+def test_inactive_rule_is_not_executed(monkeypatch):
+    catalog = load_wine_rule_catalog()
+    inactive = catalog.rules["QRF-PACK-001"]
+    object.__setattr__(inactive, "active", False)
+    monkeypatch.setattr(engine_module, "load_wine_rule_catalog", lambda: catalog)
+
+    report = run_wine_compliance(_payload())
+    assert all(item["rule_id"] != "QRF-PACK-001" for item in report["results"])
+
+
+def test_only_blocking_errors_stop_publication(monkeypatch):
+    catalog = load_wine_rule_catalog()
+    identity_rule = catalog.rules["QRF-CORE-001"]
+    object.__setattr__(identity_rule, "blocking", False)
+    monkeypatch.setattr(engine_module, "load_wine_rule_catalog", lambda: catalog)
+
+    payload = _payload()
+    payload["wine"]["wine_name"] = ""
+    report = run_wine_compliance(payload)
+    identity = next(item for item in report["results"] if item["rule_id"] == "QRF-CORE-001")
+    assert identity["status"] == ERROR
+    assert identity["blocking"] is False
+    assert report["publishable"] is True
+    assert report["blocking_error_count"] == 0
 
 
 def test_duplicate_rule_ids_are_rejected(tmp_path: Path):
