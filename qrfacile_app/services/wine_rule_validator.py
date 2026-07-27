@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from qrfacile_app.services.wine_knowledge_registry import WineKnowledgeRegistry
 from qrfacile_app.services.wine_rule_catalog import WineRuleCatalog
 
 
@@ -65,7 +66,10 @@ def _detect_cycles(catalog: WineRuleCatalog) -> list[ValidationIssue]:
     return issues
 
 
-def validate_wine_rule_catalog(catalog: WineRuleCatalog) -> ValidationReport:
+def validate_wine_rule_catalog(
+    catalog: WineRuleCatalog,
+    knowledge: WineKnowledgeRegistry | None = None,
+) -> ValidationReport:
     issues: list[ValidationIssue] = []
 
     required_weights = {"PASS", "WARNING", "ERROR"}
@@ -102,12 +106,34 @@ def validate_wine_rule_catalog(catalog: WineRuleCatalog) -> ValidationReport:
                     f"Dipendenza non censita: {dependency}",
                     rule.rule_id,
                 ))
+
         if rule.default_severity == "ERROR" and rule.domain != "wine-core" and not rule.legal_basis:
             issues.append(ValidationIssue(
                 "missing_legal_basis",
                 "Regola ERROR priva di base normativa o tecnica documentata",
                 rule.rule_id,
             ))
+
+        if not rule.knowledge_ids:
+            issues.append(ValidationIssue(
+                "missing_knowledge_link",
+                "La regola non è collegata ad alcuna voce knowledge",
+                rule.rule_id,
+            ))
+        elif knowledge is not None:
+            for knowledge_id in rule.knowledge_ids:
+                if knowledge_id not in knowledge.entries:
+                    issues.append(ValidationIssue(
+                        "unknown_knowledge_link",
+                        f"Voce knowledge non censita: {knowledge_id}",
+                        rule.rule_id,
+                    ))
+                elif knowledge.entries[knowledge_id].status != "active" and rule.active:
+                    issues.append(ValidationIssue(
+                        "inactive_knowledge_link",
+                        f"Regola attiva collegata a knowledge non attiva: {knowledge_id}",
+                        rule.rule_id,
+                    ))
 
     issues.extend(_detect_cycles(catalog))
 
@@ -120,8 +146,11 @@ def validate_wine_rule_catalog(catalog: WineRuleCatalog) -> ValidationReport:
     )
 
 
-def assert_valid_wine_rule_catalog(catalog: WineRuleCatalog) -> None:
-    report = validate_wine_rule_catalog(catalog)
+def assert_valid_wine_rule_catalog(
+    catalog: WineRuleCatalog,
+    knowledge: WineKnowledgeRegistry | None = None,
+) -> None:
+    report = validate_wine_rule_catalog(catalog, knowledge)
     if report.ready:
         return
     details = "; ".join(
