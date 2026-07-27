@@ -37,7 +37,10 @@ jobs:
             qrfacile_app/compliance_ui.py \
             qrfacile_app/legal_acceptance_ui.py \
             qrfacile_app/ai_review_ui.py \
+            qrfacile_app/ai_registry_ui.py \
+            qrfacile_app/wine_compliance_engine_ui.py \
             qrfacile_app/services/ai_registry_service.py \
+            qrfacile_app/services/wine_compliance_engine.py \
             scripts/compliance_retention.py
 
       - name: Run compliance regression tests
@@ -46,7 +49,9 @@ jobs:
             tests/test_compliance_baseline.py \
             tests/test_legal_acceptance_baseline.py \
             tests/test_privacy_incident_baseline.py \
-            tests/test_ai_system_registry.py
+            tests/test_ai_system_registry.py \
+            tests/test_ai_registry_ui.py \
+            tests/test_wine_compliance_engine.py
 
       - name: Check SQL migrations are transactional
         run: |
