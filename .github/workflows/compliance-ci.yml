@@ -39,9 +39,11 @@ jobs:
             qrfacile_app/ai_review_ui.py \
             qrfacile_app/ai_registry_ui.py \
             qrfacile_app/collaboration_access_ui.py \
+            qrfacile_app/collaboration_management_ui.py \
             qrfacile_app/wine_compliance_engine_ui.py \
             qrfacile_app/services/ai_registry_service.py \
             qrfacile_app/services/collaboration_access.py \
+            qrfacile_app/services/collaboration_management.py \
             qrfacile_app/services/wine_compliance_engine.py \
             scripts/compliance_retention.py \
             scripts/project_security_audit.py
@@ -59,7 +61,8 @@ jobs:
             tests/test_ai_system_registry.py \
             tests/test_ai_registry_ui.py \
             tests/test_wine_compliance_engine.py \
-            tests/test_collaboration_access_hardening.py
+            tests/test_collaboration_access_hardening.py \
+            tests/test_collaboration_management.py
 
       - name: Check SQL migrations are transactional
         run: |
