@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from qrfacile_app.compliance_score_middleware import ComplianceScoreMiddleware
+from qrfacile_app.public_recycling_catalog_middleware import PublicRecyclingCatalogMiddleware
 from qrfacile_app.security_middleware import SecurityHeadersMiddleware
 
 logger = logging.getLogger("qrfacile.main")
@@ -16,6 +17,7 @@ logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="QRFACILE")
 app.state.app_base_url = os.getenv("APP_BASE_URL", "").rstrip("/")
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(PublicRecyclingCatalogMiddleware)
 app.add_middleware(ComplianceScoreMiddleware)
 
 APP_ROOT = os.getenv("APP_ROOT", "/opt/qrfacile")
