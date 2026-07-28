@@ -35,6 +35,7 @@ jobs:
             qrfacile_app/security_middleware.py \
             qrfacile_app/csrf_core.py \
             qrfacile_app/audit_core.py \
+            qrfacile_app/email_verification_ui.py \
             qrfacile_app/compliance_ui.py \
             qrfacile_app/legal_acceptance_ui.py \
             qrfacile_app/ai_review_ui.py \
@@ -46,6 +47,7 @@ jobs:
             qrfacile_app/invitation_center_ui.py \
             qrfacile_app/secure_publish_ui.py \
             qrfacile_app/wine_compliance_engine_ui.py \
+            qrfacile_app/services/email_verification.py \
             qrfacile_app/services/ai_registry_service.py \
             qrfacile_app/services/collaboration_access.py \
             qrfacile_app/services/collaboration_management.py \
@@ -72,7 +74,8 @@ jobs:
             tests/test_collaboration_management.py \
             tests/test_invitation_lifecycle.py \
             tests/test_invitation_acceptance.py \
-            tests/test_secure_publishing.py
+            tests/test_secure_publishing.py \
+            tests/test_email_verification.py
 
       - name: Check SQL migrations are transactional
         run: |
@@ -83,7 +86,8 @@ jobs:
             sql/2026_ai_system_registry.sql \
             sql/2026_collaboration_access_hardening.sql \
             sql/2026_invitation_lifecycle.sql \
-            sql/2026_invitation_acceptance_hardening.sql
+            sql/2026_invitation_acceptance_hardening.sql \
+            sql/2026_email_verification.sql
           do
             grep -q '^BEGIN;' "$migration"
             grep -q '^COMMIT;' "$migration"
