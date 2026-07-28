@@ -103,6 +103,8 @@ include_router_safe("qrfacile_app.label_hub_ui")
 include_router_safe("qrfacile_app.label_media_ui")
 include_router_safe("qrfacile_app.label_compliance_ui")
 include_router_safe("qrfacile_app.label_history_ui")
+# Safe collaboration mutations must be registered before legacy routes with the same paths.
+include_router_safe("qrfacile_app.collaboration_management_ui")
 include_router_safe("qrfacile_app.label_acl_ui")
 include_router_safe("qrfacile_app.collaboration_access_ui")
 include_router_safe("qrfacile_app.wine_compliance_ui")
