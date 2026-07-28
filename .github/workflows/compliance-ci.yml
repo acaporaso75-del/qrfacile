@@ -29,7 +29,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install pytest
 
-      - name: Compile compliance and access modules
+      - name: Compile compliance, access and invitation modules
         run: |
           python -m py_compile \
             qrfacile_app/security_middleware.py \
@@ -40,10 +40,12 @@ jobs:
             qrfacile_app/ai_registry_ui.py \
             qrfacile_app/collaboration_access_ui.py \
             qrfacile_app/collaboration_management_ui.py \
+            qrfacile_app/invitation_management_ui.py \
             qrfacile_app/wine_compliance_engine_ui.py \
             qrfacile_app/services/ai_registry_service.py \
             qrfacile_app/services/collaboration_access.py \
             qrfacile_app/services/collaboration_management.py \
+            qrfacile_app/services/invitation_management.py \
             qrfacile_app/services/wine_compliance_engine.py \
             scripts/compliance_retention.py \
             scripts/project_security_audit.py
@@ -62,7 +64,8 @@ jobs:
             tests/test_ai_registry_ui.py \
             tests/test_wine_compliance_engine.py \
             tests/test_collaboration_access_hardening.py \
-            tests/test_collaboration_management.py
+            tests/test_collaboration_management.py \
+            tests/test_invitation_lifecycle.py
 
       - name: Check SQL migrations are transactional
         run: |
@@ -71,7 +74,8 @@ jobs:
             sql/2026_legal_acceptance_constraints.sql \
             sql/2026_privacy_requests.sql \
             sql/2026_ai_system_registry.sql \
-            sql/2026_collaboration_access_hardening.sql
+            sql/2026_collaboration_access_hardening.sql \
+            sql/2026_invitation_lifecycle.sql
           do
             grep -q '^BEGIN;' "$migration"
             grep -q '^COMMIT;' "$migration"
