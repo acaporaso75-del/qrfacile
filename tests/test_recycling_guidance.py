@@ -50,6 +50,17 @@ def test_catalog_has_component_specific_suggestions_and_authenticated_api():
     assert "from qrfacile_app.services.recycling_catalog import" in ui
 
 
+def test_guidance_validates_before_save_and_can_restore_recommendation():
+    ui = _ui_text()
+    assert "Ripristina suggerimento" in ui
+    assert "Materiale e codice non coincidono" in ui
+    assert "non consigliato per" in ui
+    assert "Correggere prima del salvataggio" in ui
+    assert "event.preventDefault()" in ui
+    assert "scrollIntoView" in ui
+    assert "componentLabels" in ui
+
+
 def test_guided_route_precedes_legacy_compliance_route():
     main = (ROOT / "qrfacile_app" / "main.py").read_text(encoding="utf-8")
     guided = main.index('include_router_safe("qrfacile_app.recycling_guidance_ui")')
