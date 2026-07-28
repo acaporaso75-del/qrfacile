@@ -10,9 +10,10 @@ from typing import Any, Mapping
 from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
+from qrfacile_app.services.wine_compliance_advisor import build_compliance_advice
 from qrfacile_app.services.wine_compliance_explainability import run_explainable_wine_compliance
 
-REPLAY_SCHEMA_VERSION = "2026.07.1"
+REPLAY_SCHEMA_VERSION = "2026.07.2"
 
 
 def _json_default(value: Any) -> Any:
@@ -47,6 +48,7 @@ def build_replay_snapshot(
     created_at: datetime | None = None,
 ) -> dict[str, Any]:
     report = run_explainable_wine_compliance(payload)
+    advisor = build_compliance_advice(report)
     timestamp = (created_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
     wine = payload.get("wine") or {}
 
@@ -60,8 +62,10 @@ def build_replay_snapshot(
         "engine_version": report.get("engine_version"),
         "catalog_version": report.get("catalog_version"),
         "knowledge_version": report.get("knowledge_version"),
+        "advisor_version": advisor.get("advisor_version"),
         "payload": dict(payload),
         "report": report,
+        "advisor": advisor,
     }
     return {
         "replay_id": str(uuid.uuid4()),
@@ -216,6 +220,10 @@ def compare_replays(left: Mapping[str, Any], right: Mapping[str, Any]) -> dict[s
         "change_count": len(changes),
         "score_delta": int((right_snapshot.get("report") or {}).get("score") or 0)
         - int((left_snapshot.get("report") or {}).get("score") or 0),
+        "completion_delta": int((right_snapshot.get("advisor") or {}).get("completion_percent") or 0)
+        - int((left_snapshot.get("advisor") or {}).get("completion_percent") or 0),
+        "action_count_delta": int((right_snapshot.get("advisor") or {}).get("total_actions") or 0)
+        - int((left_snapshot.get("advisor") or {}).get("total_actions") or 0),
         "publishable_changed": (left_snapshot.get("report") or {}).get("publishable")
         != (right_snapshot.get("report") or {}).get("publishable"),
         "changes": changes,
