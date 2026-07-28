@@ -71,6 +71,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 
 include_router_safe("qrfacile_app.auth_routes")
+include_router_safe("qrfacile_app.email_verification_ui")
 include_router_safe("qrfacile_app.landing_routes")
 include_router_safe("qrfacile_app.pricing_ui")
 include_router_safe("qrfacile_app.legal_pages")
