@@ -4,8 +4,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_recycling_guidance_catalog_contains_wine_packaging_families():
-    text = (ROOT / "qrfacile_app" / "recycling_guidance_ui.py").read_text(encoding="utf-8")
+def _service_text() -> str:
+    return (ROOT / "qrfacile_app" / "services" / "recycling_catalog.py").read_text(encoding="utf-8")
+
+
+def _ui_text() -> str:
+    return (ROOT / "qrfacile_app" / "recycling_guidance_ui.py").read_text(encoding="utf-8")
+
+
+def test_recycling_catalog_contains_wine_packaging_families():
+    text = _service_text()
     for marker in (
         "PET 1", "HDPE 2", "PVC 3", "LDPE 4", "PP 5", "PS 6", "OTHER 7",
         "PAP 20", "PAP 21", "PAP 22",
@@ -19,23 +27,27 @@ def test_recycling_guidance_catalog_contains_wine_packaging_families():
 
 
 def test_recycling_guidance_keeps_custom_values_and_flags_them():
-    text = (ROOT / "qrfacile_app" / "recycling_guidance_ui.py").read_text(encoding="utf-8")
-    assert "Altro materiale / codice personalizzato" in text
-    assert "Polimero biobased o compostabile" in text
-    assert "datalist" in text
-    assert 'input[name^="rec_"]' in text
-    assert "Valore personalizzato" in text
-    assert "verificarlo con il fornitore" in text
+    service = _service_text()
+    ui = _ui_text()
+    assert "Altro materiale / codice personalizzato" in service
+    assert "Polimero biobased o compostabile" in service
+    assert "datalist" in ui
+    assert 'input[name^="rec_"]' in ui
+    assert "Valore personalizzato" in ui
+    assert "verificarlo con il fornitore" in ui
 
 
 def test_catalog_has_component_specific_suggestions_and_authenticated_api():
-    text = (ROOT / "qrfacile_app" / "recycling_guidance_ui.py").read_text(encoding="utf-8")
-    assert '"components": ["bottle"' in text
-    assert '"components": ["closure"' in text
-    assert '"components": ["label"' in text
-    assert '"components": ["box"' in text
-    assert '/api/compliance/recycling-catalog' in text
-    assert 'require_any_role(request, ("admin", "studio", "winery"))' in text
+    service = _service_text()
+    ui = _ui_text()
+    assert '"bottle"' in service
+    assert '"closure"' in service
+    assert '"label"' in service
+    assert '"box"' in service
+    assert '/api/compliance/recycling-catalog' in ui
+    assert 'require_any_role(request, ("admin", "studio", "winery"))' in ui
+    assert "RECYCLING_CATALOG" in ui
+    assert "from qrfacile_app.services.recycling_catalog import" in ui
 
 
 def test_guided_route_precedes_legacy_compliance_route():
