@@ -35,3 +35,18 @@ def require_csrf(request: Request, supplied: str | None = None) -> None:
     candidate = (supplied or request.headers.get(CSRF_HEADER) or "").strip()
     if not candidate or not secrets.compare_digest(candidate, expected):
         raise HTTPException(403, "Richiesta non valida o sessione scaduta")
+
+
+def require_csrf_or_same_origin(request: Request, supplied: str | None = None) -> None:
+    """Transitional gate for legacy forms while hidden CSRF fields are rolled out."""
+    candidate = (supplied or request.headers.get(CSRF_HEADER) or "").strip()
+    if candidate:
+        require_csrf(request, candidate)
+        return
+    origin = (request.headers.get("origin") or "").strip().rstrip("/")
+    referer = (request.headers.get("referer") or "").strip()
+    expected = f"{request.url.scheme}://{request.headers.get('host', '')}".rstrip("/")
+    if origin and origin != expected:
+        raise HTTPException(403, "Origine richiesta non autorizzata")
+    if not origin and referer and not referer.startswith(expected + "/"):
+        raise HTTPException(403, "Origine richiesta non autorizzata")
