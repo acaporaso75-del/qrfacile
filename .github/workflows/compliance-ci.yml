@@ -34,6 +34,7 @@ jobs:
           python -m py_compile \
             qrfacile_app/security_middleware.py \
             qrfacile_app/compliance_score_middleware.py \
+            qrfacile_app/public_recycling_catalog_middleware.py \
             qrfacile_app/csrf_core.py \
             qrfacile_app/audit_core.py \
             qrfacile_app/email_verification_ui.py \
@@ -47,6 +48,7 @@ jobs:
             qrfacile_app/invitation_acceptance_ui.py \
             qrfacile_app/invitation_center_ui.py \
             qrfacile_app/secure_publish_ui.py \
+            qrfacile_app/recycling_validation_ui.py \
             qrfacile_app/recycling_guidance_ui.py \
             qrfacile_app/wine_compliance_engine_ui.py \
             qrfacile_app/services/email_verification.py \
@@ -77,6 +79,8 @@ jobs:
             tests/test_compliance_score_integration.py \
             tests/test_recycling_guidance.py \
             tests/test_recycling_catalog_validation.py \
+            tests/test_recycling_server_validation.py \
+            tests/test_public_recycling_catalog.py \
             tests/test_collaboration_access_hardening.py \
             tests/test_collaboration_management.py \
             tests/test_invitation_lifecycle.py \
