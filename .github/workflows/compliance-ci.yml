@@ -55,7 +55,9 @@ jobs:
             qrfacile_app/services/collaboration_management.py \
             qrfacile_app/services/invitation_management.py \
             qrfacile_app/services/invitation_acceptance.py \
+            qrfacile_app/services/recycling_catalog.py \
             qrfacile_app/services/wine_compliance_engine.py \
+            qrfacile_app/services/wine_compliance_explainability.py \
             scripts/compliance_retention.py \
             scripts/project_security_audit.py
 
@@ -74,6 +76,7 @@ jobs:
             tests/test_wine_compliance_engine.py \
             tests/test_compliance_score_integration.py \
             tests/test_recycling_guidance.py \
+            tests/test_recycling_catalog_validation.py \
             tests/test_collaboration_access_hardening.py \
             tests/test_collaboration_management.py \
             tests/test_invitation_lifecycle.py \
