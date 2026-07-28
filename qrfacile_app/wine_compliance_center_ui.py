@@ -58,6 +58,7 @@ def _compact_compliance_html(report: dict, wine_id: int) -> str:
           <div class='p'>Controlli deterministici, motivati e soggetti a revisione umana.</div>
         </div>
         <div class='wineComplianceActions'>
+          <a class='btn btn-primary' href='/app/wine/{int(wine_id)}/compliance-advisor'>Piano di correzione</a>
           <a class='btn' href='/app/wine/{int(wine_id)}/compliance-replays'>Storico replay</a>
           <a class='btn' href='/app/wine/{int(wine_id)}/compliance-report'>Apri report completo</a>
         </div>
