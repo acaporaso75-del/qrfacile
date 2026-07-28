@@ -108,7 +108,8 @@ include_router_safe("qrfacile_app.invitation_center_ui")
 include_router_safe("qrfacile_app.secure_publish_ui")
 include_router_safe("qrfacile_app.label_acl_ui")
 include_router_safe("qrfacile_app.collaboration_access_ui")
-# Guided recycling route must precede the legacy compliance GET route.
+# Recycling validation and guidance routes must precede legacy compliance routes.
+include_router_safe("qrfacile_app.recycling_validation_ui")
 include_router_safe("qrfacile_app.recycling_guidance_ui")
 include_router_safe("qrfacile_app.wine_compliance_ui")
 include_router_safe("qrfacile_app.wine_compliance_engine_ui")
