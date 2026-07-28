@@ -33,6 +33,7 @@ jobs:
         run: |
           python -m py_compile \
             qrfacile_app/security_middleware.py \
+            qrfacile_app/compliance_score_middleware.py \
             qrfacile_app/csrf_core.py \
             qrfacile_app/audit_core.py \
             qrfacile_app/email_verification_ui.py \
@@ -70,6 +71,7 @@ jobs:
             tests/test_ai_system_registry.py \
             tests/test_ai_registry_ui.py \
             tests/test_wine_compliance_engine.py \
+            tests/test_compliance_score_integration.py \
             tests/test_collaboration_access_hardening.py \
             tests/test_collaboration_management.py \
             tests/test_invitation_lifecycle.py \
