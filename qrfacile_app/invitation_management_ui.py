@@ -7,8 +7,8 @@ from fastapi.responses import RedirectResponse
 
 from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
-from qrfacile_app.services.collaboration_management import require_same_origin
 from qrfacile_app.services.invitation_management import create_invite, resend_invite, revoke_invite
 
 router = APIRouter(tags=["invitation-management"])
@@ -40,7 +40,7 @@ def secure_create_studio_invite(
     studio_email: str = Form(...),
     preset: str = Form("graphic"),
 ):
-    require_same_origin(request)
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery",))
     winery_id = _winery_id(user)
     result = create_invite(
@@ -69,7 +69,7 @@ def secure_create_studio_invite(
 
 @router.post("/app/settings/studios/invites/{token_hash}/revoke")
 def secure_revoke_studio_invite(request: Request, token_hash: str):
-    require_same_origin(request)
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery",))
     winery_id = _winery_id(user)
     result = revoke_invite(winery_id=winery_id, token_hash=token_hash, actor_user_id=int(user["id"]))
@@ -86,7 +86,7 @@ def secure_revoke_studio_invite(request: Request, token_hash: str):
 
 @router.post("/app/settings/studios/invites/{token_hash}/resend")
 def secure_resend_studio_invite(request: Request, token_hash: str):
-    require_same_origin(request)
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery",))
     winery_id = _winery_id(user)
     result = resend_invite(winery_id=winery_id, token_hash=token_hash, base_url=_base_url(request))
