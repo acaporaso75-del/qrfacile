@@ -52,29 +52,21 @@ def include_router_safe(module_path: str, router_attr: str = "router") -> None:
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     code = exc.status_code
     msg = (exc.detail or "").strip()
-
     if 300 <= code < 400:
         return Response(status_code=code, headers=dict(exc.headers or {}))
-
     if code in (404, 405, 403):
         title = "Pagina non trovata" if code == 404 else ("Metodo non consentito" if code == 405 else "Accesso negato")
         body = f"""
         <div class="card" style="margin-top:14px;max-width:860px">
-          <div class="h2">{title}</div>
-          <div class="p">{msg or ""}</div>
+          <div class="h2">{title}</div><div class="p">{msg or ""}</div>
           <div class="row" style="margin-top:14px">
             <a class="btn btn-primary" href="/app/start">Menu</a>
             <a class="btn" href="/app/dashboard">Dashboard</a>
             <a class="btn" href="/login">Login</a>
           </div>
-        </div>
-        """
-        html = f"""<!doctype html>
-<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QRFACILE · {title}</title><link rel="stylesheet" href="/static/app.css"></head>
-<body><div class="shell" style="grid-template-columns:1fr;max-width:980px"><main class="content">{body}</main></div></body></html>"""
+        </div>"""
+        html = f"""<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>QRFACILE · {title}</title><link rel="stylesheet" href="/static/app.css"></head><body><div class="shell" style="grid-template-columns:1fr;max-width:980px"><main class="content">{body}</main></div></body></html>"""
         return HTMLResponse(html, status_code=code)
-
     return HTMLResponse(str(exc.detail), status_code=code, headers=dict(exc.headers or {}))
 
 
@@ -103,11 +95,12 @@ include_router_safe("qrfacile_app.label_hub_ui")
 include_router_safe("qrfacile_app.label_media_ui")
 include_router_safe("qrfacile_app.label_compliance_ui")
 include_router_safe("qrfacile_app.label_history_ui")
-# Safe collaboration and invitation mutations must be registered before legacy routes with the same paths.
+# Safe collaboration, invitation and publication mutations precede legacy routes with the same paths.
 include_router_safe("qrfacile_app.collaboration_management_ui")
 include_router_safe("qrfacile_app.invitation_management_ui")
 include_router_safe("qrfacile_app.invitation_acceptance_ui")
 include_router_safe("qrfacile_app.invitation_center_ui")
+include_router_safe("qrfacile_app.secure_publish_ui")
 include_router_safe("qrfacile_app.label_acl_ui")
 include_router_safe("qrfacile_app.collaboration_access_ui")
 include_router_safe("qrfacile_app.wine_compliance_ui")
