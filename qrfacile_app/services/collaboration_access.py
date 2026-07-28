@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from typing import Any, Mapping
 
 from fastapi import HTTPException
@@ -63,21 +63,14 @@ def get_label_permission(user: Mapping[str, Any], label_id: int) -> EffectiveLab
 
             cur.execute(
                 """
-                SELECT
-                    sc.can_view AS general_view,
-                    sc.can_edit AS general_edit,
-                    lc.can_view AS label_view,
-                    lc.can_edit AS label_edit,
-                    lc.can_media,
-                    lc.can_export,
-                    lc.active
+                SELECT sc.can_view AS general_view, sc.can_edit AS general_edit,
+                       lc.can_view AS label_view, lc.can_edit AS label_edit,
+                       lc.can_media, lc.can_export, lc.active
                 FROM studio_clients sc
                 JOIN label_collaborators lc
                   ON lc.collaborator_user_id=sc.studio_user_id
                  AND lc.wine_label_id=%s
-                WHERE sc.studio_user_id=%s
-                  AND sc.winery_id=%s
-                  AND lc.active=TRUE
+                WHERE sc.studio_user_id=%s AND sc.winery_id=%s AND lc.active=TRUE
                 LIMIT 1
                 """,
                 (int(label_id), uid, int(label["winery_id"])),
@@ -89,7 +82,7 @@ def get_label_permission(user: Mapping[str, Any], label_id: int) -> EffectiveLab
             can_view = bool(permission.get("general_view") and permission.get("label_view"))
             can_edit = bool(can_view and permission.get("general_edit") and permission.get("label_edit"))
             if not can_view:
-                raise HTTPException(403, "Accesso in sola cantina insufficiente: serve assegnazione esplicita dell'etichetta")
+                raise HTTPException(403, "Serve l'assegnazione esplicita dell'etichetta")
 
             return EffectiveLabelPermission(
                 winery_id=int(label["winery_id"]), wine_id=int(label["wine_id"]),
@@ -119,6 +112,8 @@ def require_label_permission(user: Mapping[str, Any], label_id: int, permission:
 def require_wine_access(user: Mapping[str, Any], wine_id: int, permission: str = "view") -> dict[str, Any]:
     role = _role(user)
     uid = _user_id(user)
+    if permission not in {"view", "edit"}:
+        raise ValueError("Permesso vino non supportato")
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
@@ -146,11 +141,8 @@ def require_wine_access(user: Mapping[str, Any], wine_id: int, permission: str =
                 JOIN studio_clients sc
                   ON sc.studio_user_id=lc.collaborator_user_id
                  AND sc.winery_id=wl.winery_id
-                WHERE wl.wine_id=%s
-                  AND lc.collaborator_user_id=%s
-                  AND lc.active=TRUE
-                  AND lc.can_view=TRUE
-                  AND sc.can_view=TRUE
+                WHERE wl.wine_id=%s AND lc.collaborator_user_id=%s
+                  AND lc.active=TRUE AND lc.can_view=TRUE AND sc.can_view=TRUE
                   AND {required_column}=TRUE
                   AND (%s='view' OR sc.can_edit=TRUE)
                 LIMIT 1
@@ -158,7 +150,7 @@ def require_wine_access(user: Mapping[str, Any], wine_id: int, permission: str =
                 (int(wine_id), uid, permission),
             )
             if not cur.fetchone():
-                raise HTTPException(403, "Nessuna etichetta del vino è stata assegnata allo studio con il permesso richiesto")
+                raise HTTPException(403, "Nessuna etichetta del vino assegnata con il permesso richiesto")
             return dict(wine)
 
 
@@ -185,6 +177,24 @@ def list_wine_access(user: Mapping[str, Any], wine_id: int) -> dict[str, Any]:
                 (int(wine_id),),
             )
             rows = [dict(row) for row in cur.fetchall()]
+
+            studios: list[dict[str, Any]] = []
+            if role in {"admin", "winery"}:
+                cur.execute(
+                    """
+                    SELECT sc.id AS studio_client_id, sc.studio_user_id,
+                           COALESCE(s.company_name, u.email, '') AS studio_name,
+                           u.email, sc.can_view, sc.can_edit, sc.can_create
+                    FROM studio_clients sc
+                    JOIN users u ON u.id=sc.studio_user_id
+                    LEFT JOIN studios s ON s.user_id=sc.studio_user_id
+                    WHERE sc.winery_id=%s AND sc.can_view=TRUE
+                    ORDER BY lower(COALESCE(s.company_name, u.email, ''))
+                    """,
+                    (int(wine["winery_id"]),),
+                )
+                studios = [dict(row) for row in cur.fetchall()]
+
     if role == "studio":
         rows = [row for row in rows if int(row.get("collaborator_user_id") or 0) == uid]
-    return {"wine": wine, "labels": rows}
+    return {"wine": wine, "labels": rows, "studios": studios}
