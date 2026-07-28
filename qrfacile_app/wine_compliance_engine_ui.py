@@ -6,6 +6,7 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.db import pg
+from qrfacile_app.services.collaboration_access import require_wine_access
 from qrfacile_app.services.wine_compliance_explainability import run_explainable_wine_compliance
 from qrfacile_app.ui_shell import esc, page
 
@@ -13,6 +14,7 @@ router = APIRouter(tags=["wine-compliance-engine"])
 
 
 def _load_payload(wine_id: int, user: dict) -> dict:
+    require_wine_access(user, wine_id, "view")
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
@@ -29,28 +31,6 @@ def _load_payload(wine_id: int, user: dict) -> dict:
             wine = cur.fetchone()
             if not wine:
                 raise HTTPException(404, "Vino non trovato")
-
-            role = str(user.get("role") or "").lower()
-            user_id = int(user.get("id") or 0)
-            winery_id = int(wine["winery_id"])
-
-            if role == "winery" and user_id != int(wine.get("owner_user_id") or 0):
-                raise HTTPException(403, "Accesso negato")
-
-            if role == "studio":
-                cur.execute(
-                    """
-                    SELECT 1
-                    FROM studio_clients
-                    WHERE studio_user_id=%s
-                      AND winery_id=%s
-                      AND can_view=TRUE
-                    LIMIT 1
-                    """,
-                    (user_id, winery_id),
-                )
-                if not cur.fetchone():
-                    raise HTTPException(403, "Accesso negato")
 
             cur.execute(
                 """SELECT energy_kj, energy_kcal, fat, saturates, carbs, sugars, protein, salt
