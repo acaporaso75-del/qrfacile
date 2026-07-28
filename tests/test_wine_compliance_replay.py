@@ -43,20 +43,22 @@ def test_canonical_json_is_stable_across_key_order():
     assert sha256_payload(left) == sha256_payload(right)
 
 
-def test_replay_snapshot_contains_versions_evidence_and_valid_hash():
+def test_replay_snapshot_contains_versions_evidence_advisor_and_valid_hash():
     snapshot = build_replay_snapshot(
         _payload(),
         actor_user_id=99,
         reason="publication",
         created_at=datetime(2026, 7, 27, 20, 0, tzinfo=timezone.utc),
     )
-    assert snapshot["replay_schema_version"] == "2026.07.1"
+    assert snapshot["replay_schema_version"] == "2026.07.2"
     assert snapshot["actor_user_id"] == 99
     assert snapshot["reason"] == "publication"
     assert snapshot["engine_version"]
     assert snapshot["catalog_version"]
     assert snapshot["knowledge_version"]
+    assert snapshot["advisor_version"]
     assert snapshot["report"]["results"]
+    assert "actions" in snapshot["advisor"]
     assert all("evidence" in item for item in snapshot["report"]["results"])
     assert len(snapshot["content_hash"]) == 64
     assert verify_replay_snapshot(snapshot) is True
@@ -69,7 +71,7 @@ def test_tampered_replay_is_rejected_by_integrity_check():
     assert verify_replay_snapshot(tampered) is False
 
 
-def test_compare_replays_reports_data_and_score_changes():
+def test_compare_replays_reports_data_score_and_advisor_changes():
     left = build_replay_snapshot(
         _payload(),
         created_at=datetime(2026, 7, 27, 20, 0, tzinfo=timezone.utc),
@@ -85,6 +87,8 @@ def test_compare_replays_reports_data_and_score_changes():
     assert diff["change_count"] >= 2
     assert diff["left_replay_id"] == left["replay_id"]
     assert diff["right_replay_id"] == right["replay_id"]
+    assert "completion_delta" in diff
+    assert "action_count_delta" in diff
 
 
 def test_compare_ignores_replay_identity_metadata():
