@@ -29,10 +29,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install pytest
 
-      - name: Compile compliance, access and invitation modules
+      - name: Compile compliance, access, invitation and publication modules
         run: |
           python -m py_compile \
             qrfacile_app/security_middleware.py \
+            qrfacile_app/csrf_core.py \
             qrfacile_app/audit_core.py \
             qrfacile_app/compliance_ui.py \
             qrfacile_app/legal_acceptance_ui.py \
@@ -43,6 +44,7 @@ jobs:
             qrfacile_app/invitation_management_ui.py \
             qrfacile_app/invitation_acceptance_ui.py \
             qrfacile_app/invitation_center_ui.py \
+            qrfacile_app/secure_publish_ui.py \
             qrfacile_app/wine_compliance_engine_ui.py \
             qrfacile_app/services/ai_registry_service.py \
             qrfacile_app/services/collaboration_access.py \
@@ -69,7 +71,8 @@ jobs:
             tests/test_collaboration_access_hardening.py \
             tests/test_collaboration_management.py \
             tests/test_invitation_lifecycle.py \
-            tests/test_invitation_acceptance.py
+            tests/test_invitation_acceptance.py \
+            tests/test_secure_publishing.py
 
       - name: Check SQL migrations are transactional
         run: |
