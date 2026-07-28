@@ -30,7 +30,9 @@ def test_invitation_service_generates_strong_tokens_and_hashes():
 def test_invitation_routes_are_same_origin_and_audited():
     text = (ROOT / "qrfacile_app" / "invitation_management_ui.py").read_text(encoding="utf-8")
     main = (ROOT / "qrfacile_app" / "main.py").read_text(encoding="utf-8")
-    assert text.count("require_same_origin(request)") >= 3
+    assert "from qrfacile_app.csrf_core import require_csrf_or_same_origin" in text
+    assert text.count("require_csrf_or_same_origin(request)") >= 3
+    assert "require_same_origin" not in text
     for event in (
         "studio_invitation_created",
         "studio_invitation_revoked",
