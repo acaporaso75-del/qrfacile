@@ -10,13 +10,27 @@ from qrfacile_app.ui_shell import esc, page
 router = APIRouter(tags=["collaboration-access"])
 
 
+def _studio_options(studios: list[dict]) -> str:
+    options = ["<option value=''>Scegli uno studio autorizzato</option>"]
+    for studio in studios:
+        name = studio.get("studio_name") or studio.get("email") or "Studio"
+        edit_note = "può modificare" if studio.get("can_edit") else "solo vista"
+        options.append(
+            f"<option value='{int(studio['studio_user_id'])}'>{esc(str(name))} · {esc(edit_note)}</option>"
+        )
+    return "".join(options)
+
+
 def _access_html(wine_id: int, data: dict, role: str) -> str:
+    studios = data.get("studios") or []
+    studio_options = _studio_options(studios)
     rows = []
     for item in data.get("labels") or []:
+        label_id = int(item.get("label_id") or 0)
         assigned = bool(item.get("collaboration_id"))
         studio = item.get("studio_name") or "Gestione interna cantina"
+        permissions = []
         if assigned:
-            permissions = []
             if item.get("can_view"):
                 permissions.append("vede")
             if item.get("can_edit"):
@@ -25,25 +39,46 @@ def _access_html(wine_id: int, data: dict, role: str) -> str:
                 permissions.append("gestisce immagini")
             if item.get("can_export"):
                 permissions.append("esporta")
-            permissions_text = ", ".join(permissions) or "nessun permesso operativo"
-            status = "Studio autorizzato"
-        else:
-            permissions_text = "La cantina gestisce direttamente questa etichetta"
-            status = "Gestione interna"
+        permissions_text = ", ".join(permissions) if permissions else (
+            "La cantina gestisce direttamente questa etichetta" if not assigned else "nessun permesso operativo"
+        )
+        status = "Studio autorizzato" if assigned else "Gestione interna"
+
+        controls = ""
+        if role in {"winery", "admin"}:
+            if studios:
+                controls = f"""
+                <div class='accessControls'>
+                  <form method='post' action='/app/label/{label_id}/acl/assign'>
+                    <label>Affida questa etichetta</label>
+                    <select name='studio_user_id' required>{studio_options}</select>
+                    <select name='profile'>
+                      <option value='graphic' selected>Lavora su grafica e contenuti</option>
+                      <option value='view'>Può soltanto vedere</option>
+                    </select>
+                    <button class='btn btn-primary' type='submit'>Autorizza studio</button>
+                  </form>
+                  <form method='post' action='/app/label/{label_id}/acl/clear' onsubmit="return confirm('Riportare questa etichetta alla gestione interna della cantina?');">
+                    <button class='btn' type='submit'>Gestione interna</button>
+                  </form>
+                </div>
+                """
+            else:
+                controls = "<a class='btn btn-primary' href='/app/winery/settings#invite-studio'>Invita prima uno studio</a>"
 
         rows.append(f"""
         <article class='card accessLabelCard'>
           <div class='accessLabelTop'>
             <div>
-              <div class='accessKicker'>Etichetta #{int(item.get('label_id') or 0)}</div>
+              <div class='accessKicker'>Etichetta #{label_id}</div>
               <div class='h2'>{esc(str(item.get('label_type') or 'Etichetta'))}</div>
               <div class='p'>{esc(str(item.get('language') or ''))}</div>
             </div>
             <span class='accessStatus {'assigned' if assigned else ''}'>{esc(status)}</span>
           </div>
           <div class='accessWho'><b>{esc(str(studio))}</b><span>{esc(permissions_text)}</span></div>
-          <div class='accessRule'>La pubblicazione resta sempre riservata alla cantina o all’amministratore.</div>
-          {f"<a class='btn' href='/app/label/{int(item.get('label_id') or 0)}/acl'>Modifica assegnazione</a>" if role in {'winery','admin'} else ''}
+          <div class='accessRule'>Lo studio non può mai pubblicare. La conferma finale resta alla cantina.</div>
+          {controls}
         </article>
         """)
 
@@ -55,6 +90,9 @@ def _access_html(wine_id: int, data: dict, role: str) -> str:
       .accessHeroPanel div{{padding:14px;border-radius:15px;border:1px solid var(--border);background:var(--card)}}
       .accessHeroPanel span{{display:block;color:var(--muted);font-size:12px;font-weight:900}}
       .accessHeroPanel b{{display:block;margin-top:5px;font-size:20px}}
+      .accessSteps{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}}
+      .accessSteps div{{padding:13px;border:1px solid var(--border);border-radius:14px;background:var(--card)}}
+      .accessSteps b{{display:block}}.accessSteps span{{display:block;color:var(--muted);font-size:12px;margin-top:4px}}
       .accessGrid{{display:grid;gap:12px;margin-top:14px}}
       .accessLabelCard{{display:grid;gap:13px}}
       .accessLabelTop{{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}}
@@ -64,23 +102,31 @@ def _access_html(wine_id: int, data: dict, role: str) -> str:
       .accessWho{{display:grid;gap:4px;padding:14px;border-radius:14px;background:rgba(248,250,252,.86);border:1px solid var(--border)}}
       .accessWho span,.accessRule{{font-size:13px;color:var(--muted)}}
       .accessRule{{font-weight:850}}
-      @media(max-width:820px){{.accessHero{{grid-template-columns:1fr}}}}
+      .accessControls{{display:flex;gap:10px;align-items:end;flex-wrap:wrap;padding-top:4px;border-top:1px solid var(--border)}}
+      .accessControls form:first-child{{display:grid;grid-template-columns:minmax(210px,1fr) minmax(190px,1fr) auto;gap:8px;align-items:end;flex:1}}
+      .accessControls label{{grid-column:1/-1;color:var(--muted);font-size:12px;font-weight:900}}
+      @media(max-width:820px){{.accessHero,.accessSteps,.accessControls form:first-child{{grid-template-columns:1fr}}.accessControls{{align-items:stretch}}.accessControls form,.accessControls .btn{{width:100%}}}}
     </style>
     <div class='card accessHero'>
       <div>
         <div class='accessKicker'>Accessi e responsabilità</div>
-        <div class='h1'>Chi può lavorare sulle etichette</div>
-        <div class='p'>La cantina collega uno studio, poi decide etichetta per etichetta cosa può vedere e modificare. Nessuno studio può pubblicare.</div>
+        <div class='h1'>Chi lavora su ogni etichetta</div>
+        <div class='p'>Tre passaggi semplici: autorizza lo studio alla cantina, assegnagli una singola etichetta, poi la cantina controlla e pubblica.</div>
         <div class='row' style='margin-top:14px'>
-          <a class='btn' href='/app/winery/settings'>Studi autorizzati</a>
+          <a class='btn' href='/app/winery/settings'>1. Studi autorizzati</a>
           <a class='btn' href='/app/wine/{int(wine_id)}'>Torna al vino</a>
         </div>
       </div>
       <div class='accessHeroPanel'>
         <div><span>Etichette</span><b>{len(data.get('labels') or [])}</b></div>
-        <div><span>Controllo finale</span><b>Cantina</b></div>
+        <div><span>Studi disponibili</span><b>{len(studios)}</b></div>
         <div><span>Pubblicazione studio</span><b>Mai consentita</b></div>
       </div>
+    </div>
+    <div class='accessSteps'>
+      <div><b>1. Collega</b><span>La cantina invita o autorizza uno studio.</span></div>
+      <div><b>2. Assegna</b><span>Sceglie su quale etichetta può lavorare.</span></div>
+      <div><b>3. Approva</b><span>La cantina verifica e pubblica il risultato.</span></div>
     </div>
     <div class='accessGrid'>{''.join(rows)}{empty}</div>
     """
