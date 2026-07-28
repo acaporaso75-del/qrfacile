@@ -6,60 +6,14 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.services.recycling_catalog import (
+    CATALOG_SOURCE,
+    CATALOG_VERSION,
+    RECYCLING_CATALOG,
+)
 from qrfacile_app.wine_compliance_ui import compliance_get as legacy_compliance_get
 
 router = APIRouter(tags=["recycling-guidance"])
-
-CATALOG_VERSION = "2026.07.2"
-CATALOG_SOURCE = "Decisione 97/129/CE"
-
-# Il catalogo contiene codici esplicitamente identificati dalla Decisione 97/129/CE
-# e combinazioni composte comunemente utilizzate. Non vengono inventate abbreviazioni
-# per intervalli residuali: i casi non censiti restano liberamente inseribili e devono
-# essere verificati con il produttore dell'imballaggio.
-RECYCLING_CATALOG = [
-    {"family": "Plastica", "material": "PET - Polietilene tereftalato", "code": "PET 1", "collection": "Raccolta plastica", "components": ["bottle", "closure", "capsule", "label", "other"]},
-    {"family": "Plastica", "material": "HDPE - Polietilene ad alta densità", "code": "HDPE 2", "collection": "Raccolta plastica", "components": ["closure", "capsule", "other"]},
-    {"family": "Plastica", "material": "PVC - Polivinilcloruro", "code": "PVC 3", "collection": "Verificare le disposizioni comunali", "components": ["capsule", "label", "other"]},
-    {"family": "Plastica", "material": "LDPE - Polietilene a bassa densità", "code": "LDPE 4", "collection": "Raccolta plastica", "components": ["capsule", "label", "other"]},
-    {"family": "Plastica", "material": "PP - Polipropilene", "code": "PP 5", "collection": "Raccolta plastica", "components": ["closure", "capsule", "label", "other"]},
-    {"family": "Plastica", "material": "PS - Polistirene", "code": "PS 6", "collection": "Raccolta plastica", "components": ["closure", "other"]},
-    {"family": "Plastica", "material": "Altre plastiche", "code": "OTHER 7", "collection": "Verificare le disposizioni comunali", "components": ["closure", "capsule", "label", "other"]},
-
-    {"family": "Carta e cartone", "material": "Cartone ondulato", "code": "PAP 20", "collection": "Raccolta carta", "components": ["box", "other"]},
-    {"family": "Carta e cartone", "material": "Cartone non ondulato", "code": "PAP 21", "collection": "Raccolta carta", "components": ["box", "other"]},
-    {"family": "Carta e cartone", "material": "Carta", "code": "PAP 22", "collection": "Raccolta carta", "components": ["label", "box", "other"]},
-
-    {"family": "Metalli", "material": "Acciaio / banda stagnata", "code": "FE 40", "collection": "Raccolta metalli", "components": ["closure", "capsule", "other"]},
-    {"family": "Metalli", "material": "Alluminio", "code": "ALU 41", "collection": "Raccolta metalli", "components": ["closure", "capsule", "other"]},
-
-    {"family": "Legno", "material": "Legno", "code": "FOR 50", "collection": "Raccolta legno", "components": ["box", "other"]},
-    {"family": "Legno", "material": "Sughero", "code": "FOR 51", "collection": "Raccolta dedicata; verificare il Comune", "components": ["closure", "other"]},
-
-    {"family": "Tessili", "material": "Cotone", "code": "COT 60", "collection": "Raccolta tessili", "components": ["other"]},
-    {"family": "Tessili", "material": "Iuta", "code": "TEX 61", "collection": "Raccolta tessili", "components": ["other"]},
-
-    {"family": "Vetro", "material": "Vetro incolore", "code": "GL 70", "collection": "Raccolta vetro", "components": ["bottle", "other"]},
-    {"family": "Vetro", "material": "Vetro verde", "code": "GL 71", "collection": "Raccolta vetro", "components": ["bottle", "other"]},
-    {"family": "Vetro", "material": "Vetro marrone", "code": "GL 72", "collection": "Raccolta vetro", "components": ["bottle", "other"]},
-
-    {"family": "Composti", "material": "Carta/cartone + metalli diversi", "code": "C/PAP 80", "collection": "Verificare materiale prevalente e disposizioni comunali", "components": ["box", "other"]},
-    {"family": "Composti", "material": "Carta/cartone + plastica", "code": "C/PAP 81", "collection": "Verificare materiale prevalente e disposizioni comunali", "components": ["label", "box", "other"]},
-    {"family": "Composti", "material": "Carta/cartone + alluminio", "code": "C/PAP 82", "collection": "Verificare materiale prevalente e disposizioni comunali", "components": ["label", "box", "other"]},
-    {"family": "Composti", "material": "Carta/cartone + banda stagnata", "code": "C/PAP 83", "collection": "Verificare materiale prevalente e disposizioni comunali", "components": ["box", "other"]},
-    {"family": "Composti", "material": "Carta/cartone + plastica + alluminio", "code": "C/PAP 84", "collection": "Verificare materiale prevalente e disposizioni comunali", "components": ["label", "box", "other"]},
-    {"family": "Composti", "material": "Carta/cartone + plastica + alluminio + banda stagnata", "code": "C/PAP 85", "collection": "Verificare materiale prevalente e disposizioni comunali", "components": ["box", "other"]},
-    {"family": "Composti", "material": "Plastica + alluminio", "code": "C/OTHER 90", "collection": "Verificare polimero prevalente e disposizioni comunali", "components": ["closure", "capsule", "label", "other"]},
-    {"family": "Composti", "material": "Plastica + banda stagnata", "code": "C/OTHER 91", "collection": "Verificare polimero prevalente e disposizioni comunali", "components": ["closure", "capsule", "other"]},
-    {"family": "Composti", "material": "Plastica + metalli diversi", "code": "C/OTHER 92", "collection": "Verificare polimero prevalente e disposizioni comunali", "components": ["closure", "capsule", "other"]},
-    {"family": "Composti", "material": "Vetro + plastica", "code": "C/GL 95", "collection": "Verificare materiale prevalente e disposizioni comunali", "components": ["bottle", "other"]},
-    {"family": "Composti", "material": "Vetro + alluminio", "code": "C/GL 96", "collection": "Verificare materiale prevalente e disposizioni comunali", "components": ["bottle", "other"]},
-    {"family": "Composti", "material": "Vetro + banda stagnata", "code": "C/GL 97", "collection": "Verificare materiale prevalente e disposizioni comunali", "components": ["bottle", "other"]},
-    {"family": "Composti", "material": "Vetro + metalli diversi", "code": "C/GL 98", "collection": "Verificare materiale prevalente e disposizioni comunali", "components": ["bottle", "other"]},
-
-    {"family": "Biobased / innovativi", "material": "Polimero biobased o compostabile", "code": "", "collection": "Usare solo il codice comunicato dal fornitore; verificare certificazioni e Comune", "components": ["closure", "capsule", "label", "other"], "custom": True},
-    {"family": "Personalizzato", "material": "Altro materiale / codice personalizzato", "code": "", "collection": "Verificare con il fornitore dell'imballaggio e con il Comune", "components": ["bottle", "closure", "capsule", "label", "box", "other"], "custom": True},
-]
 
 
 def _guidance_markup() -> str:
@@ -80,7 +34,7 @@ def _guidance_markup() -> str:
     <script>
     (() => {{
       const catalog = {catalog_json};
-      const normalize = value => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      const normalize = value => String(value || '').trim().toLowerCase().replace(/\\s+/g, ' ');
       const byMaterial = new Map(catalog.map(item => [normalize(item.material), item]));
       const byCode = new Map(catalog.filter(item => item.code).map(item => [normalize(item.code), item]));
 
