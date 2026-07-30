@@ -102,7 +102,7 @@
       "domain": "environmental-labelling",
       "title": "Informazioni ambientali dell'imballaggio",
       "default_severity": "WARNING",
-      "blocking": false,
+      "blocking": true,
       "field": "recycle",
       "legal_basis": ["Decisione 97/129/CE"],
       "human_review_required": true,

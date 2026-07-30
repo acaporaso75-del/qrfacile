@@ -20,16 +20,16 @@ def _apply_recycling_validation(report: dict[str, Any], payload: Mapping[str, An
         item["evidence"] = {**(item.get("evidence") or {}), **validation}
         if validation["missing_codes"]:
             item.update({
-                "status": WARNING,
+                "status": ERROR,
                 "title": "Codici ambientali incompleti",
                 "explanation": "Uno o più componenti non dispongono di un codice materiale valorizzato.",
                 "remediation": "Completare i codici usando il catalogo guidato o il dato fornito dal produttore dell'imballaggio.",
             })
         elif validation["mismatches"]:
             item.update({
-                "status": WARNING,
-                "title": "Possibile incongruenza materiale–codice",
-                "explanation": "Il codice selezionato non appare coerente con il materiale o con il tipo di componente indicato.",
+                "status": ERROR,
+                "title": "Incongruenza materiale–codice",
+                "explanation": "Il codice conosciuto non è coerente con il materiale o con il tipo di componente indicato.",
                 "remediation": "Controllare la scheda tecnica dell'imballaggio e correggere materiale o codice.",
             })
         elif validation["custom_codes"]:

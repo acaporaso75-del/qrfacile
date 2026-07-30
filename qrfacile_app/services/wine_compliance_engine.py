@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, Iterable, Mapping
 
+from qrfacile_app.services.recycling_catalog import validate_recycling_items
 from qrfacile_app.services.wine_rule_catalog import load_wine_rule_catalog
 
 ENGINE_VERSION = "2026.07.2"
@@ -247,19 +248,36 @@ def _check_recycling(payload: Mapping[str, Any]) -> list[ComplianceResult]:
             remediation="Inserire i componenti applicabili e verificarne materiale e codice.",
         )]
 
-    incomplete = []
-    for component, item in recycle.items():
-        if not _text((item or {}).get("code")) or _text((item or {}).get("code")) == "-":
-            incomplete.append(component)
-    if incomplete:
+    validation = validate_recycling_items(recycle)
+    if validation["missing_codes"]:
+        return [_result(
+            "QRF-PACK-001",
+            ERROR,
+            "Codici ambientali incompleti",
+            "Uno o più componenti compilati non hanno un codice ambientale.",
+            field="recycle",
+            remediation="Completare i codici dopo verifica con il fornitore dell'imballaggio.",
+            evidence=validation,
+        )]
+    if validation["mismatches"]:
+        return [_result(
+            "QRF-PACK-001",
+            ERROR,
+            "Incongruenza materiale, codice o componente",
+            "Un codice conosciuto non è coerente con il materiale o con il componente selezionato.",
+            field="recycle",
+            remediation="Correggere il materiale o il codice usando il catalogo centrale.",
+            evidence=validation,
+        )]
+    if validation["custom_codes"]:
         return [_result(
             "QRF-PACK-001",
             WARNING,
-            "Codici ambientali incompleti",
-            "Alcuni componenti non hanno un codice materiale valorizzato.",
+            "Codici personalizzati da verificare",
+            "I valori personalizzati sono conservati ma non possono essere validati automaticamente.",
             field="recycle",
-            remediation="Completare i codici dopo verifica con il fornitore dell'imballaggio.",
-            evidence={"components": incomplete},
+            remediation="Verificare codice e raccolta con il fornitore dell'imballaggio e il Comune.",
+            evidence=validation,
         )]
     return [_result(
         "QRF-PACK-001",
@@ -267,7 +285,7 @@ def _check_recycling(payload: Mapping[str, Any]) -> list[ComplianceResult]:
         "Informazioni ambientali presenti",
         "I componenti registrati dispongono di un codice materiale.",
         field="recycle",
-        evidence={"component_count": len(recycle)},
+        evidence=validation,
     )]
 
 

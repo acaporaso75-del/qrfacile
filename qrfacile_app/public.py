@@ -7,6 +7,7 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.db import pg
+from qrfacile_app.services.wine_compliance_explainability import run_explainable_wine_compliance
 from qrfacile_app import ui
 
 router = APIRouter()
@@ -664,8 +665,17 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
     public_missing = _label_missing(locale, ingredient_text, allergens, nut, recycle_rows)
     is_incomplete = bool(public_missing)
 
-    if not preview and is_incomplete:
-        raise HTTPException(404, "QR incompleto")
+    compliance_payload = {
+        "wine": dict(row),
+        "nutrition": dict(nut),
+        "ingredients": ingredients,
+        "allergens": allergens,
+        "recycle": {item["component"]: dict(item) for item in recycle_rows},
+        "meta": {"extra_ingredients": extra_ing},
+    }
+    compliance_report = run_explainable_wine_compliance(compliance_payload)
+    if not preview and (is_incomplete or not compliance_report["publishable"]):
+        raise HTTPException(404, "QR non conforme o incompleto")
 
     if not preview:
         with pg() as conn:

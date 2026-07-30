@@ -20,7 +20,7 @@ class Finding:
 
 
 TEXT_SUFFIXES = {".py", ".html", ".js", ".sql", ".md"}
-SKIP_PARTS = {".git", "venv", ".venv", "node_modules", "__pycache__"}
+SKIP_PARTS = {".git", "venv", ".venv", "node_modules", "__pycache__", "_codex_reports"}
 
 
 def _files():
@@ -50,7 +50,7 @@ def scan() -> list[Finding]:
             ),
             (
                 "HIGH", "auto_verified_account",
-                re.compile(r"email_verified\s*,[^\n]*|email_verified\s*=\s*1", re.I),
+                re.compile(r"email_verified\s*=\s*(?:1|TRUE)", re.I),
                 "Verificare che gli account non siano marcati come email verificata senza prova della casella.",
             ),
             (

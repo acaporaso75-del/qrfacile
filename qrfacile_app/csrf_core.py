@@ -46,6 +46,8 @@ def require_csrf_or_same_origin(request: Request, supplied: str | None = None) -
     origin = (request.headers.get("origin") or "").strip().rstrip("/")
     referer = (request.headers.get("referer") or "").strip()
     expected = f"{request.url.scheme}://{request.headers.get('host', '')}".rstrip("/")
+    if not origin and not referer:
+        raise HTTPException(403, "Origine richiesta mancante")
     if origin and origin != expected:
         raise HTTPException(403, "Origine richiesta non autorizzata")
     if not origin and referer and not referer.startswith(expected + "/"):

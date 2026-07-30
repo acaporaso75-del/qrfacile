@@ -55,14 +55,25 @@ def test_custom_code_is_preserved_but_flagged_for_review():
     assert "personalizzati" in packaging["title"].lower()
 
 
-def test_material_code_mismatch_is_explainable_warning():
+def test_material_code_mismatch_blocks_publication():
     report = run_explainable_wine_compliance(_payload({
         "bottle": {"product": "Vetro verde", "code": "PAP 22"},
     }))
     packaging = next(item for item in report["results"] if item["rule_id"] == "QRF-PACK-001")
-    assert packaging["status"] == "WARNING"
+    assert packaging["status"] == "ERROR"
+    assert packaging["blocking"] is True
+    assert report["publishable"] is False
     assert packaging["evidence"]["mismatches"]
     assert "incongruenza" in packaging["title"].lower()
+
+
+def test_filled_component_without_code_blocks_publication():
+    report = run_explainable_wine_compliance(_payload({
+        "closure": {"product": "Sughero", "code": ""},
+    }))
+    packaging = next(item for item in report["results"] if item["rule_id"] == "QRF-PACK-001")
+    assert packaging["status"] == "ERROR"
+    assert report["publishable"] is False
 
 
 def test_recycling_validation_updates_score_and_report_metadata():

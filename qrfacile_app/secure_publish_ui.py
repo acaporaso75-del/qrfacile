@@ -18,6 +18,7 @@ from qrfacile_app.publish_routes import (
     _upsert_override_request,
 )
 from qrfacile_app.services.wine_compliance_replay import create_and_persist_replay
+from qrfacile_app.services.wine_compliance_explainability import run_explainable_wine_compliance
 from qrfacile_app.wine_compliance_engine_ui import _load_payload
 
 router = APIRouter(tags=["secure-publishing"])
@@ -34,6 +35,21 @@ def secure_publish_wine(
     user = require_any_role(request, ("winery", "admin"))
     role = str(user.get("role") or "").lower()
     force_publish = (force or "").strip() == "1"
+    payload = _load_payload(int(wine_id), user)
+    report = run_explainable_wine_compliance(payload)
+    if not report["publishable"]:
+        blocking = [
+            item["title"]
+            for item in report["results"]
+            if item["status"] == "ERROR" and item.get("blocking")
+        ]
+        msg = "Pubblicazione bloccata dal Compliance Engine: " + ", ".join(blocking)
+        return RedirectResponse(
+            f"/app/wine/{int(wine_id)}/compliance?msg={_quote_msg(msg)}",
+            status_code=303,
+        )
+    if force_publish:
+        raise HTTPException(409, "Override non necessario: il gate di conformità è superato")
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -41,26 +57,23 @@ def secure_publish_wine(
             if not _can_publish(user, wine, cur):
                 raise HTTPException(403, "Pubblicazione non autorizzata")
             missing = _publication_missing_fields(cur, int(wine_id))
-            if missing and not force_publish:
+            if missing:
                 msg = "Pubblicazione bloccata. Mancano dati obbligatori: " + ", ".join(missing)
                 return RedirectResponse(
                     f"/app/wine/{int(wine_id)}/compliance?msg={_quote_msg(msg)}",
                     status_code=303,
                 )
-            if missing and force_publish and role != "admin":
-                raise HTTPException(403, "Pubblicazione forzata consentita solo all'amministratore")
             _set_qr_status(cur, int(wine["qr_item_id"]), "attiva")
             _set_labels_public(cur, int(wine_id), True)
         conn.commit()
 
-    payload = _load_payload(int(wine_id), user)
     replay = create_and_persist_replay(
         payload,
         actor_user_id=int(user.get("id") or 0) or None,
-        reason="forced_publication" if force_publish else "publication",
+        reason="publication",
     )
     write_audit_event(
-        action="wine_published_forced" if force_publish else "wine_published",
+        action="wine_published",
         resource_type="wine",
         resource_id=wine_id,
         actor=user,
@@ -71,8 +84,7 @@ def secure_publish_wine(
             "content_hash": str(replay.get("content_hash") or ""),
         },
     )
-    suffix = "Pubblicato%20forzatamente" if force_publish else "Pubblicato"
-    return RedirectResponse(f"/app/wine/{int(wine_id)}?tab=export&msg={suffix}", status_code=303)
+    return RedirectResponse(f"/app/wine/{int(wine_id)}?tab=export&msg=Pubblicato", status_code=303)
 
 
 @router.post("/app/wine/{wine_id}/unpublish")

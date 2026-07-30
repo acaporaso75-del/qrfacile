@@ -447,7 +447,7 @@ def register_studio_post(
             cur.execute(
                 """
                 INSERT INTO users(email, pass_hash, role, created_at, email_verified, last_qr_type, pref_lock_qr_type)
-                VALUES (%s,%s,'studio',%s,1,'modulare',0)
+                VALUES (%s,%s,'studio',%s,0,'modulare',0)
                 RETURNING id
                 """,
                 (email, pass_hash, ts),

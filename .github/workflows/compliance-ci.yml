@@ -24,82 +24,40 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install test dependencies
+      - name: Install application and quality dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest
+          python -m pip install -r requirements.txt
+          python -m pip install pytest pip-audit detect-secrets
 
-      - name: Compile compliance, access, invitation and publication modules
+      - name: Compile all Python modules
         run: |
-          python -m py_compile \
-            qrfacile_app/security_middleware.py \
-            qrfacile_app/compliance_score_middleware.py \
-            qrfacile_app/public_recycling_catalog_middleware.py \
-            qrfacile_app/csrf_core.py \
-            qrfacile_app/audit_core.py \
-            qrfacile_app/email_verification_ui.py \
-            qrfacile_app/compliance_ui.py \
-            qrfacile_app/legal_acceptance_ui.py \
-            qrfacile_app/ai_review_ui.py \
-            qrfacile_app/ai_registry_ui.py \
-            qrfacile_app/collaboration_access_ui.py \
-            qrfacile_app/collaboration_management_ui.py \
-            qrfacile_app/invitation_management_ui.py \
-            qrfacile_app/invitation_acceptance_ui.py \
-            qrfacile_app/invitation_center_ui.py \
-            qrfacile_app/secure_publish_ui.py \
-            qrfacile_app/recycling_validation_ui.py \
-            qrfacile_app/recycling_guidance_ui.py \
-            qrfacile_app/wine_compliance_engine_ui.py \
-            qrfacile_app/services/email_verification.py \
-            qrfacile_app/services/ai_registry_service.py \
-            qrfacile_app/services/collaboration_access.py \
-            qrfacile_app/services/collaboration_management.py \
-            qrfacile_app/services/invitation_management.py \
-            qrfacile_app/services/invitation_acceptance.py \
-            qrfacile_app/services/recycling_catalog.py \
-            qrfacile_app/services/wine_compliance_engine.py \
-            qrfacile_app/services/wine_compliance_explainability.py \
-            scripts/compliance_retention.py \
-            scripts/project_security_audit.py
+          python -m compileall -q qrfacile_app app scripts tests main.py
+
+      - name: Import application with Python warnings as errors
+        run: |
+          python -W error -c "from qrfacile_app.main import app; assert len(app.routes) >= 70"
 
       - name: Run static project security gate
         run: |
           python scripts/project_security_audit.py --fail-on critical
 
-      - name: Run compliance regression tests
+      - name: Audit dependencies for known vulnerabilities
         run: |
-          pytest -q \
-            tests/test_compliance_baseline.py \
-            tests/test_legal_acceptance_baseline.py \
-            tests/test_privacy_incident_baseline.py \
-            tests/test_ai_system_registry.py \
-            tests/test_ai_registry_ui.py \
-            tests/test_wine_compliance_engine.py \
-            tests/test_compliance_score_integration.py \
-            tests/test_recycling_guidance.py \
-            tests/test_recycling_catalog_validation.py \
-            tests/test_recycling_server_validation.py \
-            tests/test_public_recycling_catalog.py \
-            tests/test_collaboration_access_hardening.py \
-            tests/test_collaboration_management.py \
-            tests/test_invitation_lifecycle.py \
-            tests/test_invitation_acceptance.py \
-            tests/test_secure_publishing.py \
-            tests/test_email_verification.py
+          pip-audit
+
+      - name: Scan tracked source for secrets
+        run: |
+          git ls-files -z | xargs -0 detect-secrets-hook
+
+      - name: Run complete regression suite
+        run: |
+          pytest -q
 
       - name: Check SQL migrations are transactional
         run: |
-          for migration in \
-            sql/2026_legal_ai_compliance.sql \
-            sql/2026_legal_acceptance_constraints.sql \
-            sql/2026_privacy_requests.sql \
-            sql/2026_ai_system_registry.sql \
-            sql/2026_collaboration_access_hardening.sql \
-            sql/2026_invitation_lifecycle.sql \
-            sql/2026_invitation_acceptance_hardening.sql \
-            sql/2026_email_verification.sql
+          for migration in sql/*.sql
           do
-            grep -q '^BEGIN;' "$migration"
-            grep -q '^COMMIT;' "$migration"
+            test "$(head -n 1 "$migration")" = "BEGIN;"
+            test "$(tail -n 1 "$migration")" = "COMMIT;"
           done

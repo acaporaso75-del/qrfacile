@@ -77,7 +77,7 @@ def _access_html(wine_id: int, data: dict, role: str) -> str:
             <span class='accessStatus {'assigned' if assigned else ''}'>{esc(status)}</span>
           </div>
           <div class='accessWho'><b>{esc(str(studio))}</b><span>{esc(permissions_text)}</span></div>
-          <div class='accessRule'>Lo studio non può mai pubblicare. La conferma finale resta alla cantina.</div>
+          <div class='accessRule'>Nessuno studio può pubblicare. La pubblicazione resta sempre riservata alla cantina.</div>
           {controls}
         </article>
         """)
