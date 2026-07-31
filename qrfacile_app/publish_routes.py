@@ -7,6 +7,7 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.services.recycling_catalog import normalize_recycling_items
 
 router = APIRouter()
 
@@ -178,16 +179,17 @@ def _publication_missing_fields(cur, wine_id: int) -> list[str]:
 
     cur.execute(
         """
-        SELECT COUNT(*)::int AS cnt
+        SELECT component, product, code, extra_code, note
         FROM wine_recycle_items
         WHERE wine_id=%s
-          AND COALESCE(code, '') <> ''
         """,
         (int(wine_id),),
     )
-    recycle_count = int((cur.fetchone() or {}).get("cnt") or 0)
+    recycle = normalize_recycling_items({
+        row["component"]: dict(row) for row in (cur.fetchall() or [])
+    })
 
-    if recycle_count <= 0:
+    if not recycle:
         missing.append("riciclabilità")
 
     return missing

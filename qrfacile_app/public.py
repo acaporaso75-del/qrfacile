@@ -7,6 +7,7 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.db import pg
+from qrfacile_app.services.recycling_catalog import normalize_recycling_items
 from qrfacile_app.services.wine_compliance_explainability import run_explainable_wine_compliance
 from qrfacile_app import ui
 
@@ -489,6 +490,10 @@ def _label_missing(locale: str, ingredient_text: str, allergens: list[str], nut:
     return missing
 
 
+def _public_gate_allows(status: str, missing: list[str], compliance_report: dict) -> bool:
+    return status == "attiva" and not missing and bool(compliance_report.get("publishable"))
+
+
 def _render_label_page(request: Request, slug: str, *, preview: bool):
     slug = (slug or "").strip()
     locale = choose_language(request)
@@ -631,7 +636,10 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
                 """,
                 (int(row["wine_id"]),),
             )
-            recycle_rows = cur.fetchall() or []
+            recycle_rows = list(normalize_recycling_items({
+                item["component"]: dict(item)
+                for item in (cur.fetchall() or [])
+            }).values())
 
             cur.execute(
                 """
@@ -674,7 +682,7 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
         "meta": {"extra_ingredients": extra_ing},
     }
     compliance_report = run_explainable_wine_compliance(compliance_payload)
-    if not preview and (is_incomplete or not compliance_report["publishable"]):
+    if not preview and not _public_gate_allows(status, public_missing, compliance_report):
         raise HTTPException(404, "QR non conforme o incompleto")
 
     if not preview:

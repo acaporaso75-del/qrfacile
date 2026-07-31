@@ -7,6 +7,7 @@ from psycopg.rows import dict_row
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.db import pg
 from qrfacile_app.services.collaboration_access import require_wine_access
+from qrfacile_app.services.recycling_catalog import normalize_recycling_items
 from qrfacile_app.services.wine_compliance_explainability import run_explainable_wine_compliance
 from qrfacile_app.ui_shell import esc, page
 
@@ -61,7 +62,9 @@ def _load_payload(wine_id: int, user: dict) -> dict:
                    FROM wine_recycle_items WHERE wine_id=%s ORDER BY component""",
                 (int(wine_id),),
             )
-            recycle = {row["component"]: dict(row) for row in cur.fetchall()}
+            recycle = normalize_recycling_items(
+                {row["component"]: dict(row) for row in cur.fetchall()}
+            )
 
             cur.execute(
                 """SELECT extra_ingredients, story_text, public_theme

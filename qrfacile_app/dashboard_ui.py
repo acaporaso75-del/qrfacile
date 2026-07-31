@@ -981,7 +981,10 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
                 LEFT JOIN (
                   SELECT wine_id, COUNT(*)::int AS recycle_count
                   FROM wine_recycle_items
-                  WHERE COALESCE(code, '') <> ''
+                  WHERE COALESCE(BTRIM(product), '') <> ''
+                     OR COALESCE(BTRIM(code), '') NOT IN ('', '-')
+                     OR COALESCE(BTRIM(extra_code), '') <> ''
+                     OR COALESCE(BTRIM(note), '') <> ''
                   GROUP BY wine_id
                 ) rec ON rec.wine_id = qw.id
 

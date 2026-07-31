@@ -4,10 +4,10 @@ from dataclasses import asdict, dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, Iterable, Mapping
 
-from qrfacile_app.services.recycling_catalog import validate_recycling_items
+from qrfacile_app.services.recycling_catalog import normalize_recycling_items, validate_recycling_items
 from qrfacile_app.services.wine_rule_catalog import load_wine_rule_catalog
 
-ENGINE_VERSION = "2026.07.2"
+ENGINE_VERSION = "2026.07.3"
 
 PASS = "PASS"
 WARNING = "WARNING"
@@ -237,7 +237,7 @@ def _check_nutrition_values(payload: Mapping[str, Any]) -> list[ComplianceResult
 
 
 def _check_recycling(payload: Mapping[str, Any]) -> list[ComplianceResult]:
-    recycle = payload.get("recycle") or {}
+    recycle = normalize_recycling_items(payload.get("recycle") or {})
     if not recycle:
         return [_result(
             "QRF-PACK-001",

@@ -2,6 +2,8 @@ from qrfacile_app.services.recycling_catalog import (
     CATALOG_VERSION,
     RECYCLING_CATALOG,
     find_by_code,
+    is_recycling_item_filled,
+    normalize_recycling_items,
     validate_recycling_items,
 )
 from qrfacile_app.services.wine_compliance_explainability import run_explainable_wine_compliance
@@ -43,6 +45,30 @@ def test_known_consistent_codes_are_accepted():
     assert result["all_known_and_consistent"] is True
     assert result["custom_codes"] == []
     assert result["mismatches"] == []
+
+
+def test_six_legacy_dash_placeholders_are_one_absent_recycling_result():
+    legacy = {
+        component: {"product": "", "code": "-", "extra_code": "", "note": ""}
+        for component in ("bottle", "box", "capsule", "closure", "label", "other")
+    }
+    assert normalize_recycling_items(legacy) == {}
+    validation = validate_recycling_items(legacy)
+    assert validation["component_count"] == 0
+    assert validation["missing_codes"] == []
+
+    report = run_explainable_wine_compliance(_payload(legacy))
+    packaging = [item for item in report["results"] if item["rule_id"] == "QRF-PACK-001"]
+    assert len(packaging) == 1
+    assert packaging[0]["status"] == "WARNING"
+    assert "assenti" in packaging[0]["title"].lower()
+
+
+def test_any_real_value_makes_row_filled_and_subject_to_validation():
+    row = {"product": "Sughero", "code": "-", "extra_code": "", "note": ""}
+    assert is_recycling_item_filled(row) is True
+    result = validate_recycling_items({"closure": row})
+    assert result["missing_codes"] == ["closure"]
 
 
 def test_custom_code_is_preserved_but_flagged_for_review():

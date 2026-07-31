@@ -24,7 +24,7 @@ def test_server_validation_delegates_only_after_catalog_checks():
 def test_custom_codes_are_not_blocked_by_server_guard():
     text = (ROOT / "qrfacile_app" / "recycling_validation_ui.py").read_text(encoding="utf-8")
     assert 'validation["custom_codes"]' not in text
-    assert "Completely empty components are ignored" in text
+    assert "is_recycling_item_filled(item)" in text
 
 
 def test_all_legacy_form_fields_are_forwarded():

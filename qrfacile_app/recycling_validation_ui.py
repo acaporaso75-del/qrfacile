@@ -5,7 +5,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 
-from qrfacile_app.services.recycling_catalog import validate_recycling_items
+from qrfacile_app.services.recycling_catalog import is_recycling_item_filled, validate_recycling_items
 from qrfacile_app.wine_compliance_ui import compliance_save as legacy_compliance_save
 
 router = APIRouter(tags=["recycling-validation"])
@@ -49,15 +49,14 @@ async def validated_compliance_save(request: Request, wine_id: int):
         extra = _text(form, f"rec_{component}_extra").strip()
         note = _text(form, f"rec_{component}_note").strip()
 
-        # Completely empty components are ignored by validation. The legacy
-        # persistence layer keeps its existing compatibility behaviour.
-        if product or code or extra or note:
-            recycle[component] = {
-                "product": product,
-                "code": code,
-                "extra_code": extra,
-                "note": note,
-            }
+        item = {
+            "product": product,
+            "code": code,
+            "extra_code": extra,
+            "note": note,
+        }
+        if is_recycling_item_filled(item):
+            recycle[component] = item
 
     validation = validate_recycling_items(recycle)
     if validation["missing_codes"]:

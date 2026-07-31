@@ -47,6 +47,32 @@ def normalize(value: Any) -> str:
     return " ".join(str(value or "").strip().casefold().split())
 
 
+def is_recycling_item_filled(item: Mapping[str, Any] | None) -> bool:
+    """Return whether a recycling row contains user-provided information.
+
+    Old records are pre-populated with ``code='-'`` and empty values in all
+    other fields.  That sentinel is storage compatibility data, not a real
+    packaging component.
+    """
+    row = item or {}
+    product = str(row.get("product") or "").strip()
+    code = str(row.get("code") or "").strip()
+    extra_code = str(row.get("extra_code") or "").strip()
+    note = str(row.get("note") or "").strip()
+    return bool(product or (code and code != "-") or extra_code or note)
+
+
+def normalize_recycling_items(
+    recycle: Mapping[str, Mapping[str, Any]] | None,
+) -> dict[str, dict[str, Any]]:
+    """Discard storage-only legacy placeholders while preserving real rows."""
+    return {
+        str(component): dict(raw or {})
+        for component, raw in (recycle or {}).items()
+        if is_recycling_item_filled(raw)
+    }
+
+
 _BY_CODE = {normalize(item["code"]): item for item in RECYCLING_CATALOG if item.get("code")}
 _BY_MATERIAL = {normalize(item["material"]): item for item in RECYCLING_CATALOG}
 
@@ -60,7 +86,7 @@ def find_by_material(material: Any) -> dict[str, Any] | None:
 
 
 def validate_recycling_items(recycle: Mapping[str, Mapping[str, Any]] | None) -> dict[str, Any]:
-    items = recycle or {}
+    items = normalize_recycling_items(recycle)
     missing_codes: list[str] = []
     custom_codes: list[dict[str, str]] = []
     mismatches: list[dict[str, str]] = []
