@@ -2,6 +2,7 @@ from qrfacile_app.services.recycling_catalog import (
     CATALOG_VERSION,
     RECYCLING_CATALOG,
     find_by_code,
+    get_recycling_suggestions,
     is_recycling_item_filled,
     normalize_recycling_items,
     validate_recycling_items,
@@ -34,6 +35,26 @@ def test_catalog_is_shared_versioned_and_contains_main_wine_components():
     assert len(RECYCLING_CATALOG) >= 30
     for code in ("GL 70", "GL 71", "GL 72", "FOR 51", "PAP 22", "ALU 41", "C/PAP 84"):
         assert find_by_code(code) is not None
+
+
+def _suggestion_codes(component):
+    return [item["code"] for item in get_recycling_suggestions(component) if item["code"]]
+
+
+def test_component_suggestions_start_with_explicit_priorities():
+    assert _suggestion_codes("bottle")[:3] == ["GL 71", "GL 72", "GL 70"]
+    assert _suggestion_codes("bottle")[0] != "PET 1"
+    assert _suggestion_codes("closure")[0] == "FOR 51"
+    assert _suggestion_codes("label")[0] == "PAP 22"
+    assert _suggestion_codes("box")[0] == "PAP 20"
+
+
+def test_all_compatible_catalog_items_remain_in_component_suggestions():
+    for component in ("bottle", "closure", "capsule", "label", "box", "other"):
+        expected = [item for item in RECYCLING_CATALOG if component in item.get("components", [])]
+        actual = get_recycling_suggestions(component)
+        assert {id(item) for item in actual} == {id(item) for item in expected}
+        assert len(actual) == len(expected)
 
 
 def test_known_consistent_codes_are_accepted():

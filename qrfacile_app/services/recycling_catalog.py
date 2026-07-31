@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-CATALOG_VERSION = "2026.07.3"
+CATALOG_VERSION = "2026.07.4"
 CATALOG_SOURCE = "Decisione 97/129/CE"
 
 RECYCLING_CATALOG: list[dict[str, Any]] = [
@@ -43,8 +43,40 @@ RECYCLING_CATALOG: list[dict[str, Any]] = [
 ]
 
 
+RECYCLING_COMPONENT_PRIORITIES: dict[str, tuple[str, ...]] = {
+    "bottle": ("GL 71", "GL 72", "GL 70", "PET 1", "C/GL 95", "C/GL 96", "C/GL 97", "C/GL 98"),
+    "closure": ("FOR 51", "PP 5", "ALU 41", "FE 40", "HDPE 2", "PS 6", "OTHER 7"),
+    "capsule": ("ALU 41", "PVC 3", "PET 1", "PP 5", "LDPE 4", "FE 40"),
+    "label": ("PAP 22", "PP 5", "PET 1", "PVC 3", "LDPE 4"),
+    "box": ("PAP 20", "PAP 21", "PAP 22", "FOR 50"),
+    "other": (),
+}
+
+
 def normalize(value: Any) -> str:
     return " ".join(str(value or "").strip().casefold().split())
+
+
+def get_recycling_suggestions(component: Any) -> list[dict[str, Any]]:
+    """Return every compatible catalog item in component-specific priority order."""
+    component_key = normalize(component)
+    compatible = [
+        item for item in RECYCLING_CATALOG
+        if component_key in {normalize(value) for value in item.get("components") or []}
+    ]
+    priorities = {
+        normalize(code): position
+        for position, code in enumerate(RECYCLING_COMPONENT_PRIORITIES.get(component_key, ()))
+    }
+    fallback = len(priorities)
+    catalog_positions = {id(item): position for position, item in enumerate(RECYCLING_CATALOG)}
+    return sorted(
+        compatible,
+        key=lambda item: (
+            priorities.get(normalize(item.get("code")), fallback),
+            catalog_positions[id(item)],
+        ),
+    )
 
 
 def is_recycling_item_filled(item: Mapping[str, Any] | None) -> bool:

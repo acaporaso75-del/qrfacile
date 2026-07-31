@@ -10,6 +10,7 @@ from qrfacile_app.services.recycling_catalog import (
     CATALOG_SOURCE,
     CATALOG_VERSION,
     RECYCLING_CATALOG,
+    get_recycling_suggestions,
 )
 from qrfacile_app.wine_compliance_ui import compliance_get as legacy_compliance_get
 
@@ -28,7 +29,21 @@ COMPONENT_LABELS = {
 
 def _guidance_markup() -> str:
     catalog_json = json.dumps(RECYCLING_CATALOG, ensure_ascii=False)
+    suggestions = {
+        component: get_recycling_suggestions(component)
+        for component in COMPONENT_LABELS
+    }
+    suggestions_json = json.dumps(suggestions, ensure_ascii=False)
     component_labels_json = json.dumps(COMPONENT_LABELS, ensure_ascii=False)
+    datalists = "".join(
+        f'''<datalist id="qrf-recycling-materials-{component}">
+          {''.join(f'<option value="{item["material"]}">{item["family"]} · {item["code"] or "codice da inserire"}</option>' for item in items)}
+        </datalist>
+        <datalist id="qrf-recycling-codes-{component}">
+          {''.join(f'<option value="{item["code"]}">{item["material"]}</option>' for item in items if item["code"])}
+        </datalist>'''
+        for component, items in suggestions.items()
+    )
     return f"""
     <style>
       .qrfRecycleStatus{{display:block;margin-top:7px;font-size:12px;font-weight:850;color:#64748b}}
@@ -42,16 +57,12 @@ def _guidance_markup() -> str:
       .qrfRecycleAlert.show{{display:block}}
       .qrfRecycleAlert ul{{margin:7px 0 0 18px;padding:0}}
     </style>
-    <datalist id="qrf-recycling-materials">
-      {''.join(f'<option value="{item["material"]}">{item["family"]} · {item["code"] or "codice da inserire"}</option>' for item in RECYCLING_CATALOG)}
-    </datalist>
-    <datalist id="qrf-recycling-codes">
-      {''.join(f'<option value="{item["code"]}">{item["material"]}</option>' for item in RECYCLING_CATALOG if item["code"])}
-    </datalist>
+    {datalists}
     <div id="qrf-recycling-alert" class="qrfRecycleAlert" role="alert" aria-live="assertive"></div>
     <script>
     (() => {{
       const catalog = {catalog_json};
+      const suggestions = {suggestions_json};
       const componentLabels = {component_labels_json};
       const normalize = value => String(value || '').trim().toLowerCase().replace(/\\s+/g, ' ');
       const byMaterial = new Map(catalog.map(item => [normalize(item.material), item]));
@@ -65,9 +76,9 @@ def _guidance_markup() -> str:
         const note = document.querySelector(`input[name="${{prefix}}_note"]`);
         if (!code) return;
 
-        product.setAttribute('list', 'qrf-recycling-materials');
+        product.setAttribute('list', `qrf-recycling-materials-${{component}}`);
         product.setAttribute('autocomplete', 'off');
-        code.setAttribute('list', 'qrf-recycling-codes');
+        code.setAttribute('list', `qrf-recycling-codes-${{component}}`);
         code.setAttribute('autocomplete', 'off');
 
         const status = document.createElement('span');
@@ -84,8 +95,8 @@ def _guidance_markup() -> str:
         tools.appendChild(reset);
         status.insertAdjacentElement('afterend', tools);
 
-        const preferred = catalog.filter(item => (item.components || []).includes(component) && !item.custom);
-        const recommended = preferred[0] || null;
+        const preferred = suggestions[component] || [];
+        const recommended = preferred.find(item => !item.custom) || null;
 
         const evaluate = () => {{
           const materialItem = byMaterial.get(normalize(product.value));
@@ -197,6 +208,10 @@ def recycling_catalog_api(request: Request):
         "source": CATALOG_SOURCE,
         "count": len(RECYCLING_CATALOG),
         "items": RECYCLING_CATALOG,
+        "suggestions": {
+            component: get_recycling_suggestions(component)
+            for component in COMPONENT_LABELS
+        },
     })
 
 

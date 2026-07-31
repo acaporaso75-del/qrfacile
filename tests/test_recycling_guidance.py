@@ -59,6 +59,15 @@ def test_guidance_validates_before_save_and_can_restore_recommendation():
     assert "event.preventDefault()" in ui
     assert "scrollIntoView" in ui
     assert "componentLabels" in ui
+    assert "preferred[0]" not in ui
+    assert "get_recycling_suggestions" in ui
+
+
+def test_guidance_uses_separate_component_datalists_and_shared_api_suggestions():
+    ui = _ui_text()
+    assert 'qrf-recycling-materials-{component}' in ui
+    assert 'qrf-recycling-codes-{component}' in ui
+    assert '"suggestions"' in ui
 
 
 def test_guided_route_precedes_legacy_compliance_route():
