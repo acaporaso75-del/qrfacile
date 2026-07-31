@@ -16,7 +16,7 @@ def now_epoch() -> int:
     return int(datetime.now(timezone.utc).timestamp())
 
 def new_slug(n=8):
-    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # pragma: allowlist secret
     return "".join(secrets.choice(alphabet) for _ in range(n))
 
 def get_default_user_id(cur) -> int:

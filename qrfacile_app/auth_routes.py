@@ -20,7 +20,7 @@ router = APIRouter()
 logger = logging.getLogger("qrfacile.auth_routes")
 
 PASSWORD_RESET_TTL_SECONDS = 60 * 60
-PASSWORD_RESET_NEUTRAL_MSG = "Se l’email è registrata, riceverai un link per reimpostare la password."
+PASSWORD_RESET_NEUTRAL_MSG = "Se l’email è registrata, riceverai un link per reimpostare la password."  # pragma: allowlist secret
 
 
 

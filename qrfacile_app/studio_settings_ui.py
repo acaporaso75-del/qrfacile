@@ -630,8 +630,10 @@ def studios_invite_post(
 
 
 
-@router.get("/app/invite/studio/accept/{token}", response_class=HTMLResponse)
-def studio_accept_invite(request: Request, token: str):
+# Legacy implementation intentionally left unregistered while old installations
+# transition to qrfacile_app.invitation_acceptance_ui.  Acceptance must only be
+# reachable through the POST route below.
+def _legacy_studio_accept_invite_unrouted(request: Request, token: str):
     token = (token or "").strip()
 
     with pg() as conn:

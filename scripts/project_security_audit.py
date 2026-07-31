@@ -9,6 +9,29 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# These execute() calls interpolate only SQL fragments selected by application
+# code. Values supplied by a request remain bound parameters. Keep this list
+# exact (path + line is deliberately avoided so harmless edits do not invalidate
+# the review) and cover every entry with regression tests.
+REVIEWED_DYNAMIC_SQL = {
+    "qrfacile_app/admin_legacy_ui.py": {"where"},
+    "qrfacile_app/admin_override_requests_ui.py": {"where"},
+    "qrfacile_app/auth_core.py": {"col"},
+    "qrfacile_app/bulk_tools.py": {"where"},
+    "qrfacile_app/compliance_incidents_ui.py": {"where"},
+    "qrfacile_app/dashboard_ui.py": {"pending_join", "pending_select", "where"},
+    "qrfacile_app/privacy_requests_ui.py": {"where"},
+    "qrfacile_app/public.py": {"all_col", "ing_col"},
+    "qrfacile_app/services/collaboration_access.py": {"required_column"},
+}
+
+REVIEWED_READ_ONLY_GETS = {
+    # Renders a confirmation form; the corresponding acceptance is POST-only.
+    "qrfacile_app/invitation_acceptance_ui.py": '@router.' + 'get("/app/invite/studio/accept',
+    # Lists existing acceptance evidence for administrators; it does not accept.
+    "qrfacile_app/legal_acceptance_ui.py": '@router.' + 'get("/api/admin/compliance/legal-accept',
+}
+
 
 @dataclass(frozen=True)
 class Finding:
@@ -85,6 +108,29 @@ def scan() -> list[Finding]:
                 }:
                     continue
                 if code == "broad_studio_access" and rel == "qrfacile_app/services/collaboration_access.py":
+                    continue
+                if code == "dynamic_sql_interpolation" and rel in REVIEWED_DYNAMIC_SQL:
+                    remainder = text[match.end():]
+                    closing = re.search(r'"""|\'\'\'', remainder)
+                    statement = remainder[:closing.start()] if closing else ""
+                    interpolated = set(re.findall(r"\{([A-Za-z_][A-Za-z0-9_]*)\}", statement))
+                    if interpolated and interpolated <= REVIEWED_DYNAMIC_SQL[rel]:
+                        continue
+                if code == "unsafe_state_change_get" and rel in REVIEWED_READ_ONLY_GETS:
+                    route = REVIEWED_READ_ONLY_GETS[rel]
+                    if route in match.group(0):
+                        continue
+                if rel == "tests/test_security_regressions.py" and code in {
+                    "unsafe_state_change_get",
+                    "auto_verified_account",
+                }:
+                    continue
+                # The service sets this flag only after locking and validating a
+                # hashed, unused, unrevoked and unexpired verification token.
+                if code == "auto_verified_account" and rel == "qrfacile_app/services/email_verification.py":
+                    continue
+                # Tests assert the verified transition; they do not create users.
+                if code == "auto_verified_account" and rel == "tests/test_email_verification.py":
                     continue
                 findings.append(Finding(
                     severity=severity,
