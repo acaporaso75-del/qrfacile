@@ -4,6 +4,7 @@ from typing import Set
 
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
+from psycopg.errors import UniqueViolation
 from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
@@ -16,6 +17,8 @@ from qrfacile_app.auth_core import (
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 
 router = APIRouter()
+
+QR_WINES_QR_ITEM_UNIQUE_CONSTRAINT = "uq_qr_wines_qr_item_id"
 
 
 def now() -> int:
@@ -1142,10 +1145,22 @@ def new_wine_post(
             placeholders = ",".join(["%s"] * len(values))
             cols_sql = ",".join(col_names)
 
-            cur.execute(
-                f"INSERT INTO qr_wines({cols_sql}) VALUES ({placeholders}) RETURNING id",
-                tuple(values),
-            )
+            try:
+                cur.execute(
+                    f"INSERT INTO qr_wines({cols_sql}) VALUES ({placeholders}) RETURNING id",
+                    tuple(values),
+                )
+            except UniqueViolation as exc:
+                conn.rollback()
+                if exc.diag.constraint_name == QR_WINES_QR_ITEM_UNIQUE_CONSTRAINT:
+                    return RedirectResponse(
+                        url=(
+                            f"/app/new-wine?winery_id={int(winery_id)}"
+                            "&err=Esiste%20gi%C3%A0%20un%20vino%20per%20questo%20QR"
+                        ),
+                        status_code=303,
+                    )
+                raise
             wine_id = int(cur.fetchone()["id"])
 
             cur.execute(
