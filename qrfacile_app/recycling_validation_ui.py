@@ -4,9 +4,13 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
+from psycopg.rows import dict_row
 
+from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.db import pg
 from qrfacile_app.services.recycling_catalog import is_recycling_item_filled, validate_recycling_items
-from qrfacile_app.wine_compliance_ui import compliance_save as legacy_compliance_save
+from qrfacile_app.services.recycling_persistence import RecyclingPersistenceError, persist_recycling_component
+from qrfacile_app.wine_compliance_ui import _upsert_meta, _upsert_nutrition, _wine
 
 router = APIRouter(tags=["recycling-validation"])
 
@@ -42,6 +46,16 @@ def _text(form, name: str, default: str = "") -> str:
 async def validated_compliance_save(request: Request, wine_id: int):
     form = await request.form()
 
+    with pg() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            wine = _wine(cur, int(wine_id))
+    require_any_role(
+        request,
+        ("winery", "studio", "admin"),
+        winery_id=int(wine["winery_id"]),
+        need="edit",
+    )
+
     recycle: dict[str, dict[str, str]] = {}
     for component in COMPONENTS:
         product = _text(form, f"rec_{component}_product").strip()
@@ -74,11 +88,39 @@ async def validated_compliance_save(request: Request, wine_id: int):
             f"Materiale e codice riciclabilità non coerenti per: {labels}",
         )
 
-    kwargs = {field: _text(form, field) for field in BASE_FIELDS}
-    for component in COMPONENTS:
-        kwargs[f"rec_{component}_product"] = _text(form, f"rec_{component}_product")
-        kwargs[f"rec_{component}_code"] = _text(form, f"rec_{component}_code")
-        kwargs[f"rec_{component}_extra"] = _text(form, f"rec_{component}_extra")
-        kwargs[f"rec_{component}_note"] = _text(form, f"rec_{component}_note")
+    try:
+        energy_kj = int(_text(form, "energy_kj").strip())
+        energy_kcal = int(_text(form, "energy_kcal").strip())
+    except ValueError:
+        return _redirect_error(wine_id, "Energia kJ e kcal obbligatoria e numerica")
 
-    return legacy_compliance_save(request=request, wine_id=wine_id, **kwargs)
+    try:
+        with pg() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                _upsert_nutrition(
+                    cur, int(wine_id), energy_kj, energy_kcal,
+                    *(_text(form, field) for field in ("fat", "saturates", "carbs", "sugars", "protein", "salt")),
+                )
+                _upsert_meta(
+                    cur,
+                    int(wine_id),
+                    _text(form, "extra_ingredients").strip(),
+                    _text(form, "story_text").strip(),
+                    _text(form, "public_theme", "minimal").strip() or "minimal",
+                )
+                for component in COMPONENTS:
+                    persist_recycling_component(cur, int(wine_id), component, {
+                        "product": _text(form, f"rec_{component}_product"),
+                        "code": _text(form, f"rec_{component}_code"),
+                        "extra_code": _text(form, f"rec_{component}_extra"),
+                        "note": _text(form, f"rec_{component}_note"),
+                    })
+            conn.commit()
+    except RecyclingPersistenceError as exc:
+        return _redirect_error(wine_id, str(exc))
+
+    custom = validation["custom_codes"]
+    if custom:
+        codes = ", ".join(item["code"] for item in custom)
+        return _redirect_error(wine_id, f"Codice personalizzato salvato: {codes}; verificare con il fornitore")
+    return _redirect_error(wine_id, "Dati salvati correttamente")

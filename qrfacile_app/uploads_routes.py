@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 
 router = APIRouter()
 
-UPLOADS_DIR = "/opt/qrfacile/uploads"
+UPLOADS_DIR = os.getenv("UPLOADS_DIR", os.path.join(os.getenv("APP_ROOT", "/opt/qrfacile"), "uploads"))
 
 def _serve_upload(path: str):
     if ".." in path or path.startswith("/"):
@@ -28,4 +28,3 @@ def uploads_get(path: str = Path(...)):
 @router.head("/uploads/{path:path}")
 def uploads_head(path: str = Path(...)):
     return _serve_upload(path)
-

@@ -10,10 +10,12 @@ from psycopg.rows import dict_row
 from qrfacile_app.db import pg
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
+from qrfacile_app.guided_flow import render_guided_stepper
 
 router = APIRouter()
 
-UPLOAD_BASE = "/opt/qrfacile/uploads/wine_assets"
+UPLOADS_DIR = os.getenv("UPLOADS_DIR", os.path.join(os.getenv("APP_ROOT", "/opt/qrfacile"), "uploads"))
+UPLOAD_BASE = os.path.join(UPLOADS_DIR, "wine_assets")
 
 # Hardening upload
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024        # 5MB
@@ -212,7 +214,8 @@ def _image_card(wine_id: int, kind: str, asset: dict) -> str:
     original = (asset.get("img_original") or "").strip()
     optimized = (asset.get("img_optimized") or "").strip()
 
-    if thumb:
+    thumb_readable = bool(thumb and os.path.isfile(os.path.join(UPLOADS_DIR, thumb)) and os.access(os.path.join(UPLOADS_DIR, thumb), os.R_OK))
+    if thumb_readable:
         preview = f"""
         <div class="imagesPreviewBox">
           <img src="/uploads/{esc(thumb)}" alt="{esc(title)}">
@@ -244,7 +247,7 @@ def _image_card(wine_id: int, kind: str, asset: dict) -> str:
         """
 
     delete_form = ""
-    if thumb:
+    if thumb_readable:
         delete_form = f"""
         <form method="post" action="/app/wine/{int(wine_id)}/images/delete"
               onsubmit="return confirm('Eliminare immagine {esc(title)}?');">
@@ -369,6 +372,8 @@ def images_page(request: Request, wine_id: int, msg: str = ""):
         </div>
       </div>
 
+      {render_guided_stepper(int(wine_id), "images", {"wine"})}
+
       <div class="imagesTabs">
         <a class="imagesTab" href="/app/wine/{int(wine_id)}">Overview</a>
         <a class="imagesTab active" href="/app/wine/{int(wine_id)}/images">Immagini</a>
@@ -404,6 +409,12 @@ def images_page(request: Request, wine_id: int, msg: str = ""):
       <div class="note" style="margin-top:18px">
         I file vengono salvati in versione originale, ottimizzata e thumbnail.
         Le immagini non valide, troppo grandi o non supportate vengono rifiutate.
+      </div>
+
+      <div class="complianceActions" style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+        <a class="btn" href="/app/wine/{int(wine_id)}">Indietro</a>
+        <a class="btn" href="/app/wine/{int(wine_id)}/images">Salva</a>
+        <a class="btn btn-primary" href="/app/wine/{int(wine_id)}/compliance#ingredienti">Salva e continua</a>
       </div>
 
       <style>
@@ -818,6 +829,16 @@ def images_upload(request: Request, wine_id: int, kind: str = Form(...), image: 
             status_code=303,
         )
 
+    if not all(
+        os.path.isfile(os.path.join(UPLOADS_DIR, relative))
+        and os.access(os.path.join(UPLOADS_DIR, relative), os.R_OK)
+        for relative in paths.values()
+    ):
+        return RedirectResponse(
+            f"/app/wine/{wine_id}/images?msg=File%20salvato%20ma%20non%20leggibile",
+            status_code=303,
+        )
+
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
@@ -839,6 +860,12 @@ def images_upload(request: Request, wine_id: int, kind: str = Form(...), image: 
                     now(),
                 ),
             )
+            if cur.rowcount != 1:
+                conn.rollback()
+                return RedirectResponse(
+                    f"/app/wine/{wine_id}/images?msg=Database%20immagine%20non%20aggiornato",
+                    status_code=303,
+                )
             conn.commit()
 
     return RedirectResponse(f"/app/wine/{wine_id}/images?msg=Caricato", status_code=303)

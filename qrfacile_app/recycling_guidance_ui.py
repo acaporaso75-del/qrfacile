@@ -130,7 +130,7 @@ def _guidance_markup() -> str:
             return {{state: 'wrong-component', item}};
           }}
           status.className = 'qrfRecycleStatus known';
-          status.textContent = `Codice verificato nel catalogo ${{{json.dumps(CATALOG_VERSION)}}}: ${{item.material}}.`;
+          status.textContent = `Valido · ${{item.material}} · ${{item.collection}}`;
           return {{state: 'known', item}};
         }};
 
@@ -157,8 +157,10 @@ def _guidance_markup() -> str:
 
         product.addEventListener('change', applyFromMaterial);
         product.addEventListener('input', evaluate);
+        product.addEventListener('blur', applyFromMaterial);
         code.addEventListener('change', applyFromCode);
         code.addEventListener('input', evaluate);
+        code.addEventListener('blur', applyFromCode);
         reset.addEventListener('click', () => apply(recommended));
 
         product.placeholder = preferred.length

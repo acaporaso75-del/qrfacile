@@ -8,6 +8,7 @@ from psycopg.rows import dict_row
 from qrfacile_app.db import pg
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
+from qrfacile_app.guided_flow import render_guided_stepper
 
 router = APIRouter()
 
@@ -34,8 +35,10 @@ def _wine(cur, wine_id: int) -> dict:
                qw.wine_name,
                qw.vintage,
                qw.lot,
+               qi.slug,
                w.name AS winery_name
         FROM qr_wines qw
+        JOIN qr_items qi ON qi.id = qw.qr_item_id
         JOIN wineries w ON w.id = qw.winery_id
         WHERE qw.id=%s
         LIMIT 1
@@ -494,16 +497,10 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
           {summary_html}
         </div>
 
-        <div class="complianceHeroCard">
-          <div class="complianceHeroCardTitle">Percorso consigliato</div>
-
-          <div class="complianceStepsMini">
-            <div><b>1</b><span>Immagini</span></div>
-            <div class="active"><b>2</b><span>Compliance</span></div>
-            <div><b>3</b><span>Export</span></div>
-          </div>
-        </div>
+        <div class="complianceHeroCard"><div class="complianceHeroCardTitle">Percorso guidato</div><p>Salva ogni sezione e continua fino al controllo finale.</p></div>
       </div>
+
+      {render_guided_stepper(int(wine_id), "ingredients", {"wine"})}
 
       <div class="complianceTabs">
         <a class="complianceTab" href="/app/wine/{int(wine_id)}">Overview</a>
@@ -512,7 +509,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
         <a class="complianceTab" href="/app/wine/{int(wine_id)}/export">Export</a>
       </div>
 
-      <div class="complianceFlow">
+      <div class="complianceFlow" style="display:none">
         <a href="/app/wine/{int(wine_id)}/images">
           <span>1</span>
           <b>Immagini</b>
@@ -532,7 +529,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
         </a>
       </div>
 
-      <div class="complianceGrid2">
+      <div class="complianceGrid2" id="ingredienti">
         <div class="card compliancePanel">
           <div class="compliancePanelHead">
             <div>
@@ -612,7 +609,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
                  placeholder="es. eventuali ingredienti non presenti in lista">
         </div>
 
-        <div class="card compliancePanel" style="margin-top:18px">
+        <div class="card compliancePanel" id="nutrizione" style="margin-top:18px">
           <div class="compliancePanelHead">
             <div>
               <div class="complianceSmallLabel">Nutrizione</div>
@@ -679,7 +676,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
           </div>
         </div>
 
-        <div class="card compliancePanel" style="margin-top:18px">
+        <div class="card compliancePanel" id="riciclabilita" style="margin-top:18px">
           <div class="compliancePanelHead">
             <div>
               <div class="complianceSmallLabel">Riciclabilità</div>
@@ -724,11 +721,35 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
         </div>
 
         <div class="complianceActions">
-          <a class="btn" href="/app/wine/{int(wine_id)}">Torna al lotto</a>
-          <button class="btn btn-primary complianceSaveBtn" type="submit">Salva compliance</button>
-          <a class="btn complianceExportBtn" href="/app/wine/{int(wine_id)}/export">Vai a Export</a>
+          <a class="btn" href="/app/wine/{int(wine_id)}/images">Indietro</a>
+          <button class="btn" type="submit" name="continue_to" value="stay">Salva</button>
+          <button class="btn btn-primary complianceSaveBtn" type="submit" name="continue_to" value="review">Salva e continua</button>
         </div>
       </form>
+
+      <div class="card compliancePanel" id="controllo-finale" style="margin-top:18px">
+        <div class="complianceSmallLabel">Step 6</div><div class="h2">Controllo finale</div>
+        <p>Il Compliance Score mostra errori bloccanti, warning e collegamenti ai campi da correggere. Il gate server viene eseguito di nuovo quando pubblichi.</p>
+        {summary_html}
+      </div>
+      <div class="card compliancePanel" id="pubblicazione" style="margin-top:18px">
+        <div class="complianceSmallLabel">Step 7</div><div class="h2">Preview e pubblicazione</div>
+        <div class="complianceActions">
+          <a class="btn" href="/preview/{esc(w.get('slug') or '')}" target="_blank">Apri preview</a>
+          <a class="btn btn-primary" href="/app/wine/{int(wine_id)}">Vai alla pubblicazione</a>
+        </div>
+      </div>
+
+      <script>
+      (() => {{
+        const form=document.getElementById('saveForm'); if(!form) return;
+        let dirty=false; let submitting=false;
+        form.addEventListener('input',()=>{{dirty=true}});
+        form.addEventListener('change',()=>{{dirty=true}});
+        form.addEventListener('submit',()=>{{submitting=true;dirty=false}});
+        window.addEventListener('beforeunload',event=>{{if(dirty&&!submitting){{event.preventDefault();event.returnValue=''}}}});
+      }})();
+      </script>
 
       <style>
         .complianceWrap {{

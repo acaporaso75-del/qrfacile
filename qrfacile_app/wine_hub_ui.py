@@ -8,6 +8,7 @@ from psycopg.rows import dict_row
 from qrfacile_app.db import pg
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
+from qrfacile_app.guided_flow import render_guided_stepper
 
 router = APIRouter()
 
@@ -112,6 +113,34 @@ def _wine_assets(cur, wine_id: int) -> dict:
         (int(wine_id),),
     )
     return {r["kind"]: r for r in (cur.fetchall() or [])}
+
+
+def _workflow_snapshot(cur, wine: dict, assets: dict, published: bool) -> dict:
+    wine_id = int(wine["wine_id"])
+    cur.execute("SELECT COUNT(*)::int AS cnt FROM wine_ingredients WHERE wine_id=%s", (wine_id,))
+    ingredients = int((cur.fetchone() or {}).get("cnt") or 0)
+    cur.execute("SELECT COUNT(*)::int AS cnt FROM wine_allergens WHERE wine_id=%s", (wine_id,))
+    allergens = int((cur.fetchone() or {}).get("cnt") or 0)
+    cur.execute("SELECT energy_kj, energy_kcal FROM wine_nutrition WHERE wine_id=%s LIMIT 1", (wine_id,))
+    nutrition = cur.fetchone() or {}
+    cur.execute("SELECT COUNT(*)::int AS cnt FROM wine_recycle_items WHERE wine_id=%s AND COALESCE(NULLIF(BTRIM(code), ''), '-') <> '-'", (wine_id,))
+    recycling = int((cur.fetchone() or {}).get("cnt") or 0)
+    complete = {
+        "wine": bool(str(wine.get("wine_name") or "").strip() and str(wine.get("lot") or "").strip()),
+        "images": bool(assets.get("front")),
+        "ingredients": ingredients > 0 and allergens > 0,
+        "nutrition": nutrition.get("energy_kj") is not None and nutrition.get("energy_kcal") is not None,
+        "recycling": recycling > 0,
+    }
+    missing = [label for key, label in (("wine", "dati vino"), ("images", "immagine fronte"), ("ingredients", "ingredienti e allergeni"), ("nutrition", "valori nutrizionali"), ("recycling", "riciclabilità")) if not complete[key]]
+    publishable = not missing
+    if publishable:
+        complete.update({"review": True})
+    if published:
+        complete.update({"publish": True})
+    percent = round(len(complete) / 7 * 100)
+    state = "Pubblicata" if published else ("Pronta per la pubblicazione" if publishable else ("In compilazione" if any(complete.values()) else "Bozza"))
+    return {"completed": set(complete), "missing": missing, "publishable": publishable, "percent": percent, "state": state}
 
 
 def _labels_for_wine(cur, wine_id: int, role: str, user_id: int) -> list[dict]:
@@ -666,6 +695,7 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
             label_ids = [int(row["label_id"]) for row in labels]
             management = _label_management_map(cur, label_ids)
             connected_studios = _connected_studios(cur, int(wine["winery_id"])) if role in ("winery", "admin") else []
+            workflow = _workflow_snapshot(cur, wine, assets, pub_count > 0)
 
     app_base = getattr(request.app.state, "app_base_url", "").rstrip("/")
 
@@ -742,7 +772,7 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
     new_label_action = ""
     if role in ("winery", "admin"):
         new_label_action = f"""
-        <a class="btn btn-primary" href="/app/new-label?wine_id={int(wine_id)}">
+        <a class="btn" href="/app/new-label?wine_id={int(wine_id)}">
           + Etichetta
         </a>
         """
@@ -819,6 +849,21 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
             <span>Pubbliche</span>
             <b>{pub_count}</b>
           </div>
+        </div>
+      </div>
+
+      {render_guided_stepper(int(wine_id), "wine", workflow["completed"])}
+
+      <div class="card" style="margin-top:18px;padding:22px" id="stato-etichetta">
+        <div class="wineHubCardHead"><div><div class="wineHubSmallLabel">Stato etichetta</div><div class="h2">{esc(workflow['state'])}</div></div><span class="pill {'pill-green' if workflow['publishable'] else 'pill-muted'}">{workflow['percent']}% completo</span></div>
+        <div style="height:10px;border-radius:999px;background:#e2e8f0;overflow:hidden;margin:14px 0"><div style="height:100%;width:{workflow['percent']}%;background:#14b8a6"></div></div>
+        {('<div class="note note-ok"><b>Etichetta pronta per la pubblicazione</b></div>' if workflow['publishable'] and not is_published else '')}
+        {('<div class="note"><b>Dati mancanti:</b> ' + esc(', '.join(workflow['missing'])) + '</div>' if workflow['missing'] else '')}
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+          {('<a class="btn btn-primary" href="/app/wine/' + str(int(wine_id)) + '/images">Continua compilazione</a>' if not workflow['publishable'] else '')}
+          {('<a class="btn" target="_blank" href="/preview/' + esc(slug) + '">Apri preview</a>' if slug else '')}
+          {('<a class="btn" target="_blank" href="/e/' + esc(slug) + '">Apri pagina pubblica</a>' if is_published and slug else '')}
+          {('<a class="btn" href="/app/wine/' + str(int(wine_id)) + '/export">Scarica QR</a>' if slug else '')}
         </div>
       </div>
 

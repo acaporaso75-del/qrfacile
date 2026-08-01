@@ -11,19 +11,22 @@ def test_server_validation_route_precedes_legacy_save_route():
     assert guard < legacy
 
 
-def test_server_validation_delegates_only_after_catalog_checks():
+def test_server_validation_persists_only_after_catalog_checks():
     text = (ROOT / "qrfacile_app" / "recycling_validation_ui.py").read_text(encoding="utf-8")
     validation = text.index("validate_recycling_items(recycle)")
     missing = text.index('validation["missing_codes"]')
     mismatches = text.index('validation["mismatches"]')
-    delegate = text.index("return legacy_compliance_save")
-    assert validation < missing < delegate
-    assert validation < mismatches < delegate
+    persist = text.index("persist_recycling_component")
+    persist_call = text.index("persist_recycling_component", persist + 1)
+    assert validation < missing < persist_call
+    assert validation < mismatches < persist_call
+    assert "legacy_compliance_save" not in text
 
 
 def test_custom_codes_are_not_blocked_by_server_guard():
     text = (ROOT / "qrfacile_app" / "recycling_validation_ui.py").read_text(encoding="utf-8")
-    assert 'validation["custom_codes"]' not in text
+    assert 'validation["custom_codes"]' in text
+    assert "Codice personalizzato salvato" in text
     assert "is_recycling_item_filled(item)" in text
 
 

@@ -7,7 +7,7 @@ from typing import Dict
 from PIL import Image, ImageFile
 from fastapi import UploadFile
 
-UPLOADS_DIR = "/opt/qrfacile/uploads"
+UPLOADS_DIR = os.getenv("UPLOADS_DIR", os.path.join(os.getenv("APP_ROOT", "/opt/qrfacile"), "uploads"))
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024          # 5 MB
 MAX_IMAGE_PIXELS = 40_000_000               # anti decompression bomb
