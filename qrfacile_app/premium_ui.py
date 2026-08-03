@@ -15,6 +15,7 @@ from qrfacile_app.auth_core import (
     winery_id_for_owner,
 )
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
+from qrfacile_app.guided_flow import render_guided_stepper
 
 router = APIRouter()
 
@@ -187,16 +188,16 @@ def _studio_assignment_box(
       <label class="newWineWorkOption">
         <input type="radio" name="studio_work_mode" value="self" checked>
         <span>
-          <b>Gestisco io</b>
-          <small>Nessuno studio viene assegnato ora.</small>
+          <b>La cantina gestisce direttamente il lavoro</b>
+          <small>Solo gli utenti autorizzati della cantina potranno modificare e pubblicare.</small>
         </span>
       </label>
 
       <label class="newWineWorkOption">
         <input type="radio" name="studio_work_mode" value="connected" {connected_disabled}>
         <span>
-          <b>Assegna a Studio già collegato</b>
-          <small>Lo studio deve essere collegato alla cantina e poi assegnato a questa etichetta.</small>
+          <b>Affida il lavoro a uno studio grafico collegato</b>
+          <small>Lo studio potrà modificare l’etichetta; la pubblicazione resta sotto il controllo della cantina.</small>
         </span>
       </label>
       <div class="newWineWorkNested">
@@ -205,7 +206,7 @@ def _studio_assignment_box(
           {''.join(opts)}
         </select>
         <div class="note" style="margin-top:10px">
-          Il collegamento generale resta in <b>studio_clients</b>; l'assegnazione operativa usa <b>label_collaborators</b>.
+          Scegli lo studio che preparerà questa etichetta. Potrai cambiare assegnazione dalla dashboard.
         </div>
       </div>
 
@@ -570,6 +571,8 @@ def new_wine_get(
         </div>
       </div>
 
+      {render_guided_stepper(0, "wine")}
+
       <form class="card newWineForm" method="post" action="/app/new-wine">
         <div class="newWineSectionTitle">
           <span>1</span>
@@ -590,7 +593,7 @@ def new_wine_get(
               {''.join(master_opts)}
             </select>
             <div class="note" style="margin-top:10px">
-              Seleziona l’etichetta/prodotto a cui collegare questo lotto.
+              Se scegli un’etichetta esistente, i dati disponibili verranno copiati nel nuovo lotto. Potrai modificarli prima di salvare.
               Se non esiste ancora, creala da
               <a class="dashboardInlineLink" href="/app/new-wine-master">Nuova etichetta</a>.
             </div>
@@ -608,16 +611,16 @@ def new_wine_get(
         <div class="newWineGrid3">
           <div style="grid-column:1 / -1">
             <label>Etichetta selezionata</label>
-            <input class="input" name="wine_name" placeholder="Compilata automaticamente dall’etichetta scelta" readonly>
+            <input class="input" name="wine_name" placeholder="Scegli prima un’etichetta dall’elenco" readonly>
           </div>
 
           <div>
-            <label>Annata opzionale</label>
+            <label>Annata (se dichiarata in etichetta)</label>
             <input class="input" name="vintage" placeholder="2023">
           </div>
 
           <div>
-            <label>Lotto opzionale</label>
+            <label>Codice lotto</label>
             <input class="input" name="lot" placeholder="L001/7">
           </div>
 
@@ -627,7 +630,7 @@ def new_wine_get(
           </div>
 
           <div>
-            <label>Grado alcolico opzionale</label>
+            <label>Grado alcolico (% vol)</label>
             <input class="input" name="alcohol" placeholder="13.5">
           </div>
 

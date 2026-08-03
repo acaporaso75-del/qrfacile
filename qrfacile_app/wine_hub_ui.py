@@ -744,30 +744,15 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
               <button class="btn" type="submit">Rendi bozza</button>
             </form>
             """
-        else:
+        elif workflow["publishable"]:
             publish_action = f"""
             <form method="post" action="/app/wine/{int(wine_id)}/publish" style="display:inline">
               <button class="btn btn-primary" type="submit">Pubblica</button>
             </form>
             """
 
-            if role == "admin":
-                publish_action += f"""
-                <form method="post" action="/app/wine/{int(wine_id)}/publish" style="display:inline"
-                      onsubmit="return confirm('Forzare la pubblicazione anche se i dati obbligatori sono incompleti? Usare solo per test, demo o casi eccezionali.');">
-                  <input type="hidden" name="force" value="1">
-                  <button class="btn btn-danger-soft" type="submit">Forza pubblicazione</button>
-                </form>
-                """
-
-            if role == "admin":
-                publish_action += f"""
-                <form method="post" action="/app/wine/{int(wine_id)}/publish" style="display:inline"
-                      onsubmit="return confirm('Forzare la pubblicazione anche se i dati obbligatori sono incompleti? Usare solo per test o casi eccezionali.');">
-                  <input type="hidden" name="force" value="1">
-                  <button class="btn btn-danger-soft" type="submit">Forza pubblicazione</button>
-                </form>
-                """
+        else:
+            publish_action = f'<a class="btn" href="/app/wine/{int(wine_id)}/review">Controlla cosa manca</a>'
 
     new_label_action = ""
     if role in ("winery", "admin"):
@@ -876,9 +861,9 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
 
       <div class="card wineHubActionBar">
         <div>
-          <div class="h2">Azioni lotto</div>
+          <div class="h2">Cosa vuoi fare adesso?</div>
           <div class="p">
-            Gestisci fronte/retro, immagini, compliance, pubblicazione ed esportazione QR.
+            Continua la compilazione guidata, controlla l’anteprima oppure apri gli strumenti disponibili per questo lotto.
           </div>
         </div>
 

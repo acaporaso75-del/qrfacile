@@ -1,25 +1,17 @@
-import os
 from fastapi import APIRouter, HTTPException, Path
 from fastapi.responses import FileResponse
+from qrfacile_app.services.storage import asset_absolute_path
 
 router = APIRouter()
 
-UPLOADS_DIR = os.getenv("UPLOADS_DIR", os.path.join(os.getenv("APP_ROOT", "/opt/qrfacile"), "uploads"))
-
 def _serve_upload(path: str):
-    if ".." in path or path.startswith("/"):
-        raise HTTPException(400, "Bad path")
-
-    abs_path = os.path.normpath(os.path.join(UPLOADS_DIR, path))
-    base = os.path.normpath(UPLOADS_DIR)
-
-    if not abs_path.startswith(base):
-        raise HTTPException(400, "Bad path")
-
-    if not os.path.exists(abs_path):
-        raise HTTPException(404, "Not found")
-
-    return FileResponse(abs_path)
+    try:
+        abs_path = asset_absolute_path(path)
+    except ValueError:
+        raise HTTPException(400, "Percorso file non valido")
+    if not abs_path.is_file():
+        raise HTTPException(404, "Immagine non disponibile")
+    return FileResponse(str(abs_path), headers={"Cache-Control": "public, max-age=3600, must-revalidate"})
 
 @router.get("/uploads/{path:path}")
 def uploads_get(path: str = Path(...)):

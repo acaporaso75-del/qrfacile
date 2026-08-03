@@ -117,6 +117,26 @@ def find_by_material(material: Any) -> dict[str, Any] | None:
     return _BY_MATERIAL.get(normalize(material))
 
 
+def resolve_recycling_selection(component: Any, material: Any, code: Any = "") -> dict[str, Any]:
+    """Resolve the authoritative suggestion for a component/material selection."""
+    component_key = normalize(component)
+    material_item = find_by_material(material)
+    suggested = ""
+    collection = ""
+    if material_item and component_key in {normalize(item) for item in material_item.get("components") or []}:
+        suggested = str(material_item.get("code") or "").strip()
+        collection = str(material_item.get("collection") or "").strip()
+    current = str(code or "").strip()
+    return {
+        "component": component_key,
+        "material": str(material or "").strip(),
+        "current_code": current,
+        "suggested_code": suggested,
+        "collection": collection,
+        "code_is_consistent": bool(suggested and normalize(current) == normalize(suggested)),
+    }
+
+
 def validate_recycling_items(recycle: Mapping[str, Mapping[str, Any]] | None) -> dict[str, Any]:
     items = normalize_recycling_items(recycle)
     missing_codes: list[str] = []

@@ -5,9 +5,9 @@ from html import escape
 
 STEPS = (
     ("wine", "Dati vino"),
-    ("images", "Immagini"),
     ("ingredients", "Ingredienti e allergeni"),
     ("nutrition", "Valori nutrizionali"),
+    ("images", "Immagini"),
     ("recycling", "Riciclabilità"),
     ("review", "Controllo finale"),
     ("publish", "Preview e pubblicazione"),
@@ -22,9 +22,11 @@ def render_guided_stepper(wine_id: int, active: str, completed: set[str] | None 
         "ingredients": f"/app/wine/{wine_id}/compliance#ingredienti",
         "nutrition": f"/app/wine/{wine_id}/compliance#nutrizione",
         "recycling": f"/app/wine/{wine_id}/compliance#riciclabilita",
-        "review": f"/app/wine/{wine_id}/compliance#controllo-finale",
-        "publish": f"/app/wine/{wine_id}/compliance#pubblicazione",
+        "review": f"/app/wine/{wine_id}/review",
+        "publish": f"/app/wine/{wine_id}/complete",
     }
+    if wine_id <= 0:
+        links = {key: ("/app/new-wine" if key == "wine" else "#") for key, _label in STEPS}
     items = []
     for number, (key, label) in enumerate(STEPS, 1):
         classes = "qrfWizardStep"

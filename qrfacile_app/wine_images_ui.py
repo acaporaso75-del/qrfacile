@@ -1,6 +1,9 @@
 import os
 import io
 import time
+import tempfile
+import shutil
+import logging
 
 from PIL import Image, ImageFile
 from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
@@ -11,11 +14,10 @@ from qrfacile_app.db import pg
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 from qrfacile_app.guided_flow import render_guided_stepper
+from qrfacile_app.services.storage import asset_url, get_uploads_dir, verify_saved_asset
 
 router = APIRouter()
-
-UPLOADS_DIR = os.getenv("UPLOADS_DIR", os.path.join(os.getenv("APP_ROOT", "/opt/qrfacile"), "uploads"))
-UPLOAD_BASE = os.path.join(UPLOADS_DIR, "wine_assets")
+logger = logging.getLogger("qrfacile.images")
 
 # Hardening upload
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024        # 5MB
@@ -106,11 +108,13 @@ def _validate_image_bytes(data: bytes) -> str | None:
 
 
 def _save_images(wine_id: int, kind: str, data: bytes, ext: str) -> dict:
-    wine_dir = os.path.join(UPLOAD_BASE, str(wine_id), kind)
-    _ensure_dir(wine_dir)
+    upload_root = get_uploads_dir()
+    wine_dir = upload_root / "wine_assets" / str(wine_id) / kind
+    _ensure_dir(str(wine_dir.parent))
+    temp_dir = tempfile.mkdtemp(prefix=f".{kind}-", dir=str(wine_dir.parent))
 
     orig_name = f"original{ext}"
-    orig_path = os.path.join(wine_dir, orig_name)
+    orig_path = os.path.join(temp_dir, orig_name)
 
     with open(orig_path, "wb") as f:
         f.write(data)
@@ -134,13 +138,17 @@ def _save_images(wine_id: int, kind: str, data: bytes, ext: str) -> dict:
         scale = 2000 / max_side
         img = img.resize((max(1, int(w * scale)), max(1, int(h * scale))))
 
-    opt_path = os.path.join(wine_dir, "optimized.jpg")
+    opt_path = os.path.join(temp_dir, "optimized.jpg")
     img.save(opt_path, format="JPEG", quality=88, optimize=True, progressive=True)
 
     thumb = img.copy()
     thumb.thumbnail((640, 640))
-    thumb_path = os.path.join(wine_dir, "thumb.webp")
+    thumb_path = os.path.join(temp_dir, "thumb.webp")
     thumb.save(thumb_path, format="WEBP", quality=82, method=6)
+
+    if wine_dir.exists():
+        shutil.rmtree(wine_dir)
+    os.replace(temp_dir, wine_dir)
 
     return {
         "img_original": f"wine_assets/{wine_id}/{kind}/{orig_name}",
@@ -198,7 +206,7 @@ def _wine(cur, wine_id: int) -> dict:
 def _asset(cur, wine_id: int, kind: str) -> dict:
     cur.execute(
         """
-        SELECT id, img_original, img_optimized, img_thumb
+        SELECT id, img_original, img_optimized, img_thumb, updated_at
         FROM wine_assets
         WHERE wine_id=%s AND kind=%s
         LIMIT 1
@@ -214,11 +222,15 @@ def _image_card(wine_id: int, kind: str, asset: dict) -> str:
     original = (asset.get("img_original") or "").strip()
     optimized = (asset.get("img_optimized") or "").strip()
 
-    thumb_readable = bool(thumb and os.path.isfile(os.path.join(UPLOADS_DIR, thumb)) and os.access(os.path.join(UPLOADS_DIR, thumb), os.R_OK))
+    version = asset.get("updated_at") or ""
+    try:
+        thumb_readable = bool(thumb and verify_saved_asset({"thumb": thumb}))
+    except (OSError, ValueError):
+        thumb_readable = False
     if thumb_readable:
         preview = f"""
         <div class="imagesPreviewBox">
-          <img src="/uploads/{esc(thumb)}" alt="{esc(title)}">
+          <img src="{esc(asset_url(thumb, version))}" alt="{esc(title)}">
         </div>
         """
         status = """
@@ -279,7 +291,7 @@ def _image_card(wine_id: int, kind: str, asset: dict) -> str:
           <input class="input" type="file" name="image" accept="image/png,image/jpeg,image/webp" required>
         </div>
 
-        <button class="btn btn-primary" type="submit">Upload</button>
+        <button class="btn" type="submit">Carica e mostra anteprima</button>
       </form>
 
       <div class="imagesCardActions">
@@ -767,7 +779,7 @@ def images_page(request: Request, wine_id: int, msg: str = ""):
 
 
 @router.post("/app/wine/{wine_id}/images/upload")
-def images_upload(request: Request, wine_id: int, kind: str = Form(...), image: UploadFile = File(...)):
+async def images_upload(request: Request, wine_id: int, kind: str = Form(...), image: UploadFile = File(...)):
     kind = (kind or "").strip().lower()
 
     if kind not in ("front", "back"):
@@ -792,7 +804,12 @@ def images_upload(request: Request, wine_id: int, kind: str = Form(...), image: 
             status_code=303,
         )
 
-    data = _read_limited(image, MAX_UPLOAD_BYTES)
+    try:
+        data = await image.read(MAX_UPLOAD_BYTES + 1)
+    except Exception:
+        data = b""
+    if len(data) > MAX_UPLOAD_BYTES:
+        data = None
 
     if data is None:
         return RedirectResponse(
@@ -824,16 +841,16 @@ def images_upload(request: Request, wine_id: int, kind: str = Form(...), image: 
     try:
         paths = _save_images(int(wine_id), kind, data, ext)
     except Exception:
+        logger.exception("Elaborazione immagine fallita wine_id=%s kind=%s", wine_id, kind)
         return RedirectResponse(
             f"/app/wine/{wine_id}/images?msg=Errore%20salvataggio%20immagine",
             status_code=303,
         )
 
-    if not all(
-        os.path.isfile(os.path.join(UPLOADS_DIR, relative))
-        and os.access(os.path.join(UPLOADS_DIR, relative), os.R_OK)
-        for relative in paths.values()
-    ):
+    try:
+        verify_saved_asset(paths)
+    except (OSError, ValueError):
+        logger.exception("Verifica file immagine fallita wine_id=%s kind=%s paths=%s", wine_id, kind, paths)
         return RedirectResponse(
             f"/app/wine/{wine_id}/images?msg=File%20salvato%20ma%20non%20leggibile",
             status_code=303,
@@ -864,6 +881,18 @@ def images_upload(request: Request, wine_id: int, kind: str = Form(...), image: 
                 conn.rollback()
                 return RedirectResponse(
                     f"/app/wine/{wine_id}/images?msg=Database%20immagine%20non%20aggiornato",
+                    status_code=303,
+                )
+            cur.execute(
+                """SELECT img_original, img_optimized, img_thumb FROM wine_assets
+                   WHERE wine_id=%s AND kind=%s LIMIT 1""",
+                (int(wine_id), kind),
+            )
+            persisted = cur.fetchone() or {}
+            if any(persisted.get(key) != value for key, value in paths.items()):
+                conn.rollback()
+                return RedirectResponse(
+                    f"/app/wine/{wine_id}/images?msg=Verifica%20database%20immagine%20fallita",
                     status_code=303,
                 )
             conn.commit()
@@ -898,7 +927,7 @@ def images_delete(request: Request, wine_id: int, kind: str = Form(...)):
             conn.commit()
 
     try:
-        folder = os.path.join(UPLOAD_BASE, str(wine_id), kind)
+        folder = str(get_uploads_dir() / "wine_assets" / str(wine_id) / kind)
 
         for fn in ("optimized.jpg", "thumb.webp"):
             p = os.path.join(folder, fn)

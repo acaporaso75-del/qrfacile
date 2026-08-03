@@ -10,6 +10,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from qrfacile_app.compliance_score_middleware import ComplianceScoreMiddleware
 from qrfacile_app.public_recycling_catalog_middleware import PublicRecyclingCatalogMiddleware
 from qrfacile_app.security_middleware import SecurityHeadersMiddleware
+from qrfacile_app.services.storage import get_uploads_dir
 
 logger = logging.getLogger("qrfacile.main")
 logging.basicConfig(level=logging.INFO)
@@ -22,7 +23,7 @@ app.add_middleware(ComplianceScoreMiddleware)
 
 APP_ROOT = os.getenv("APP_ROOT", "/opt/qrfacile")
 STATIC_DIR = os.getenv("STATIC_DIR", f"{APP_ROOT}/static")
-UPLOADS_DIR = os.getenv("UPLOADS_DIR", f"{APP_ROOT}/uploads")
+UPLOADS_DIR = str(get_uploads_dir())
 
 try:
     if os.path.isdir(STATIC_DIR):
@@ -118,6 +119,7 @@ include_router_safe("qrfacile_app.wine_knowledge_ui")
 include_router_safe("qrfacile_app.wine_compliance_replay_ui")
 include_router_safe("qrfacile_app.wine_compliance_advisor_ui")
 include_router_safe("qrfacile_app.wine_compliance_center_ui")
+include_router_safe("qrfacile_app.wine_flow_ui")
 include_router_safe("qrfacile_app.wine_hub_ui")
 include_router_safe("qrfacile_app.wine_images_ui")
 include_router_safe("qrfacile_app.studio_area")

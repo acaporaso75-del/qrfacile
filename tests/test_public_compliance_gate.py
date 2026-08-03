@@ -10,4 +10,5 @@ def test_public_page_rechecks_server_side_compliance_gate():
     assert "run_explainable_wine_compliance(compliance_payload)" in source
     assert "_public_gate_allows(status, public_missing, compliance_report)" in source
     assert 'bool(compliance_report.get("publishable"))' in source
-    assert "QR non conforme o incompleto" in source
+    assert "Etichetta non ancora pubblicata" in source
+    assert "_not_published_page(slug)" in source

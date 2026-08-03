@@ -494,6 +494,11 @@ def _public_gate_allows(status: str, missing: list[str], compliance_report: dict
     return status == "attiva" and not missing and bool(compliance_report.get("publishable"))
 
 
+def _not_published_page(slug: str) -> HTMLResponse:
+    safe_slug = ui.esc(slug)
+    return HTMLResponse(f"""<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Etichetta non ancora pubblicata</title><link rel="stylesheet" href="/static/app.css"></head><body><main style="max-width:760px;margin:60px auto;padding:24px"><div class="card"><div class="h1">Etichetta non ancora pubblicata</div><p>I dati sono in compilazione o devono ancora superare il controllo finale.</p><a class="btn btn-primary" href="/login?next=/preview/{safe_slug}">Accedi per completare o vedere l’anteprima</a></div></main></body></html>""", status_code=200)
+
+
 def _render_label_page(request: Request, slug: str, *, preview: bool):
     slug = (slug or "").strip()
     locale = choose_language(request)
@@ -540,7 +545,7 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
 
             status = (row.get("status") or "").strip().lower()
             if not preview and status != "attiva":
-                raise HTTPException(404, "QR non pubblicato")
+                return _not_published_page(slug)
             is_draft = status != "attiva"
 
             cur.execute(
@@ -683,7 +688,7 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
     }
     compliance_report = run_explainable_wine_compliance(compliance_payload)
     if not preview and not _public_gate_allows(status, public_missing, compliance_report):
-        raise HTTPException(404, "QR non conforme o incompleto")
+        return _not_published_page(slug)
 
     if not preview:
         with pg() as conn:

@@ -400,9 +400,13 @@ def _recycle_rows(recycle: dict) -> str:
 
             <div>
               <label>Codice extra</label>
-              <input class="input mono" name="rec_{key}_extra"
-                     value="{esc(_val(r.get('extra_code')))}"
-                     placeholder="es. C/ALU90">
+              <details class="qrfAdvanced"><summary>Opzioni avanzate</summary>
+                <label>Codice aggiuntivo eccezionale</label>
+                <input class="input mono" name="rec_{key}_extra"
+                       value="{esc(_val(r.get('extra_code')))}"
+                       placeholder="Solo se documentato dal fornitore">
+                <small>Non usare per il normale codice del materiale. Compilare solo quando il fornitore richiede un secondo riferimento documentato.</small>
+              </details>
             </div>
 
             <div>
@@ -553,7 +557,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
                      required>
             </div>
 
-            <button class="btn btn-primary" type="submit">Aggiungi</button>
+            <button class="btn" type="submit">Aggiungi ingrediente</button>
           </form>
 
           <div class="note" style="margin-top:14px">
@@ -584,7 +588,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
                      required>
             </div>
 
-            <button class="btn btn-primary" type="submit">Aggiungi</button>
+            <button class="btn" type="submit">Aggiungi allergene</button>
           </form>
 
           <div class="note" style="margin-top:14px">
@@ -620,57 +624,57 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
           </div>
 
           <div class="note" style="margin-top:0">
-            Energia in kJ e kcal obbligatoria. Gli altri campi possono essere lasciati vuoti.
+            Valori riferiti a 100 ml. kJ e kcal sono obbligatori; virgola e punto sono entrambi accettati.
           </div>
 
           <div class="complianceNutritionGrid">
             <div>
-              <label>kJ*</label>
-              <input class="input mono" name="energy_kj"
+              <label>Energia (kJ per 100 ml)*</label>
+              <input class="input mono" name="energy_kj" inputmode="decimal" min="0" max="5000"
                      value="{esc(_val(nut.get('energy_kj')))}"
                      placeholder="0">
             </div>
 
             <div>
-              <label>kcal*</label>
-              <input class="input mono" name="energy_kcal"
+              <label>Energia (kcal per 100 ml)*</label>
+              <input class="input mono" name="energy_kcal" inputmode="decimal" min="0" max="1200"
                      value="{esc(_val(nut.get('energy_kcal')))}"
                      placeholder="0">
             </div>
 
             <div>
               <label>Grassi</label>
-              <input class="input mono" name="fat"
+              <input class="input mono" name="fat" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('fat')))}">
             </div>
 
             <div>
               <label>Saturi</label>
-              <input class="input mono" name="saturates"
+              <input class="input mono" name="saturates" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('saturates')))}">
             </div>
 
             <div>
               <label>Carboidrati</label>
-              <input class="input mono" name="carbs"
+              <input class="input mono" name="carbs" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('carbs')))}">
             </div>
 
             <div>
               <label>Zuccheri</label>
-              <input class="input mono" name="sugars"
+              <input class="input mono" name="sugars" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('sugars')))}">
             </div>
 
             <div>
               <label>Proteine</label>
-              <input class="input mono" name="protein"
+              <input class="input mono" name="protein" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('protein')))}">
             </div>
 
             <div>
               <label>Sale</label>
-              <input class="input mono" name="salt"
+              <input class="input mono" name="salt" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('salt')))}">
             </div>
           </div>
@@ -683,7 +687,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
               <div class="h2">Componenti packaging</div>
             </div>
 
-            <span class="pill pill-muted">Codice minimo “-”</span>
+            <span class="pill pill-muted">Materiale e codice verificati</span>
           </div>
 
           <div class="complianceRecycleList">
@@ -743,10 +747,22 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
       <script>
       (() => {{
         const form=document.getElementById('saveForm'); if(!form) return;
+        const storageKey='qrfacile:wine:{int(wine_id)}:draft';
+        const status=document.createElement('div'); status.className='note'; status.style.marginTop='10px'; status.textContent='Tutte le modifiche sono salvate.';
+        form.insertAdjacentElement('afterbegin',status);
         let dirty=false; let submitting=false;
-        form.addEventListener('input',()=>{{dirty=true}});
-        form.addEventListener('change',()=>{{dirty=true}});
-        form.addEventListener('submit',()=>{{submitting=true;dirty=false}});
+        const fields=Array.from(document.querySelectorAll('input[name],select[name],textarea[name]')).filter(node=>node.type!=='file'&&node.name!=='csrf_token');
+        const keyFor=node=>`${{node.form?.action||'page'}}::${{node.name}}`;
+        if ({str((msg or '').startswith('Dati salvati correttamente')).lower()}) sessionStorage.removeItem(storageKey);
+        else {{
+          try {{ const draft=JSON.parse(sessionStorage.getItem(storageKey)||'{{}}'); fields.forEach(node=>{{if(Object.hasOwn(draft,keyFor(node))) node.value=draft[keyFor(node)]}}); }} catch (_) {{}}
+        }}
+        const remember=()=>{{
+          dirty=true; status.textContent='Modifiche non salvate'; status.className='note note-warn';
+          const draft={{}}; fields.forEach(node=>draft[keyFor(node)]=node.value); sessionStorage.setItem(storageKey,JSON.stringify(draft));
+        }};
+        fields.forEach(node=>{{node.addEventListener('input',remember);node.addEventListener('change',remember)}});
+        form.addEventListener('submit',()=>{{submitting=true}});
         window.addEventListener('beforeunload',event=>{{if(dirty&&!submitting){{event.preventDefault();event.returnValue=''}}}});
       }})();
       </script>

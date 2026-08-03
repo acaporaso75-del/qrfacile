@@ -10,6 +10,7 @@ from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.db import pg
 from qrfacile_app.services.recycling_catalog import is_recycling_item_filled, validate_recycling_items
 from qrfacile_app.services.recycling_persistence import RecyclingPersistenceError, persist_recycling_component
+from qrfacile_app.services.nutrition_validation import validate_nutrition_form
 from qrfacile_app.wine_compliance_ui import _upsert_meta, _upsert_nutrition, _wine
 
 router = APIRouter(tags=["recycling-validation"])
@@ -88,18 +89,22 @@ async def validated_compliance_save(request: Request, wine_id: int):
             f"Materiale e codice riciclabilità non coerenti per: {labels}",
         )
 
-    try:
-        energy_kj = int(_text(form, "energy_kj").strip())
-        energy_kcal = int(_text(form, "energy_kcal").strip())
-    except ValueError:
-        return _redirect_error(wine_id, "Energia kJ e kcal obbligatoria e numerica")
+    nutrition = validate_nutrition_form({field: _text(form, field) for field in (
+        "energy_kj", "energy_kcal", "fat", "saturates", "carbs", "sugars", "protein", "salt",
+    )})
+    if nutrition.errors:
+        first = nutrition.errors[0]
+        return RedirectResponse(
+            f"/app/wine/{int(wine_id)}/compliance?msg={quote('Errore bloccante: ' + first.message)}#nutrizione",
+            status_code=303,
+        )
 
     try:
         with pg() as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 _upsert_nutrition(
-                    cur, int(wine_id), energy_kj, energy_kcal,
-                    *(_text(form, field) for field in ("fat", "saturates", "carbs", "sugars", "protein", "salt")),
+                    cur, int(wine_id), nutrition.values["energy_kj"], nutrition.values["energy_kcal"],
+                    *(nutrition.values[field] for field in ("fat", "saturates", "carbs", "sugars", "protein", "salt")),
                 )
                 _upsert_meta(
                     cur,
@@ -120,7 +125,12 @@ async def validated_compliance_save(request: Request, wine_id: int):
         return _redirect_error(wine_id, str(exc))
 
     custom = validation["custom_codes"]
+    continue_to = _text(form, "continue_to")
+    target = f"/app/wine/{int(wine_id)}/review" if continue_to == "review" else f"/app/wine/{int(wine_id)}/compliance"
     if custom:
         codes = ", ".join(item["code"] for item in custom)
-        return _redirect_error(wine_id, f"Codice personalizzato salvato: {codes}; verificare con il fornitore")
-    return _redirect_error(wine_id, "Dati salvati correttamente")
+        return RedirectResponse(f"{target}?msg={quote(f'Codice personalizzato salvato: {codes}; verificare con il fornitore')}", status_code=303)
+    message = "Dati salvati correttamente"
+    if nutrition.warnings:
+        message += ". Avviso: " + nutrition.warnings[0].message
+    return RedirectResponse(f"{target}?msg={quote(message)}", status_code=303)

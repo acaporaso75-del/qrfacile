@@ -51,6 +51,18 @@ def secure_publish_wine(
     if force_publish:
         raise HTTPException(409, "Override non necessario: il gate di conformità è superato")
 
+    try:
+        replay = create_and_persist_replay(
+            payload,
+            actor_user_id=int(user.get("id") or 0) or None,
+            reason="publication",
+        )
+    except Exception:
+        return RedirectResponse(
+            f"/app/wine/{int(wine_id)}/review?msg=Pubblicazione%20non%20completata%3A%20audit%20non%20disponibile",
+            status_code=303,
+        )
+
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             wine = _load_wine(cur, int(wine_id))
@@ -67,11 +79,6 @@ def secure_publish_wine(
             _set_labels_public(cur, int(wine_id), True)
         conn.commit()
 
-    replay = create_and_persist_replay(
-        payload,
-        actor_user_id=int(user.get("id") or 0) or None,
-        reason="publication",
-    )
     write_audit_event(
         action="wine_published",
         resource_type="wine",
@@ -84,7 +91,7 @@ def secure_publish_wine(
             "content_hash": str(replay.get("content_hash") or ""),
         },
     )
-    return RedirectResponse(f"/app/wine/{int(wine_id)}?tab=export&msg=Pubblicato", status_code=303)
+    return RedirectResponse(f"/app/wine/{int(wine_id)}/complete?msg=Pubblicato", status_code=303)
 
 
 @router.post("/app/wine/{wine_id}/unpublish")

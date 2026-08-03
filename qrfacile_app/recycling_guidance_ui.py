@@ -51,6 +51,8 @@ def _guidance_markup() -> str:
       .qrfRecycleTools{{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}}
       .qrfRecycleReset{{border:1px solid rgba(15,23,42,.16);background:#fff;border-radius:10px;padding:6px 9px;font-size:12px;font-weight:800;cursor:pointer}}
       .qrfRecycleReset:hover{{background:#f8fafc}}
+      .qrfRecycleAccept{{border:0;background:#0f766e;color:#fff;border-radius:10px;padding:7px 10px;font-size:12px;font-weight:850;cursor:pointer}}
+      .qrfRecycleCollection{{display:block;margin-top:7px;font-size:12px;color:#475569}}
       .qrfRecycleHelp{{margin-top:14px;padding:14px;border:1px solid rgba(2,8,23,.08);border-radius:16px;background:rgba(248,250,252,.86)}}
       .qrfRecycleHelp b{{display:block;margin-bottom:4px}}
       .qrfRecycleAlert{{display:none;margin:14px 0;padding:13px 14px;border-radius:14px;border:1px solid #fecaca;background:#fff1f2;color:#991b1b;font-weight:750}}
@@ -93,7 +95,12 @@ def _guidance_markup() -> str:
         reset.className = 'qrfRecycleReset';
         reset.textContent = 'Ripristina suggerimento';
         tools.appendChild(reset);
+        const accept = document.createElement('button');
+        accept.type = 'button'; accept.className = 'qrfRecycleAccept'; accept.textContent = 'Usa codice suggerito'; accept.hidden = true;
+        tools.appendChild(accept);
         status.insertAdjacentElement('afterend', tools);
+        const collection = document.createElement('span'); collection.className='qrfRecycleCollection';
+        tools.insertAdjacentElement('afterend', collection);
 
         const preferred = suggestions[component] || [];
         const recommended = preferred.find(item => !item.custom) || null;
@@ -103,6 +110,8 @@ def _guidance_markup() -> str:
           const codeItem = byCode.get(normalize(code.value));
           const item = codeItem || materialItem || null;
           const hasValue = product.value.trim() || code.value.trim();
+          accept.hidden = true;
+          collection.textContent = item && item.collection ? `Indicazione di raccolta: ${{item.collection}}` : '';
 
           if (!hasValue) {{
             status.className = 'qrfRecycleStatus';
@@ -122,6 +131,7 @@ def _guidance_markup() -> str:
           if (materialItem && codeItem && materialItem.code !== codeItem.code) {{
             status.className = 'qrfRecycleStatus invalid';
             status.textContent = `Materiale e codice non coincidono: ${{materialItem.code}} atteso per il materiale selezionato.`;
+            accept.hidden = false;
             return {{state: 'mismatch', item: codeItem}};
           }}
           if (!(item.components || []).includes(component)) {{
@@ -144,7 +154,7 @@ def _guidance_markup() -> str:
 
         const applyFromMaterial = () => {{
           const item = byMaterial.get(normalize(product.value));
-          if (item && item.code && !code.value.trim()) code.value = item.code;
+          if (item && item.code) code.value = item.code;
           if (item && note && !note.value.trim() && item.collection) note.value = item.collection;
           evaluate();
         }};
@@ -162,6 +172,7 @@ def _guidance_markup() -> str:
         code.addEventListener('input', evaluate);
         code.addEventListener('blur', applyFromCode);
         reset.addEventListener('click', () => apply(recommended));
+        accept.addEventListener('click', () => applyFromMaterial());
 
         product.placeholder = preferred.length
           ? 'es. ' + preferred.slice(0, 3).map(item => item.material.split(' - ')[0]).join(', ')

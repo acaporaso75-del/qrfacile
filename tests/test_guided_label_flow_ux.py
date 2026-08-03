@@ -29,15 +29,15 @@ def test_unsaved_changes_and_field_anchors_exist():
 
 def test_upload_directory_is_configurable_and_readability_is_checked():
     source = (ROOT / "qrfacile_app" / "wine_images_ui.py").read_text(encoding="utf-8")
-    assert 'os.getenv("UPLOADS_DIR"' in source
-    assert "os.path.isfile" in source
-    assert "os.access" in source
+    storage = (ROOT / "qrfacile_app" / "services" / "storage.py").read_text(encoding="utf-8")
+    assert 'os.getenv("UPLOADS_DIR")' in storage
+    assert "target.is_file()" in storage
+    assert "os.access" in storage
     assert "cur.rowcount != 1" in source
 
 
 def test_image_upload_creates_all_consistent_readable_results(tmp_path, monkeypatch):
-    monkeypatch.setattr(wine_images_ui, "UPLOADS_DIR", str(tmp_path))
-    monkeypatch.setattr(wine_images_ui, "UPLOAD_BASE", str(tmp_path / "wine_assets"))
+    monkeypatch.setenv("UPLOADS_DIR", str(tmp_path))
     content = BytesIO()
     Image.new("RGB", (80, 120), (120, 30, 60)).save(content, format="PNG")
     paths = wine_images_ui._save_images(33, "front", content.getvalue(), ".png")
