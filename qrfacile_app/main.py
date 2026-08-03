@@ -11,6 +11,7 @@ from qrfacile_app.compliance_score_middleware import ComplianceScoreMiddleware
 from qrfacile_app.public_recycling_catalog_middleware import PublicRecyclingCatalogMiddleware
 from qrfacile_app.security_middleware import SecurityHeadersMiddleware
 from qrfacile_app.services.storage import get_uploads_dir
+from qrfacile_app.uploads_routes import VersionedUploadStaticFiles
 
 logger = logging.getLogger("qrfacile.main")
 logging.basicConfig(level=logging.INFO)
@@ -34,7 +35,7 @@ except Exception as e:
 
 try:
     if os.path.isdir(UPLOADS_DIR):
-        app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
+        app.mount("/uploads", VersionedUploadStaticFiles(directory=UPLOADS_DIR), name="uploads")
         logger.info("Mounted /uploads -> %s", UPLOADS_DIR)
 except Exception as e:
     logger.warning("Skip uploads mount: %s", e)
