@@ -14,7 +14,7 @@ from qrfacile_app.db import pg
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 from qrfacile_app.guided_flow import render_guided_stepper
-from qrfacile_app.services.storage import asset_url, get_uploads_dir, verify_saved_asset
+from qrfacile_app.services.storage import get_uploads_dir, verify_saved_asset, versioned_upload_url
 
 router = APIRouter()
 logger = logging.getLogger("qrfacile.images")
@@ -230,7 +230,7 @@ def _image_card(wine_id: int, kind: str, asset: dict) -> str:
     if thumb_readable:
         preview = f"""
         <div class="imagesPreviewBox">
-          <img src="{esc(asset_url(thumb, version))}" alt="{esc(title)}">
+          <img src="{esc(versioned_upload_url(thumb, version))}" alt="{esc(title)}">
         </div>
         """
         status = """
@@ -866,7 +866,7 @@ async def images_upload(request: Request, wine_id: int, kind: str = Form(...), i
                   img_original=EXCLUDED.img_original,
                   img_optimized=EXCLUDED.img_optimized,
                   img_thumb=EXCLUDED.img_thumb,
-                  updated_at=EXCLUDED.updated_at
+                  updated_at=GREATEST(EXCLUDED.updated_at, wine_assets.updated_at + 1)
                 """,
                 (
                     int(wine_id),
@@ -884,7 +884,7 @@ async def images_upload(request: Request, wine_id: int, kind: str = Form(...), i
                     status_code=303,
                 )
             cur.execute(
-                """SELECT img_original, img_optimized, img_thumb FROM wine_assets
+                """SELECT img_original, img_optimized, img_thumb, updated_at FROM wine_assets
                    WHERE wine_id=%s AND kind=%s LIMIT 1""",
                 (int(wine_id), kind),
             )

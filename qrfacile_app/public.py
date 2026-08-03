@@ -8,6 +8,7 @@ from psycopg.rows import dict_row
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.db import pg
 from qrfacile_app.services.recycling_catalog import normalize_recycling_items
+from qrfacile_app.services.storage import versioned_upload_url
 from qrfacile_app.services.wine_compliance_explainability import run_explainable_wine_compliance
 from qrfacile_app import ui
 
@@ -319,6 +320,30 @@ def _upload_src(path: str) -> str:
     if path.startswith("/"):
         return path
     return "/uploads/" + path.lstrip("/")
+
+
+def _label_images_html(image_rows, wine_name: str) -> str:
+    image_cards = []
+    for image_row in image_rows:
+        kind = (image_row.get("kind") or "").strip().lower()
+        img_path = (image_row.get("img_optimized") or image_row.get("img_thumb") or "").strip()
+        if not img_path:
+            continue
+        label = "Fronte etichetta" if kind == "front" else "Retro etichetta"
+        src = versioned_upload_url(img_path, image_row.get("updated_at"))
+        image_cards.append(f"""
+        <figure class="labelImageCard">
+          <img src="{ui.esc(src)}" alt="{ui.esc(label)} {ui.esc(wine_name)}">
+          <figcaption>{ui.esc(label)}</figcaption>
+        </figure>
+        """)
+    if not image_cards:
+        return ""
+    return f"""
+        <section class="labelImages" aria-label="Immagini etichetta">
+          {''.join(image_cards)}
+        </section>
+        """
 
 
 def _is_suspicious_text(value: str) -> bool:
@@ -648,7 +673,7 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
 
             cur.execute(
                 """
-                SELECT kind, img_thumb, img_optimized
+                SELECT kind, img_thumb, img_optimized, updated_at
                 FROM wine_assets
                 WHERE wine_id=%s
                   AND kind IN ('front', 'back')
@@ -719,27 +744,7 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
         </div>
         """
 
-    label_images_html = ""
-    image_cards = []
-    for image_row in image_rows:
-        kind = (image_row.get("kind") or "").strip().lower()
-        img_path = (image_row.get("img_optimized") or image_row.get("img_thumb") or "").strip()
-        if not img_path:
-            continue
-        label = "Fronte etichetta" if kind == "front" else "Retro etichetta"
-        image_cards.append(f"""
-        <figure class="labelImageCard">
-          <img src="{ui.esc(_upload_src(img_path))}" alt="{ui.esc(label)} {ui.esc(wine_name)}">
-          <figcaption>{ui.esc(label)}</figcaption>
-        </figure>
-        """)
-
-    if image_cards:
-        label_images_html = f"""
-        <section class="labelImages" aria-label="Immagini etichetta">
-          {''.join(image_cards)}
-        </section>
-        """
+    label_images_html = _label_images_html(image_rows, wine_name)
 
     allergens_html = ""
 

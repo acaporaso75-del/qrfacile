@@ -30,10 +30,15 @@ def asset_absolute_path(value: object) -> Path:
     return target
 
 
-def asset_url(value: object, version: object = "") -> str:
+def versioned_upload_url(value: object, updated_at: object = "") -> str:
     relative = normalize_asset_path(value)
-    suffix = f"?v={quote(str(version))}" if str(version or "").strip() else ""
+    suffix = f"?v={quote(str(updated_at))}" if str(updated_at or "").strip() else ""
     return f"/uploads/{quote(relative, safe='/')}{suffix}"
+
+
+def asset_url(value: object, version: object = "") -> str:
+    """Backward-compatible alias for callers outside the wine-assets flow."""
+    return versioned_upload_url(value, version)
 
 
 def verify_saved_asset(paths: Mapping[str, object]) -> dict[str, Path]:

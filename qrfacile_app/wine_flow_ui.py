@@ -8,7 +8,7 @@ from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.csrf_core import csrf_input
 from qrfacile_app.db import pg
 from qrfacile_app.guided_flow import render_guided_stepper
-from qrfacile_app.services.storage import asset_url, verify_saved_asset
+from qrfacile_app.services.storage import verify_saved_asset, versioned_upload_url
 from qrfacile_app.services.wine_compliance_explainability import run_explainable_wine_compliance
 from qrfacile_app.ui_shell import esc, page
 from qrfacile_app.wine_compliance_engine_ui import _load_payload
@@ -37,7 +37,7 @@ def _image_preview(asset: dict, label: str) -> str:
     thumb = asset.get("img_thumb") or ""
     try:
         verify_saved_asset({"thumb": thumb})
-        return f'<figure><img src="{esc(asset_url(thumb, asset.get("updated_at")))}" alt="{esc(label)}" style="width:100%;max-height:280px;object-fit:contain"><figcaption>{esc(label)} disponibile</figcaption></figure>'
+        return f'<figure><img src="{esc(versioned_upload_url(thumb, asset.get("updated_at")))}" alt="{esc(label)}" style="width:100%;max-height:280px;object-fit:contain"><figcaption>{esc(label)} disponibile</figcaption></figure>'
     except (OSError, ValueError):
         return f'<div class="note"><b>{esc(label)} non disponibile.</b> Carica o sostituisci il file nello step Immagini.</div>'
 

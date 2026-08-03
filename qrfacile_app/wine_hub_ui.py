@@ -9,6 +9,7 @@ from qrfacile_app.db import pg
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 from qrfacile_app.guided_flow import render_guided_stepper
+from qrfacile_app.services.storage import versioned_upload_url
 
 router = APIRouter()
 
@@ -106,7 +107,7 @@ def _studio_can_access_wine(cur, studio_user_id: int, winery_id: int) -> bool:
 def _wine_assets(cur, wine_id: int) -> dict:
     cur.execute(
         """
-        SELECT kind, img_thumb, img_optimized, img_original
+        SELECT kind, img_thumb, img_optimized, img_original, updated_at
         FROM wine_assets
         WHERE wine_id=%s
         """,
@@ -376,7 +377,7 @@ def _asset_card(kind: str, asset: dict | None, wine_id: int) -> str:
     if thumb:
         media = f"""
         <div class="wineHubImageBox">
-          <img src="/uploads/{esc(thumb)}" alt="{esc(label)}">
+          <img src="{esc(versioned_upload_url(thumb, asset.get('updated_at')))}" alt="{esc(label)}">
         </div>
         """
     else:

@@ -10,6 +10,7 @@ from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, esc
 from qrfacile_app.ui_layout import pill
+from qrfacile_app.services.storage import versioned_upload_url
 
 router = APIRouter()
 
@@ -18,9 +19,9 @@ def _h(s: str) -> str:
     return html.escape(s or "")
 
 
-def _thumb(asset_path: str | None) -> str:
+def _thumb(asset_path: str | None, updated_at: object = "") -> str:
     if asset_path:
-        return f"/uploads/{asset_path}"
+        return versioned_upload_url(asset_path, updated_at)
     return "/static/img/placeholder_label.svg"
 
 
@@ -535,8 +536,8 @@ def _wine_card(r: dict, role: str = "", labels_by_wine: dict[int, list[dict]] | 
     slug = r.get("slug") or ""
     wine_id = int(r["wine_id"])
 
-    front = _thumb(r.get("front_thumb"))
-    back = _thumb(r.get("back_thumb"))
+    front = _thumb(r.get("front_thumb"), r.get("front_updated_at"))
+    back = _thumb(r.get("back_thumb"), r.get("back_updated_at"))
 
     wine_name = _h(r.get("wine_name") or "Senza nome")
     winery_name = _h(r.get("winery_name") or "")
@@ -940,6 +941,8 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
                   w.name AS winery_name,
                   wa_front.img_thumb AS front_thumb,
                   wa_back.img_thumb AS back_thumb,
+                  wa_front.updated_at AS front_updated_at,
+                  wa_back.updated_at AS back_updated_at,
                   COALESCE(ing.ingredient_count, 0) AS ingredient_count,
                   COALESCE(allg.allergen_count, 0) AS allergen_count,
                   COALESCE(rec.recycle_count, 0) AS recycle_count,
