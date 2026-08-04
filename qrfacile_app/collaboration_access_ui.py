@@ -10,25 +10,27 @@ from qrfacile_app.ui_shell import esc, page
 router = APIRouter(tags=["collaboration-access"])
 
 
-def _studio_options(studios: list[dict]) -> str:
+def _studio_options(studios: list[dict], current_id: int = 0) -> str:
     options = ["<option value=''>Scegli uno studio autorizzato</option>"]
     for studio in studios:
         name = studio.get("studio_name") or studio.get("email") or "Studio"
         edit_note = "può modificare" if studio.get("can_edit") else "solo vista"
-        options.append(
-            f"<option value='{int(studio['studio_user_id'])}'>{esc(str(name))} · {esc(edit_note)}</option>"
-        )
+        studio_id = int(studio['studio_user_id'])
+        selected = " selected" if studio_id == int(current_id or 0) else ""
+        current = " · attuale" if selected else ""
+        options.append(f"<option value='{studio_id}'{selected}>{esc(str(name))} · {esc(edit_note)}{current}</option>")
     return "".join(options)
 
 
 def _access_html(wine_id: int, data: dict, role: str) -> str:
     studios = data.get("studios") or []
-    studio_options = _studio_options(studios)
     rows = []
     for item in data.get("labels") or []:
         label_id = int(item.get("label_id") or 0)
         assigned = bool(item.get("collaboration_id"))
-        studio = item.get("studio_name") or "Gestione interna cantina"
+        current_id = int(item.get("studio_user_id") or item.get("collaborator_user_id") or 0)
+        studio_options = _studio_options(studios, current_id)
+        studio = item.get("studio_name") or "Gestione diretta della cantina"
         permissions = []
         if assigned:
             if item.get("can_view"):
@@ -42,7 +44,7 @@ def _access_html(wine_id: int, data: dict, role: str) -> str:
         permissions_text = ", ".join(permissions) if permissions else (
             "La cantina gestisce direttamente questa etichetta" if not assigned else "nessun permesso operativo"
         )
-        status = "Studio autorizzato" if assigned else "Gestione interna"
+        status = f"Studio assegnato: {studio}" if assigned else "Gestione diretta della cantina"
 
         controls = ""
         if role in {"winery", "admin"}:
@@ -50,17 +52,17 @@ def _access_html(wine_id: int, data: dict, role: str) -> str:
                 controls = f"""
                 <div class='accessControls'>
                   <form method='post' action='/app/label/{label_id}/acl/assign'>
-                    <label>Affida questa etichetta</label>
+                    <label>{'Cambia studio' if assigned else 'Assegna uno studio'}</label>
                     <select name='studio_user_id' required>{studio_options}</select>
                     <select name='profile'>
                       <option value='graphic' selected>Lavora su grafica e contenuti</option>
                       <option value='view'>Può soltanto vedere</option>
                     </select>
-                    <button class='btn btn-primary' type='submit'>Autorizza studio</button>
+                    <button class='btn btn-primary' type='submit'>{'Cambia studio' if assigned else 'Assegna uno studio'}</button>
                   </form>
-                  <form method='post' action='/app/label/{label_id}/acl/clear' onsubmit="return confirm('Riportare questa etichetta alla gestione interna della cantina?');">
-                    <button class='btn' type='submit'>Gestione interna</button>
-                  </form>
+                  {f'''<form method='post' action='/app/label/{label_id}/acl/clear' onsubmit="return confirm('Rimuovere lo studio assegnato e passare alla gestione diretta? Lo studio e lo storico non saranno eliminati.');">
+                    <button class='btn' type='submit'>Rimuovi studio assegnato · Gestisco io</button>
+                  </form>''' if assigned else ''}
                 </div>
                 """
             else:
@@ -74,9 +76,9 @@ def _access_html(wine_id: int, data: dict, role: str) -> str:
               <div class='h2'>{esc(str(item.get('label_type') or 'Etichetta'))}</div>
               <div class='p'>{esc(str(item.get('language') or ''))}</div>
             </div>
-            <span class='accessStatus {'assigned' if assigned else ''}'>{esc(status)}</span>
+            <span class='accessStatus {'assigned' if assigned else ''}'>{'🏢' if assigned else '👤'} {esc(status)}</span>
           </div>
-          <div class='accessWho'><b>{esc(str(studio))}</b><span>{esc(permissions_text)}</span></div>
+          <div class='accessWho'><b>{esc(status)}</b><span>{esc(permissions_text)}</span></div>
           <div class='accessRule'>Nessuno studio può pubblicare. La pubblicazione resta sempre riservata alla cantina.</div>
           {controls}
         </article>

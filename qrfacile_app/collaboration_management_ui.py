@@ -60,6 +60,8 @@ def safe_label_assign(
             "studio_user_id": studio_user_id,
             "profile": profile,
             "permissions": result["collaboration"],
+            "old_studio": result["old_studio"],
+            "new_studio": result["new_studio"],
         },
     )
     return _return(f"/app/wine/{result['label']['wine_id']}/access-center", msg="Studio assegnato all'etichetta")
@@ -76,7 +78,11 @@ def safe_label_clear(request: Request, label_id: int):
         resource_id=label_id,
         actor=actor,
         request=request,
-        metadata={"deactivated": result["deactivated"]},
+        metadata={
+            "deactivated": result["deactivated"],
+            "old_studio": result["old_studio"],
+            "new_studio": None,
+        },
     )
     return _return(f"/app/wine/{result['label']['wine_id']}/access-center", msg="Gestione interna attivata")
 
@@ -101,6 +107,7 @@ def safe_label_management_set(
             resource_id=label_id,
             actor=actor,
             request=request,
+            metadata={"old_studio": result["old_studio"], "new_studio": None},
         )
         return _return(return_to or f"/app/wine/{result['label']['wine_id']}/access-center", msg="Gestione interna attivata")
     if value.startswith("studio:"):
@@ -115,7 +122,12 @@ def safe_label_management_set(
             resource_id=label_id,
             actor=actor,
             request=request,
-            metadata={"studio_user_id": studio_user_id, "profile": "graphic"},
+            metadata={
+                "studio_user_id": studio_user_id,
+                "profile": "graphic",
+                "old_studio": result["old_studio"],
+                "new_studio": result["new_studio"],
+            },
         )
         return _return(return_to or f"/app/wine/{result['label']['wine_id']}/access-center", msg="Studio assegnato")
     raise HTTPException(422, "Scelta gestione non valida")

@@ -30,6 +30,7 @@ def _load_label_for_owner(cur, label_id: int, actor: Mapping[str, Any]) -> dict[
         JOIN wineries w ON w.id=wl.winery_id
         WHERE wl.id=%s
         LIMIT 1
+        FOR UPDATE
         """,
         (int(label_id),),
     )
@@ -40,6 +41,24 @@ def _load_label_for_owner(cur, label_id: int, actor: Mapping[str, Any]) -> dict[
     if role != "admin" and not (role == "winery" and _actor_id(actor) == int(label.get("owner_user_id") or 0)):
         raise HTTPException(403, "Solo la cantina proprietaria può gestire questa etichetta")
     return dict(label)
+
+
+def _current_studio(cur, label_id: int) -> dict[str, Any] | None:
+    cur.execute(
+        """
+        SELECT lc.collaborator_user_id AS studio_user_id,
+               COALESCE(NULLIF(s.company_name, ''), u.email) AS studio_name
+        FROM label_collaborators lc
+        JOIN users u ON u.id=lc.collaborator_user_id
+        LEFT JOIN studios s ON s.user_id=u.id
+        WHERE lc.wine_label_id=%s AND lc.active=TRUE AND lc.can_view=TRUE
+        ORDER BY lc.updated_at DESC, lc.id DESC
+        LIMIT 1
+        """,
+        (int(label_id),),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
 
 
 def assign_studio_to_label(
@@ -57,6 +76,7 @@ def assign_studio_to_label(
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             label = _load_label_for_owner(cur, label_id, actor)
+            old_studio = _current_studio(cur, label_id)
             cur.execute(
                 """
                 SELECT can_view, can_edit, can_create
@@ -102,14 +122,24 @@ def assign_studio_to_label(
                 (int(label_id), int(studio_user_id), effective_view, effective_edit, effective_media, effective_export),
             )
             row = dict(cur.fetchone())
+            persisted = _current_studio(cur, label_id)
+            if not persisted or int(persisted["studio_user_id"]) != int(studio_user_id):
+                raise RuntimeError("Verifica persistenza assegnazione studio fallita")
         conn.commit()
-    return {"label": label, "collaboration": row, "profile": profile}
+    return {
+        "label": label,
+        "collaboration": row,
+        "profile": profile,
+        "old_studio": old_studio,
+        "new_studio": persisted,
+    }
 
 
 def clear_label_collaboration(*, actor: Mapping[str, Any], label_id: int) -> dict[str, Any]:
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             label = _load_label_for_owner(cur, label_id, actor)
+            old_studio = _current_studio(cur, label_id)
             cur.execute(
                 """
                 UPDATE label_collaborators
@@ -120,8 +150,16 @@ def clear_label_collaboration(*, actor: Mapping[str, Any], label_id: int) -> dic
                 (int(label_id),),
             )
             changed = cur.rowcount
+            persisted = _current_studio(cur, label_id)
+            if persisted is not None:
+                raise RuntimeError("Verifica persistenza gestione diretta fallita")
         conn.commit()
-    return {"label": label, "deactivated": int(changed or 0)}
+    return {
+        "label": label,
+        "deactivated": int(changed or 0),
+        "old_studio": old_studio,
+        "new_studio": None,
+    }
 
 
 def update_studio_connection_profile(

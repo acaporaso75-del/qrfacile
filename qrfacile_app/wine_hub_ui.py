@@ -6,7 +6,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
+from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 from qrfacile_app.guided_flow import render_guided_stepper
 from qrfacile_app.services.storage import versioned_upload_url
@@ -331,10 +333,18 @@ def _management_picker(wine_id: int, active_studio_user_id: int, studios: list[d
 
 def _management_section(labels: list[dict], management: dict[int, dict], role: str, wine_id: int, studios: list[dict]) -> str:
     main_picker = ""
+    active_id = _wine_management_active_id(management)
+    assigned_names = sorted({str(info.get("assigned") or "").strip() for info in management.values() if info.get("assigned")})
+    if active_id > 0 and len(assigned_names) == 1:
+        current_status = f"🏢 Studio assegnato: {esc(assigned_names[0])}"
+    elif assigned_names:
+        current_status = "🏢 Studi diversi assegnati alle etichette del lotto"
+    else:
+        current_status = "👤 Gestione diretta della cantina"
     if role in ("winery", "admin") and labels:
         main_picker = _management_picker(
             int(wine_id),
-            _wine_management_active_id(management),
+            active_id,
             studios,
             f"/app/wine/{int(wine_id)}#gestione-grafica",
         )
@@ -359,6 +369,7 @@ def _management_section(labels: list[dict], management: dict[int, dict], role: s
           <div class="wineHubSmallLabel">Fronte / Retro</div>
           <div class="h2">Gestione grafica del lotto</div>
           <div class="p" style="margin-top:4px">Scegli chi lavora sulla grafica di questo lotto.</div>
+          <div class="p" style="margin-top:8px"><b>Stato corrente:</b> {current_status}</div>
         </div>
       </div>
       {main_picker}
@@ -547,6 +558,7 @@ def wine_management_set(
     management_value: str = Form(...),
     return_to: str = Form(""),
 ):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery", "admin"))
     role = (user.get("role") or "").lower().strip()
     value = (management_value or "").strip().lower()
@@ -571,6 +583,14 @@ def wine_management_set(
                 )
 
             label_ids = _wine_label_ids(cur, int(wine_id))
+            old_studio_ids: list[int] = []
+            if label_ids:
+                cur.execute(
+                    """SELECT DISTINCT collaborator_user_id FROM label_collaborators
+                       WHERE wine_label_id = ANY(%s) AND active=TRUE AND can_view=TRUE""",
+                    (label_ids,),
+                )
+                old_studio_ids = sorted(int(row["collaborator_user_id"]) for row in (cur.fetchall() or []))
 
             if value == "self":
                 if label_ids:
@@ -583,7 +603,22 @@ def wine_management_set(
                         """,
                         (label_ids,),
                     )
+                    cur.execute(
+                        """SELECT COUNT(*)::int AS active_count FROM label_collaborators
+                           WHERE wine_label_id = ANY(%s) AND active=TRUE AND can_view=TRUE""",
+                        (label_ids,),
+                    )
+                    if int((cur.fetchone() or {}).get("active_count") or 0) != 0:
+                        raise RuntimeError("Verifica persistenza gestione diretta del lotto fallita")
                 conn.commit()
+                write_audit_event(
+                    action="wine_management_internal",
+                    resource_type="wine",
+                    resource_id=wine_id,
+                    actor=user,
+                    request=request,
+                    metadata={"old_studio_ids": old_studio_ids, "new_studio_id": None, "label_ids": label_ids},
+                )
                 return RedirectResponse(
                     _with_notice(redirect_to, "msg", "Gestione interna attivata"),
                     status_code=303,
@@ -610,7 +645,26 @@ def wine_management_set(
                         status_code=303,
                     )
 
+                if label_ids:
+                    cur.execute(
+                        """SELECT COUNT(DISTINCT wine_label_id)::int AS assigned_count
+                           FROM label_collaborators
+                           WHERE wine_label_id = ANY(%s) AND collaborator_user_id=%s
+                             AND active=TRUE AND can_view=TRUE""",
+                        (label_ids, int(studio_user_id)),
+                    )
+                    persisted = int((cur.fetchone() or {}).get("assigned_count") or 0)
+                    if persisted != len(label_ids):
+                        raise RuntimeError("Verifica persistenza assegnazione studio al lotto fallita")
                 conn.commit()
+                write_audit_event(
+                    action="wine_studio_assignment_changed",
+                    resource_type="wine",
+                    resource_id=wine_id,
+                    actor=user,
+                    request=request,
+                    metadata={"old_studio_ids": old_studio_ids, "new_studio_id": studio_user_id, "label_ids": label_ids},
+                )
                 return RedirectResponse(
                     _with_notice(redirect_to, "msg", "Studio assegnato al lotto"),
                     status_code=303,
