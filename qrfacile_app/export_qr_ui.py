@@ -3,10 +3,14 @@ import os
 import re
 import zipfile
 import smtplib
+from email.utils import parseaddr
 from email.message import EmailMessage
+from threading import Lock
+from time import monotonic
 
-from fastapi import APIRouter, Request, Query, HTTPException, Form
-from fastapi.responses import HTMLResponse, Response, RedirectResponse
+from fastapi import APIRouter, Request, Query, HTTPException, Body
+from fastapi.responses import HTMLResponse, Response, JSONResponse
+from pydantic import BaseModel, ConfigDict
 from psycopg.rows import dict_row
 
 import qrcode
@@ -29,6 +33,28 @@ from qrfacile_app.ui_shell import page, top_actions, esc
 from qrfacile_app.audit import audit_log
 
 router = APIRouter()
+
+
+class PackageSendRequest(BaseModel):
+    """Public contract for sending a print package."""
+
+    model_config = ConfigDict(extra="forbid")
+    to_email: str | None = None
+
+
+_send_guard = Lock()
+_recent_sends: dict[tuple[int, int, str], float] = {}
+_DUPLICATE_WINDOW_SECONDS = 30.0
+
+
+def _valid_email(value: str) -> bool:
+    email = (value or "").strip().lower()
+    parsed = parseaddr(email)[1]
+    return bool(parsed == email and re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email))
+
+
+def _send_error(message: str, status_code: int) -> JSONResponse:
+    return JSONResponse({"ok": False, "message": message}, status_code=status_code)
 
 # -------------------------
 # Preset stampa
@@ -502,16 +528,15 @@ def export_page(request: Request, wine_id: int, preset: str = "label_pro", name:
           <span class="exportIcon">✉️</span>
         </div>
 
-        <form method="post" action="/app/wine/{int(wine_id)}/export/send" class="exportSendForm">
-          <input type="hidden" name="name" value="{esc(base_name)}">
-
+        <form action="/app/wine/{int(wine_id)}/export/send?name={esc(base_name)}" class="exportSendForm" data-package-send-form>
           <div>
             <label>Email destinatario</label>
-            <input class="input" name="to_email" placeholder="tipografia@example.com">
+            <input class="input" name="to_email" type="email" required autocomplete="email" placeholder="tipografia@example.com">
           </div>
 
-          <button class="btn btn-primary" type="submit">Invia ZIP</button>
+          <button class="btn btn-primary" type="submit" data-package-send-button>Invia pacchetti</button>
         </form>
+        <div class="exportHint" data-package-send-message role="status" aria-live="polite"></div>
 
         <div class="exportHint">
           Funzione riservata a cantina/admin. Gli studi possono esportare, ma non inviare email direttamente.
@@ -807,6 +832,52 @@ def export_page(request: Request, wine_id: int, preset: str = "label_pro", name:
           }}
         }}
       </style>
+      <script>
+      (() => {{
+        const form = document.querySelector('[data-package-send-form]');
+        if (!form) return;
+        const email = form.elements.to_email;
+        const button = form.querySelector('[data-package-send-button]');
+        const message = document.querySelector('[data-package-send-message]');
+        let sending = false;
+        const show = (text, error = false) => {{
+          message.textContent = text;
+          message.style.color = error ? '#b42318' : '#067647';
+        }};
+        form.addEventListener('submit', async (event) => {{
+          event.preventDefault();
+          if (sending) return;
+          const toEmail = email.value.trim();
+          if (!toEmail) {{ show('Inserisci l’indirizzo email del destinatario', true); email.focus(); return; }}
+          if (!email.checkValidity()) {{ show('Inserisci un indirizzo email valido', true); email.focus(); return; }}
+          sending = true;
+          button.disabled = true;
+          button.setAttribute('aria-busy', 'true');
+          show('Invio in corso…');
+          try {{
+            const response = await fetch(form.action, {{
+              method: 'POST',
+              headers: {{'Content-Type': 'application/json', 'Accept': 'application/json'}},
+              credentials: 'same-origin',
+              body: JSON.stringify({{to_email: toEmail}})
+            }});
+            let data = {{}};
+            try {{ data = await response.json(); }} catch (_) {{ /* never expose raw server bodies */ }}
+            if (!response.ok || !data.ok) throw new Error(data.message || 'Invio non riuscito. Riprova.');
+            show('Pacchetti inviati correttamente');
+            form.reset();
+          }} catch (error) {{
+            const safe = error.message === 'Destinatario non trovato' ? error.message :
+              (error.message === 'Invio già effettuato. Attendi prima di riprovare.' ? error.message : 'Invio non riuscito. Riprova.');
+            show(safe, true);
+          }} finally {{
+            sending = false;
+            button.disabled = false;
+            button.removeAttribute('aria-busy');
+          }}
+        }});
+      }})();
+      </script>
     </section>
     """
 
@@ -914,23 +985,42 @@ def export_zip(request: Request, wine_id: int, name: str = Query("qrfacile")):
 
 
 @router.post("/app/wine/{wine_id}/export/send")
-def export_send(request: Request, wine_id: int, to_email: str = Form(...), name: str = Form("qrfacile")):
+def export_send(
+    request: Request,
+    wine_id: int,
+    payload: PackageSendRequest | None = Body(default=None),
+    name: str = Query("qrfacile"),
+):
     u = _require_export_access(request, wine_id)
 
     # studio può esportare, ma invio email è “sensibile”: lo teniamo consentito SOLO a winery/admin
     role = (u.get("role") or "").lower().strip()
     if role == "studio":
-        raise HTTPException(403, "Invio email non consentito allo studio")
+        return _send_error("Non sei autorizzato a inviare questi pacchetti", 403)
 
-    to_email = (to_email or "").strip()
-    if not to_email or "@" not in to_email:
-        raise HTTPException(400, "Email non valida")
+    to_email = ((payload.to_email if payload else "") or "").strip().lower()
+    if not to_email:
+        return _send_error("Inserisci l’indirizzo email del destinatario", 400)
+    if not _valid_email(to_email):
+        return _send_error("Inserisci un indirizzo email valido", 422)
 
     name = _safe_filename(name)
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             w = _wine(cur, wine_id)
+
+    # The ACL above resolves the wine's winery server-side. Never trust a winery id
+    # from the browser. A short idempotency window also stops double clicks/retries.
+    duplicate_key = (int(u["id"]), int(wine_id), to_email)
+    now_mono = monotonic()
+    with _send_guard:
+        expired = [key for key, sent_at in _recent_sends.items() if now_mono - sent_at >= _DUPLICATE_WINDOW_SECONDS]
+        for key in expired:
+            _recent_sends.pop(key, None)
+        if duplicate_key in _recent_sends:
+            return _send_error("Invio già effettuato. Attendi prima di riprovare.", 409)
+        _recent_sends[duplicate_key] = now_mono
 
     url = _public_url(request, w["slug"])
     zip_bytes = _build_zip_bundle(url, name)
@@ -948,17 +1038,18 @@ Grazie.
 
     try:
         _smtp_send_zip(to_email, subject, body, zip_bytes, zip_name)
-    except Exception as e:
-        err = "SMTP non configurato o invio non riuscito. Scarica lo ZIP manualmente oppure configura noreply@qrfacile.it."
-        return RedirectResponse(
-            f"/app/wine/{wine_id}/export?preset=label_pro&name={name}&err=" + err.replace(" ", "%20"),
-            status_code=303,
-        )
+    except smtplib.SMTPRecipientsRefused:
+        with _send_guard:
+            _recent_sends.pop(duplicate_key, None)
+        return _send_error("Destinatario non trovato", 404)
+    except Exception:
+        with _send_guard:
+            _recent_sends.pop(duplicate_key, None)
+        return _send_error("Invio non riuscito. Riprova.", 503)
 
     audit_log(u, "export_send_email", "wine", int(wine_id),
               request.client.host if request.client else "",
               request.headers.get("user-agent", ""),
               {"to": to_email, "name": name})
 
-    return RedirectResponse(f"/app/wine/{wine_id}/export?preset=label_pro&name={name}&msg=Inviato", status_code=303)
-
+    return {"ok": True, "message": "Pacchetti inviati correttamente"}
