@@ -28,6 +28,8 @@ REVIEWED_DYNAMIC_SQL = {
 REVIEWED_READ_ONLY_GETS = {
     # Renders a confirmation form; the corresponding acceptance is POST-only.
     "qrfacile_app/invitation_acceptance_ui.py": '@router.' + 'get("/app/invite/studio/accept',
+    # Renders invitation details and CSRF-protected POST forms only.
+    "qrfacile_app/invitations_ui.py": '@router.' + 'get("/app/invite/{invite_type}/accept',
     # Lists existing acceptance evidence for administrators; it does not accept.
     "qrfacile_app/legal_acceptance_ui.py": '@router.' + 'get("/api/admin/compliance/legal-accept',
 }

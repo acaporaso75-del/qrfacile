@@ -228,35 +228,16 @@ def _create_studio_invite_for_context(
     if not studio_email or "@" not in studio_email or "." not in studio_email:
         return False
 
-    token = secrets.token_urlsafe(24)
-    ts = now()
-    exp = ts + 14 * 86400
-
-    cols = [
-        "token",
-        "winery_id",
-        "inviter_user_id",
-        "studio_email",
-        "can_view",
-        "can_edit",
-        "can_create",
-        "created_at",
-        "expires_at",
-    ]
-    vals = [token, int(winery_id), int(inviter_user_id), studio_email, True, True, False, ts, exp]
-
-    invite_cols = _columns(cur, "studio_invites")
-    if wine_id and "source_wine_id" in invite_cols:
-        cols.append("source_wine_id")
-        vals.append(int(wine_id))
-    if label_id and "source_label_id" in invite_cols:
-        cols.append("source_label_id")
-        vals.append(int(label_id))
-
-    placeholders = ",".join(["%s"] * len(vals))
+    import hashlib, json
+    token = secrets.token_urlsafe(32)
+    invite_type = "label" if label_id else ("wine" if wine_id else "studio")
     cur.execute(
-        f"INSERT INTO studio_invites ({','.join(cols)}) VALUES ({placeholders})",
-        tuple(vals),
+        """INSERT INTO invites(legacy_token,token_hash,invite_type,inviter_user_id,inviter_role,
+             invitee_email,target_role,winery_id,wine_id,label_id,permissions_json,status,expires_at,created_at,send_attempts)
+           VALUES(NULL,%s,%s,%s,'winery',%s,'studio',%s,%s,%s,%s::jsonb,'pending',now()+interval '14 days',now(),0)""",
+        (hashlib.sha256(token.encode()).hexdigest(),invite_type,int(inviter_user_id),studio_email,
+         int(winery_id),int(wine_id) if wine_id else None,int(label_id) if label_id else None,
+         json.dumps({"can_view":True,"can_edit":True,"can_create":False,"can_publish":False})),
     )
     return True
 

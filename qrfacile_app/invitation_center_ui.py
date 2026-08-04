@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
@@ -34,6 +34,10 @@ def _status_label(item: dict) -> tuple[str, str]:
 
 @router.get("/app/winery/invitations", response_class=HTMLResponse)
 def winery_invitation_center(request: Request):
+    # Compatibility URL: the canonical center includes sent and received invites.
+    require_any_role(request, ("winery",))
+    return RedirectResponse("/app/invitations", status_code=303)
+    """Legacy renderer retained temporarily for source-history reference."""
     user = require_any_role(request, ("winery",))
     winery_id = _winery_id(user)
     with pg() as conn:

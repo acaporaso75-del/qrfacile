@@ -543,7 +543,7 @@ def studios_settings_redirect(request: Request, msg: str = "", err: str = ""):
     return RedirectResponse(f"/app/winery/settings{suffix}", status_code=303)
 
 
-@router.post("/app/settings/studios/invite")
+# Legacy duplicate deliberately unrouted; invitation_management_ui owns this path.
 def studios_invite_post(
     request: Request,
     studio_email: str = Form(...),

@@ -14,6 +14,8 @@ from psycopg.rows import dict_row
 from qrfacile_app.db import pg
 
 INVITE_TTL_SECONDS = 14 * 24 * 60 * 60
+# The canonical service generates each raw secret with secrets.token_urlsafe(32)
+# and persists only its SHA-256 digest.
 
 
 def _clean_email(value: str) -> str:
@@ -77,61 +79,37 @@ def _send_email(*, to_email: str, winery_name: str, invite_url: str) -> tuple[bo
 
 
 def create_invite(*, winery_id: int, actor_user_id: int, studio_email: str, preset: str, base_url: str) -> dict[str, Any]:
-    email = _clean_email(studio_email)
-    if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
-        raise HTTPException(422, "Email non valida")
-    can_view, can_edit, can_create = _permissions(preset)
-    token = secrets.token_urlsafe(32)
-    ts = int(time.time())
-    expires = ts + INVITE_TTL_SECONDS
+    """Compatibility adapter into the canonical hash-only invitations service."""
+    from qrfacile_app.services.invitations import create_invitation
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute("SELECT name FROM wineries WHERE id=%s LIMIT 1", (int(winery_id),))
-            winery = cur.fetchone()
-            if not winery:
-                raise HTTPException(404, "Cantina non trovata")
-            cur.execute(
-                """
-                UPDATE studio_invites
-                SET revoked_at=now(), revoked_by_user_id=%s, status='revoked'
-                WHERE winery_id=%s AND lower(studio_email)=lower(%s)
-                  AND used_at IS NULL AND revoked_at IS NULL
-                """,
-                (int(actor_user_id), int(winery_id), email),
-            )
-            cur.execute(
-                """
-                INSERT INTO studio_invites (
-                    token, token_hash, winery_id, inviter_user_id, studio_email,
-                    can_view, can_edit, can_create, created_at, expires_at,
-                    status, email_delivery_status, send_attempts
-                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'pending','sending',1)
-                RETURNING token_hash, winery_id, studio_email, created_at, expires_at, status
-                """,
-                (token, _token_hash(token), int(winery_id), int(actor_user_id), email,
-                 can_view, can_edit, can_create, ts, expires),
-            )
-            row = dict(cur.fetchone())
-        conn.commit()
+            cur.execute("SELECT id,email,role FROM users WHERE id=%s",(actor_user_id,)); actor=cur.fetchone()
+            cur.execute("SELECT name FROM wineries WHERE id=%s",(winery_id,)); winery=cur.fetchone()
+    if not actor or not winery: raise HTTPException(404,"Mittente o cantina non trovati")
+    can_view,can_edit,can_create=_permissions(preset)
+    result=create_invitation(invite_type="studio",inviter=actor,recipient_email=studio_email,
+        winery_id=winery_id,permissions={"can_view":can_view,"can_edit":can_edit,"can_create":can_create})
+    raw=result.pop("raw_token"); invite_url=f"{base_url.rstrip('/')}/app/invite/studio/accept/{raw}"
+    sent,error=_send_email(to_email=result["invitee_email"],winery_name=str(winery["name"]),invite_url=invite_url)
+    return {**result,"studio_email":result["invitee_email"],"email_sent":sent,"email_error":error,"invite_url":invite_url}
 
-    invite_url = f"{base_url.rstrip('/')}/app/invite/studio/accept/{token}"
-    sent, error = _send_email(to_email=email, winery_name=str(winery["name"]), invite_url=invite_url)
-    with pg() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                UPDATE studio_invites
-                SET email_delivery_status=%s, email_last_error=%s,
-                    email_last_attempt_at=now(), email_sent_at=CASE WHEN %s THEN now() ELSE email_sent_at END
-                WHERE token_hash=%s
-                """,
-                ("sent" if sent else "failed", error or None, sent, row["token_hash"]),
-            )
-        conn.commit()
-    return {**row, "email_sent": sent, "email_error": error, "invite_url": invite_url}
+
+def _legacy_create_invite(*, winery_id: int, actor_user_id: int, studio_email: str, preset: str, base_url: str) -> dict[str, Any]:
+    raise RuntimeError("Legacy invitation writer disabled")
 
 
 def revoke_invite(*, winery_id: int, token_hash: str, actor_user_id: int) -> dict[str, Any]:
+    from qrfacile_app.services.invitations import revoke_or_resend
+    with pg() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT id FROM invites WHERE token_hash=%s AND winery_id=%s",(token_hash,winery_id)); row=cur.fetchone()
+            cur.execute("SELECT id,email,role FROM users WHERE id=%s",(actor_user_id,)); actor=cur.fetchone()
+    if not row or not actor: raise HTTPException(404,"Invito non trovato")
+    result=revoke_or_resend(invite_id=row["id"],actor=actor)
+    return {**result,"token_hash":token_hash,"studio_email":""}
+
+
+def _legacy_revoke_invite(*, winery_id: int, token_hash: str, actor_user_id: int) -> dict[str, Any]:
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
@@ -150,7 +128,22 @@ def revoke_invite(*, winery_id: int, token_hash: str, actor_user_id: int) -> dic
     return dict(row)
 
 
-def resend_invite(*, winery_id: int, token_hash: str, base_url: str) -> dict[str, Any]:
+def resend_invite(*, winery_id: int, token_hash: str, base_url: str, actor_user_id: int | None = None) -> dict[str, Any]:
+    from qrfacile_app.services.invitations import revoke_or_resend
+    with pg() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT id,inviter_user_id FROM invites WHERE token_hash=%s AND winery_id=%s",(token_hash,winery_id)); row=cur.fetchone()
+            uid=int(actor_user_id or (row or {}).get("inviter_user_id") or 0)
+            cur.execute("SELECT id,email,role FROM users WHERE id=%s",(uid,)); actor=cur.fetchone()
+            cur.execute("SELECT name FROM wineries WHERE id=%s",(winery_id,)); winery=cur.fetchone()
+    if not row or not actor or not winery: raise HTTPException(404,"Invito non trovato")
+    result=revoke_or_resend(invite_id=row["id"],actor=actor,resend=True)
+    raw=result.pop("raw_token"); link=f"{base_url.rstrip('/')}/app/invite/{result['invite_type']}/accept/{raw}"
+    sent,error=_send_email(to_email=result["invitee_email"],winery_name=winery["name"],invite_url=link)
+    return {"token_hash":result["token_hash"],"email_sent":sent,"email_error":error}
+
+
+def _legacy_resend_invite(*, winery_id: int, token_hash: str, base_url: str) -> dict[str, Any]:
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(

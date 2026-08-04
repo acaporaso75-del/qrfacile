@@ -89,7 +89,7 @@ def secure_resend_studio_invite(request: Request, token_hash: str):
     require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery",))
     winery_id = _winery_id(user)
-    result = resend_invite(winery_id=winery_id, token_hash=token_hash, base_url=_base_url(request))
+    result = resend_invite(winery_id=winery_id, token_hash=token_hash, base_url=_base_url(request), actor_user_id=int(user["id"]))
     write_audit_event(
         action="studio_invitation_resent",
         resource_type="studio_invite",
