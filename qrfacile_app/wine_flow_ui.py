@@ -39,7 +39,8 @@ def _image_preview(asset: dict, label: str) -> str:
         verify_saved_asset({"thumb": thumb})
         return f'<figure><img src="{esc(versioned_upload_url(thumb, asset.get("updated_at")))}" alt="{esc(label)}" style="width:100%;max-height:280px;object-fit:contain"><figcaption>{esc(label)} disponibile</figcaption></figure>'
     except (OSError, ValueError):
-        return f'<div class="note"><b>{esc(label)} non disponibile.</b> Carica o sostituisci il file nello step Immagini.</div>'
+        missing = "Immagine fronte non caricata" if "fronte" in label.lower() else "Immagine retro non caricata"
+        return f'<div class="note"><b>{esc(missing)}</b> Carica o sostituisci il file nello step Immagini.</div>'
 
 
 def _list(items: list[str], empty: str) -> str:
@@ -56,6 +57,9 @@ def review(request: Request, wine_id: int, msg: str = ""):
     published = str(qr.get("status") or "").lower() == "attiva"
     slug = str(qr.get("slug") or "")
     role = str(user.get("role") or "").lower()
+    status_label = "Pubblicato" if published else ("Incompleto" if blocking else "Pronto")
+    if not published and not payload.get("wine", {}).get("wine_name"):
+        status_label = "Bozza"
     if blocking:
         primary = f'<a class="btn btn-primary" href="/app/wine/{wine_id}/compliance">Correggi dati</a>'
     elif not published and role in ("winery", "admin"):
@@ -76,16 +80,21 @@ def review(request: Request, wine_id: int, msg: str = ""):
       <p>Controlla tutti i dati in un’unica pagina. La preview è disponibile anche prima della pubblicazione.</p>
       {render_guided_stepper(wine_id, "review", {"wine","images","ingredients","nutrition","recycling"})}
       {f'<div class="note note-ok">{esc(msg)}</div>' if msg else ''}
-      <div class="card"><div class="h2">Compliance Score: {report['score']}/100</div><p>{'Pubblicabile' if not blocking else 'Non pubblicabile: correggere gli errori indicati'}</p><ul>{result_rows}</ul></div>
+        <div class="card"><div class="h2">Stato: {esc(status_label)} · Compliance Score: {report['score']}/100</div><p>{'Pubblicabile' if not blocking else 'Non pubblicabile: correggere gli errori indicati'}</p><ul>{result_rows}</ul></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">{_image_preview(assets.get('front') or {}, 'Immagine fronte')}{_image_preview(assets.get('back') or {}, 'Immagine retro')}</div>
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:16px">
         <div class="card"><div class="h2">Ingredienti</div>{_list(payload.get('ingredients') or [], 'Nessun ingrediente')}</div>
         <div class="card"><div class="h2">Allergeni</div>{_list(payload.get('allergens') or [], 'Nessun allergene dichiarato')}</div>
-        <div class="card"><div class="h2">Nutrizione per 100 ml</div><p>{esc(str(nut.get('energy_kj') or '—'))} kJ · {esc(str(nut.get('energy_kcal') or '—'))} kcal</p></div>
-        <div class="card"><div class="h2">Riciclabilità</div><ul>{recycle_rows}</ul></div>
+        <div class="card"><div class="h2">Nutrizione per 100 ml</div>{f"<p>{esc(str(nut.get('energy_kj')))} kJ · {esc(str(nut.get('energy_kcal')))} kcal</p>" if nut.get('energy_kj') is not None and nut.get('energy_kcal') is not None else '<p>Valori nutrizionali non completati</p>'}</div>
+        <div class="card"><div class="h2">Riciclabilità</div>{f'<ul>{recycle_rows}</ul>' if recycle else '<p>Informazioni di riciclabilità mancanti</p>'}</div>
       </div>
-      <div class="card" style="margin-top:16px"><div class="h2">Anteprima della pagina</div><iframe title="Anteprima etichetta" src="/preview/{esc(slug)}" style="width:100%;height:520px;border:1px solid #ddd;border-radius:14px"></iframe></div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px"><a class="btn" href="/app/wine/{wine_id}/compliance">Indietro</a><a class="btn" href="/app/wine/{wine_id}">Dashboard del lotto</a><a class="btn" target="_blank" href="/preview/{esc(slug)}">Apri anteprima</a>{primary}</div>
+      <div class="card" style="margin-top:16px"><div class="h2">Anteprima della pagina consumatore</div>
+        <div style="display:flex;gap:8px;margin:10px 0"><button class="btn" type="button" data-preview-width="100%">Desktop</button><button class="btn" type="button" data-preview-width="390px">Mobile</button></div>
+        <div data-preview-frame-wrap style="width:100%;max-width:100%;margin:auto;transition:max-width .2s ease"><iframe title="Anteprima pagina pubblica del vino" src="/app/wine/{int(wine_id)}/preview" style="width:100%;height:620px;border:1px solid #ddd;border-radius:14px;background:#fff"></iframe></div>
+        <p><a target="_blank" rel="noopener" href="/app/wine/{int(wine_id)}/preview">Apri anteprima in nuova scheda</a></p>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px"><a class="btn" href="/app/wine/{wine_id}/compliance">Indietro</a><a class="btn" href="/app/wine/{wine_id}/compliance">Modifica</a><a class="btn" href="/app/wine/{wine_id}/compliance">Salva dati</a><a class="btn" href="/app/wine/{wine_id}">Dashboard del lotto</a><a class="btn" target="_blank" rel="noopener" href="/app/wine/{int(wine_id)}/preview">Apri anteprima</a>{primary}</div>
+      <script>document.querySelectorAll('[data-preview-width]').forEach(button => button.addEventListener('click', () => {{ document.querySelector('[data-preview-frame-wrap]').style.maxWidth = button.dataset.previewWidth; }}));</script>
     </section>"""
     return HTMLResponse(page(title="QRFACILE · Controllo finale", subtitle="Step 7 di 7", body_html=body, actions_html="", user_email=user.get("email", ""), role=role, credits={}))
 
