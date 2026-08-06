@@ -2,7 +2,7 @@ name: Compliance CI
 
 on:
   pull_request:
-    branches: [staging]
+    branches: [staging, feature/legal-ai-compliance-2026]
   push:
     branches: [feature/legal-ai-compliance-2026]
 
@@ -35,6 +35,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -46,7 +48,17 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-          python -m pip install pytest pip-audit detect-secrets
+          python -m pip install pytest pip-audit detect-secrets pglast
+
+      - name: Check committed diff formatting
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "${BASE_SHA}" ]; then
+            git diff --check "${BASE_SHA}...HEAD"
+          else
+            git diff --check HEAD^..HEAD
+          fi
 
       - name: Compile all Python modules
         run: |
@@ -74,3 +86,16 @@ jobs:
 
       - name: Check SQL migrations are transactional
         run: python scripts/check_sql_transactions.py
+
+      - name: Parse staging safety SQL
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from pglast import parse_sql
+
+          files = sorted(Path("sql").glob("2026_staging_safety_reconciliation_v1*.sql"))
+          assert len(files) == 4, files
+          for path in files:
+              parse_sql(path.read_text(encoding="utf-8"))
+              print(f"PARSE_OK {path}")
+          PY
