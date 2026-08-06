@@ -22,9 +22,8 @@ def test_tracked_sources_pass_detect_secrets():
         for item in tracked.split(b"\0")
         if item and (ROOT / item.decode()).is_file()
     ]
-    hook = Path(sys.executable).with_name("detect-secrets-hook")
     result = subprocess.run(
-        [hook, *files],
+        [sys.executable, "-m", "detect_secrets.pre_commit_hook", *files],
         cwd=ROOT,
         capture_output=True,
     )

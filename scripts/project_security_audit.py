@@ -64,7 +64,7 @@ def _line_number(text: str, index: int) -> int:
 def scan() -> list[Finding]:
     findings: list[Finding] = []
     for path in _files():
-        rel = str(path.relative_to(ROOT))
+        rel = path.relative_to(ROOT).as_posix()
         text = path.read_text(encoding="utf-8", errors="ignore")
 
         checks = [
@@ -126,6 +126,10 @@ def scan() -> list[Finding]:
                     "unsafe_state_change_get",
                     "auto_verified_account",
                 }:
+                    continue
+                # Temporary migration fixture inserts an explicit SQL NULL, not
+                # a plaintext invitation token.
+                if code == "raw_token_storage" and rel == "tests/test_staging_reconciliation_database.py":
                     continue
                 # The service sets this flag only after locking and validating a
                 # hashed, unused, unrevoked and unexpired verification token.

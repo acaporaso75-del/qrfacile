@@ -1,6 +1,50 @@
 from qrfacile_app.services.wine_compliance_advisor import build_compliance_advice
 
 
+def test_compliance_advisor_page_uses_ui_shell_keyword_contract(monkeypatch):
+    from starlette.requests import Request
+
+    from qrfacile_app import wine_compliance_advisor_ui as advisor_ui
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/app/wine/7/compliance-advisor",
+            "query_string": b"",
+            "headers": [],
+        }
+    )
+    monkeypatch.setattr(
+        advisor_ui,
+        "require_any_role",
+        lambda *_args: {
+            "id": 3,
+            "email": "owner@example.test",
+            "role": "winery",
+            "credits": {"available": 2},
+        },
+    )
+    monkeypatch.setattr(advisor_ui, "_load_payload", lambda *_args: {})
+    monkeypatch.setattr(advisor_ui, "run_explainable_wine_compliance", lambda _payload: {})
+    monkeypatch.setattr(
+        advisor_ui,
+        "build_compliance_advice",
+        lambda _report: {
+            "actions": [],
+            "priority_counts": {},
+            "completion_percent": 100,
+        },
+    )
+
+    response = advisor_ui.compliance_advisor_page(request, 7)
+
+    assert response.status_code == 200
+    body = response.body.decode()
+    assert "Compliance Advisor" in body
+    assert "owner@example.test" in body
+
+
 def _report(results, counts=None, publishable=False):
     return {
         "engine_version": "test-engine",

@@ -5,10 +5,15 @@ from pathlib import Path
 from typing import Mapping
 from urllib.parse import quote
 
+from qrfacile_app.runtime_config import get_runtime_config
+
 
 def get_uploads_dir() -> Path:
-    root = os.getenv("UPLOADS_DIR") or os.path.join(os.getenv("APP_ROOT", "/opt/qrfacile"), "uploads")
-    return Path(root).expanduser().resolve()
+    return get_runtime_config(validate=False).uploads_dir
+
+
+def get_templates_dir() -> Path:
+    return get_runtime_config(validate=False).templates_dir
 
 
 def normalize_asset_path(value: object) -> str:
