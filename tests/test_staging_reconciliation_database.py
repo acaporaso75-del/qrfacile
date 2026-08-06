@@ -122,6 +122,24 @@ def test_reconciliation_migration_postcheck_and_rollback_on_temporary_database()
             "SELECT to_regclass('public.email_verification_tokens') IS NULL"
         ).fetchone() == (True,)
 
+        _run_sql(conn, MIGRATION)
+        _run_sql(conn, POSTCHECK)
+        assert conn.execute(
+            "SELECT state FROM qrfacile_schema_migrations WHERE migration_id=%s",
+            ("2026_staging_safety_reconciliation_v1",),
+        ).fetchone() == ("applied",)
+        assert dict(
+            conn.execute(
+                "SELECT status, count(*) FROM studio_invites GROUP BY status"
+            ).fetchall()
+        ) == {"accepted": 2, "expired": 14, "pending": 1}
+        assert conn.execute(
+            "SELECT count(*) FROM studio_invites WHERE token_hash IS NOT NULL"
+        ).fetchone() == (0,)
+        assert conn.execute(
+            "SELECT to_regclass('public.email_verification_tokens') IS NOT NULL"
+        ).fetchone() == (True,)
+
 
 def test_migration_never_reconstructs_existing_tokens():
     source = MIGRATION.read_text(encoding="utf-8").lower()
