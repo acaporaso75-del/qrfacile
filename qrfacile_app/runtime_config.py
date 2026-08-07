@@ -159,6 +159,7 @@ def validate_runtime_config(
         ):
             if _is_production_path(path):
                 errors.append(f"{label} punta a un percorso produttivo: {path}")
+                continue
             if not path.is_dir():
                 errors.append(f"{label} non è una directory leggibile: {path}")
 
