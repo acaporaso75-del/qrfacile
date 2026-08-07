@@ -338,7 +338,7 @@ def label_acl(request: Request, label_id: int, msg: str = "", err: str = ""):
                   </div>
                   <div>
                     <label><input type="checkbox" name="can_export" checked> export</label>
-                    <label><input type="checkbox" name="can_publish"> publish</label>
+                    <span class="note">Pubblicazione non assegnabile agli studi.</span>
                   </div>
                 </div>
 

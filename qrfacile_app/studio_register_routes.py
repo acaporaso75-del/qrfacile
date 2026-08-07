@@ -107,7 +107,7 @@ def _input(name: str, type_: str, placeholder: str, value: str = "", required: b
 
 
 @router.get("/register-studio", response_class=HTMLResponse)
-def register_studio_get(err: str = "", msg: str = "", invite: str = ""):
+def register_studio_get(err: str = "", msg: str = "", invite: str = "", next: str = ""):
     actions = top_actions(
         ("/", "Home"),
         ("/login", "Login"),
@@ -183,6 +183,7 @@ def register_studio_get(err: str = "", msg: str = "", invite: str = ""):
 
             <form method="post" action="/register-studio" style="margin-top:26px">
               <input type="hidden" name="invite" value="{esc(invite)}">
+              <input type="hidden" name="next" value="{esc(next if next.startswith('/') and not next.startswith('//') else '')}">
               <div class="grid2 register-form-grid">
                 <div>
                   <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Email login</label>
@@ -388,6 +389,7 @@ def register_studio_post(
     billing_cap: str = Form(""),
     billing_province: str = Form(""),
     invite: str = Form(""),
+    next: str = Form(""),
 ):
     email = (email or "").strip().lower()
     password = password or ""
@@ -447,7 +449,7 @@ def register_studio_post(
             cur.execute(
                 """
                 INSERT INTO users(email, pass_hash, role, created_at, email_verified, last_qr_type, pref_lock_qr_type)
-                VALUES (%s,%s,'studio',%s,1,'modulare',0)
+                VALUES (%s,%s,'studio',%s,0,'modulare',0)
                 RETURNING id
                 """,
                 (email, pass_hash, ts),
@@ -485,5 +487,8 @@ def register_studio_post(
 
     if invite:
         return RedirectResponse(f"/login?created=1&next={_invite_next_after_login(inv)}", status_code=303)
+
+    if next.startswith("/") and not next.startswith("//"):
+        return RedirectResponse(f"/login?created=1&next={next}", status_code=303)
 
     return RedirectResponse("/login?created=1", status_code=303)

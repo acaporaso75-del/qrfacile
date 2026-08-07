@@ -593,6 +593,8 @@ def studio_invite(
     mode: str = Form("both"),
     recommended_pack: str = Form(""),
 ):
+    from qrfacile_app.csrf_core import require_csrf_or_same_origin
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("studio", "admin"))
     uid = int(user["id"])
     studio_email = (user.get("email") or "").strip().lower()
@@ -611,10 +613,6 @@ def studio_invite(
     can_edit = (mode == "both")
     can_create = (mode == "both")
 
-    token = secrets.token_urlsafe(24)
-    ts = now()
-    exp = ts + 60 * 60 * 24 * 14
-
     base_url = ""
     try:
         base_url = (getattr(request.app.state, "app_base_url", "") or "").rstrip("/")
@@ -627,7 +625,12 @@ def studio_invite(
         if host:
             base_url = f"{scheme}://{host}".rstrip("/")
 
-    invite_path = f"/register-winery?invite={token}"
+    from qrfacile_app.services.invitations import create_invitation
+    invitation = create_invitation(invite_type="winery", inviter=user,
+        recipient_email=winery_email, winery_id=None,
+        permissions={"can_view":can_view,"can_edit":can_edit,"can_create":can_create})
+    token = invitation.pop("raw_token")
+    invite_path = f"/app/invite/winery/accept/{token}"
     invite_url = f"{base_url}{invite_path}" if base_url else invite_path
 
     pack_labels = {
@@ -637,37 +640,6 @@ def studio_invite(
         "unlimited": "Non disponibile online",
     }
     recommended_label = pack_labels.get(recommended_pack, "-")
-
-    with pg() as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            winery_id = None
-            try:
-                cur.execute(
-                    """
-                    SELECT w.id
-                    FROM wineries w
-                    JOIN users u ON u.id = w.owner_user_id
-                    WHERE lower(u.email)=lower(%s)
-                    LIMIT 1
-                    """,
-                    (winery_email,),
-                )
-                w = cur.fetchone()
-                if w:
-                    winery_id = int(w["id"])
-            except Exception:
-                winery_id = None
-
-            cur.execute(
-                """
-                INSERT INTO studio_invites
-                  (token, winery_id, inviter_user_id, studio_email, recommended_pack, can_view, can_edit, can_create, created_at, expires_at)
-                VALUES
-                  (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """,
-                (token, winery_id, uid, winery_email, recommended_pack or None, can_view, can_edit, can_create, ts, exp),
-            )
-            conn.commit()
 
     sent, smtp_error = _send_winery_invite_email(
         to_email=winery_email,

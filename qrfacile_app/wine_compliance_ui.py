@@ -8,6 +8,7 @@ from psycopg.rows import dict_row
 from qrfacile_app.db import pg
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
+from qrfacile_app.guided_flow import render_guided_stepper
 
 router = APIRouter()
 
@@ -34,8 +35,10 @@ def _wine(cur, wine_id: int) -> dict:
                qw.wine_name,
                qw.vintage,
                qw.lot,
+               qi.slug,
                w.name AS winery_name
         FROM qr_wines qw
+        JOIN qr_items qi ON qi.id = qw.qr_item_id
         JOIN wineries w ON w.id = qw.winery_id
         WHERE qw.id=%s
         LIMIT 1
@@ -397,9 +400,13 @@ def _recycle_rows(recycle: dict) -> str:
 
             <div>
               <label>Codice extra</label>
-              <input class="input mono" name="rec_{key}_extra"
-                     value="{esc(_val(r.get('extra_code')))}"
-                     placeholder="es. C/ALU90">
+              <details class="qrfAdvanced"><summary>Opzioni avanzate</summary>
+                <label>Codice aggiuntivo eccezionale</label>
+                <input class="input mono" name="rec_{key}_extra"
+                       value="{esc(_val(r.get('extra_code')))}"
+                       placeholder="Solo se documentato dal fornitore">
+                <small>Non usare per il normale codice del materiale. Compilare solo quando il fornitore richiede un secondo riferimento documentato.</small>
+              </details>
             </div>
 
             <div>
@@ -494,16 +501,10 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
           {summary_html}
         </div>
 
-        <div class="complianceHeroCard">
-          <div class="complianceHeroCardTitle">Percorso consigliato</div>
-
-          <div class="complianceStepsMini">
-            <div><b>1</b><span>Immagini</span></div>
-            <div class="active"><b>2</b><span>Compliance</span></div>
-            <div><b>3</b><span>Export</span></div>
-          </div>
-        </div>
+        <div class="complianceHeroCard"><div class="complianceHeroCardTitle">Percorso guidato</div><p>Salva ogni sezione e continua fino al controllo finale.</p></div>
       </div>
+
+      {render_guided_stepper(int(wine_id), "ingredients", {"wine"})}
 
       <div class="complianceTabs">
         <a class="complianceTab" href="/app/wine/{int(wine_id)}">Overview</a>
@@ -512,7 +513,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
         <a class="complianceTab" href="/app/wine/{int(wine_id)}/export">Export</a>
       </div>
 
-      <div class="complianceFlow">
+      <div class="complianceFlow" style="display:none">
         <a href="/app/wine/{int(wine_id)}/images">
           <span>1</span>
           <b>Immagini</b>
@@ -532,7 +533,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
         </a>
       </div>
 
-      <div class="complianceGrid2">
+      <div class="complianceGrid2" id="ingredienti">
         <div class="card compliancePanel">
           <div class="compliancePanelHead">
             <div>
@@ -556,7 +557,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
                      required>
             </div>
 
-            <button class="btn btn-primary" type="submit">Aggiungi</button>
+            <button class="btn" type="submit">Aggiungi ingrediente</button>
           </form>
 
           <div class="note" style="margin-top:14px">
@@ -587,7 +588,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
                      required>
             </div>
 
-            <button class="btn btn-primary" type="submit">Aggiungi</button>
+            <button class="btn" type="submit">Aggiungi allergene</button>
           </form>
 
           <div class="note" style="margin-top:14px">
@@ -612,7 +613,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
                  placeholder="es. eventuali ingredienti non presenti in lista">
         </div>
 
-        <div class="card compliancePanel" style="margin-top:18px">
+        <div class="card compliancePanel" id="nutrizione" style="margin-top:18px">
           <div class="compliancePanelHead">
             <div>
               <div class="complianceSmallLabel">Nutrizione</div>
@@ -623,70 +624,70 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
           </div>
 
           <div class="note" style="margin-top:0">
-            Energia in kJ e kcal obbligatoria. Gli altri campi possono essere lasciati vuoti.
+            Valori riferiti a 100 ml. kJ e kcal sono obbligatori; virgola e punto sono entrambi accettati.
           </div>
 
           <div class="complianceNutritionGrid">
             <div>
-              <label>kJ*</label>
-              <input class="input mono" name="energy_kj"
+              <label>Energia (kJ per 100 ml)*</label>
+              <input class="input mono" name="energy_kj" inputmode="decimal" min="0" max="5000"
                      value="{esc(_val(nut.get('energy_kj')))}"
                      placeholder="0">
             </div>
 
             <div>
-              <label>kcal*</label>
-              <input class="input mono" name="energy_kcal"
+              <label>Energia (kcal per 100 ml)*</label>
+              <input class="input mono" name="energy_kcal" inputmode="decimal" min="0" max="1200"
                      value="{esc(_val(nut.get('energy_kcal')))}"
                      placeholder="0">
             </div>
 
             <div>
               <label>Grassi</label>
-              <input class="input mono" name="fat"
+              <input class="input mono" name="fat" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('fat')))}">
             </div>
 
             <div>
               <label>Saturi</label>
-              <input class="input mono" name="saturates"
+              <input class="input mono" name="saturates" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('saturates')))}">
             </div>
 
             <div>
               <label>Carboidrati</label>
-              <input class="input mono" name="carbs"
+              <input class="input mono" name="carbs" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('carbs')))}">
             </div>
 
             <div>
               <label>Zuccheri</label>
-              <input class="input mono" name="sugars"
+              <input class="input mono" name="sugars" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('sugars')))}">
             </div>
 
             <div>
               <label>Proteine</label>
-              <input class="input mono" name="protein"
+              <input class="input mono" name="protein" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('protein')))}">
             </div>
 
             <div>
               <label>Sale</label>
-              <input class="input mono" name="salt"
+              <input class="input mono" name="salt" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('salt')))}">
             </div>
           </div>
         </div>
 
-        <div class="card compliancePanel" style="margin-top:18px">
+        <div class="card compliancePanel" id="riciclabilita" style="margin-top:18px">
           <div class="compliancePanelHead">
             <div>
               <div class="complianceSmallLabel">Riciclabilità</div>
               <div class="h2">Componenti packaging</div>
             </div>
 
-            <span class="pill pill-muted">Codice minimo “-”</span>
+            <span class="pill pill-muted">Materiale e codice verificati</span>
           </div>
 
           <div class="complianceRecycleList">
@@ -724,11 +725,47 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
         </div>
 
         <div class="complianceActions">
-          <a class="btn" href="/app/wine/{int(wine_id)}">Torna al lotto</a>
-          <button class="btn btn-primary complianceSaveBtn" type="submit">Salva compliance</button>
-          <a class="btn complianceExportBtn" href="/app/wine/{int(wine_id)}/export">Vai a Export</a>
+          <a class="btn" href="/app/wine/{int(wine_id)}/images">Indietro</a>
+          <button class="btn" type="submit" name="continue_to" value="stay">Salva</button>
+          <button class="btn btn-primary complianceSaveBtn" type="submit" name="continue_to" value="review">Salva e continua</button>
         </div>
       </form>
+
+      <div class="card compliancePanel" id="controllo-finale" style="margin-top:18px">
+        <div class="complianceSmallLabel">Step 6</div><div class="h2">Controllo finale</div>
+        <p>Il Compliance Score mostra errori bloccanti, warning e collegamenti ai campi da correggere. Il gate server viene eseguito di nuovo quando pubblichi.</p>
+        {summary_html}
+      </div>
+      <div class="card compliancePanel" id="pubblicazione" style="margin-top:18px">
+        <div class="complianceSmallLabel">Step 7</div><div class="h2">Preview e pubblicazione</div>
+        <div class="complianceActions">
+          <a class="btn" href="/preview/{esc(w.get('slug') or '')}" target="_blank">Apri preview</a>
+          <a class="btn btn-primary" href="/app/wine/{int(wine_id)}">Vai alla pubblicazione</a>
+        </div>
+      </div>
+
+      <script>
+      (() => {{
+        const form=document.getElementById('saveForm'); if(!form) return;
+        const storageKey='qrfacile:wine:{int(wine_id)}:draft';
+        const status=document.createElement('div'); status.className='note'; status.style.marginTop='10px'; status.textContent='Tutte le modifiche sono salvate.';
+        form.insertAdjacentElement('afterbegin',status);
+        let dirty=false; let submitting=false;
+        const fields=Array.from(document.querySelectorAll('input[name],select[name],textarea[name]')).filter(node=>node.type!=='file'&&node.name!=='csrf_token');
+        const keyFor=node=>`${{node.form?.action||'page'}}::${{node.name}}`;
+        if ({str((msg or '').startswith('Dati salvati correttamente')).lower()}) sessionStorage.removeItem(storageKey);
+        else {{
+          try {{ const draft=JSON.parse(sessionStorage.getItem(storageKey)||'{{}}'); fields.forEach(node=>{{if(Object.hasOwn(draft,keyFor(node))) node.value=draft[keyFor(node)]}}); }} catch (_) {{}}
+        }}
+        const remember=()=>{{
+          dirty=true; status.textContent='Modifiche non salvate'; status.className='note note-warn';
+          const draft={{}}; fields.forEach(node=>draft[keyFor(node)]=node.value); sessionStorage.setItem(storageKey,JSON.stringify(draft));
+        }};
+        fields.forEach(node=>{{node.addEventListener('input',remember);node.addEventListener('change',remember)}});
+        form.addEventListener('submit',()=>{{submitting=true}});
+        window.addEventListener('beforeunload',event=>{{if(dirty&&!submitting){{event.preventDefault();event.returnValue=''}}}});
+      }})();
+      </script>
 
       <style>
         .complianceWrap {{

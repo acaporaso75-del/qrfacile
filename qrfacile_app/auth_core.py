@@ -160,9 +160,10 @@ def require_any_role(
     u = get_current_user(request)
 
     role = (u.get("role") or "").lower().strip()
+    authorization_role = "studio" if role == "collaborator" else role
     roles_set = {r.lower().strip() for r in roles}
 
-    if role not in roles_set:
+    if authorization_role not in roles_set:
         _forbidden()
 
     # Admin sempre autorizzato
@@ -170,7 +171,7 @@ def require_any_role(
         return u
 
     # Controllo permessi studio solo se viene passato winery_id
-    if role == "studio" and winery_id is not None:
+    if authorization_role == "studio" and winery_id is not None:
         _require_studio_permission(
             studio_user_id=int(u["id"]),
             winery_id=int(winery_id),

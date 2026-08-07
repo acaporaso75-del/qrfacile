@@ -6,8 +6,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
+from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
+from qrfacile_app.guided_flow import render_guided_stepper
+from qrfacile_app.services.storage import versioned_upload_url
 
 router = APIRouter()
 
@@ -105,13 +109,41 @@ def _studio_can_access_wine(cur, studio_user_id: int, winery_id: int) -> bool:
 def _wine_assets(cur, wine_id: int) -> dict:
     cur.execute(
         """
-        SELECT kind, img_thumb, img_optimized, img_original
+        SELECT kind, img_thumb, img_optimized, img_original, updated_at
         FROM wine_assets
         WHERE wine_id=%s
         """,
         (int(wine_id),),
     )
     return {r["kind"]: r for r in (cur.fetchall() or [])}
+
+
+def _workflow_snapshot(cur, wine: dict, assets: dict, published: bool) -> dict:
+    wine_id = int(wine["wine_id"])
+    cur.execute("SELECT COUNT(*)::int AS cnt FROM wine_ingredients WHERE wine_id=%s", (wine_id,))
+    ingredients = int((cur.fetchone() or {}).get("cnt") or 0)
+    cur.execute("SELECT COUNT(*)::int AS cnt FROM wine_allergens WHERE wine_id=%s", (wine_id,))
+    allergens = int((cur.fetchone() or {}).get("cnt") or 0)
+    cur.execute("SELECT energy_kj, energy_kcal FROM wine_nutrition WHERE wine_id=%s LIMIT 1", (wine_id,))
+    nutrition = cur.fetchone() or {}
+    cur.execute("SELECT COUNT(*)::int AS cnt FROM wine_recycle_items WHERE wine_id=%s AND COALESCE(NULLIF(BTRIM(code), ''), '-') <> '-'", (wine_id,))
+    recycling = int((cur.fetchone() or {}).get("cnt") or 0)
+    complete = {
+        "wine": bool(str(wine.get("wine_name") or "").strip() and str(wine.get("lot") or "").strip()),
+        "images": bool(assets.get("front")),
+        "ingredients": ingredients > 0 and allergens > 0,
+        "nutrition": nutrition.get("energy_kj") is not None and nutrition.get("energy_kcal") is not None,
+        "recycling": recycling > 0,
+    }
+    missing = [label for key, label in (("wine", "dati vino"), ("images", "immagine fronte"), ("ingredients", "ingredienti e allergeni"), ("nutrition", "valori nutrizionali"), ("recycling", "riciclabilità")) if not complete[key]]
+    publishable = not missing
+    if publishable:
+        complete.update({"review": True})
+    if published:
+        complete.update({"publish": True})
+    percent = round(len(complete) / 7 * 100)
+    state = "Pubblicata" if published else ("Pronta per la pubblicazione" if publishable else ("In compilazione" if any(complete.values()) else "Bozza"))
+    return {"completed": set(complete), "missing": missing, "publishable": publishable, "percent": percent, "state": state}
 
 
 def _labels_for_wine(cur, wine_id: int, role: str, user_id: int) -> list[dict]:
@@ -301,10 +333,18 @@ def _management_picker(wine_id: int, active_studio_user_id: int, studios: list[d
 
 def _management_section(labels: list[dict], management: dict[int, dict], role: str, wine_id: int, studios: list[dict]) -> str:
     main_picker = ""
+    active_id = _wine_management_active_id(management)
+    assigned_names = sorted({str(info.get("assigned") or "").strip() for info in management.values() if info.get("assigned")})
+    if active_id > 0 and len(assigned_names) == 1:
+        current_status = f"🏢 Studio assegnato: {esc(assigned_names[0])}"
+    elif assigned_names:
+        current_status = "🏢 Studi diversi assegnati alle etichette del lotto"
+    else:
+        current_status = "👤 Gestione diretta della cantina"
     if role in ("winery", "admin") and labels:
         main_picker = _management_picker(
             int(wine_id),
-            _wine_management_active_id(management),
+            active_id,
             studios,
             f"/app/wine/{int(wine_id)}#gestione-grafica",
         )
@@ -329,6 +369,7 @@ def _management_section(labels: list[dict], management: dict[int, dict], role: s
           <div class="wineHubSmallLabel">Fronte / Retro</div>
           <div class="h2">Gestione grafica del lotto</div>
           <div class="p" style="margin-top:4px">Scegli chi lavora sulla grafica di questo lotto.</div>
+          <div class="p" style="margin-top:8px"><b>Stato corrente:</b> {current_status}</div>
         </div>
       </div>
       {main_picker}
@@ -347,7 +388,7 @@ def _asset_card(kind: str, asset: dict | None, wine_id: int) -> str:
     if thumb:
         media = f"""
         <div class="wineHubImageBox">
-          <img src="/uploads/{esc(thumb)}" alt="{esc(label)}">
+          <img src="{esc(versioned_upload_url(thumb, asset.get('updated_at')))}" alt="{esc(label)}">
         </div>
         """
     else:
@@ -517,6 +558,7 @@ def wine_management_set(
     management_value: str = Form(...),
     return_to: str = Form(""),
 ):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery", "admin"))
     role = (user.get("role") or "").lower().strip()
     value = (management_value or "").strip().lower()
@@ -541,6 +583,14 @@ def wine_management_set(
                 )
 
             label_ids = _wine_label_ids(cur, int(wine_id))
+            old_studio_ids: list[int] = []
+            if label_ids:
+                cur.execute(
+                    """SELECT DISTINCT collaborator_user_id FROM label_collaborators
+                       WHERE wine_label_id = ANY(%s) AND active=TRUE AND can_view=TRUE""",
+                    (label_ids,),
+                )
+                old_studio_ids = sorted(int(row["collaborator_user_id"]) for row in (cur.fetchall() or []))
 
             if value == "self":
                 if label_ids:
@@ -553,7 +603,22 @@ def wine_management_set(
                         """,
                         (label_ids,),
                     )
+                    cur.execute(
+                        """SELECT COUNT(*)::int AS active_count FROM label_collaborators
+                           WHERE wine_label_id = ANY(%s) AND active=TRUE AND can_view=TRUE""",
+                        (label_ids,),
+                    )
+                    if int((cur.fetchone() or {}).get("active_count") or 0) != 0:
+                        raise RuntimeError("Verifica persistenza gestione diretta del lotto fallita")
                 conn.commit()
+                write_audit_event(
+                    action="wine_management_internal",
+                    resource_type="wine",
+                    resource_id=wine_id,
+                    actor=user,
+                    request=request,
+                    metadata={"old_studio_ids": old_studio_ids, "new_studio_id": None, "label_ids": label_ids},
+                )
                 return RedirectResponse(
                     _with_notice(redirect_to, "msg", "Gestione interna attivata"),
                     status_code=303,
@@ -580,7 +645,26 @@ def wine_management_set(
                         status_code=303,
                     )
 
+                if label_ids:
+                    cur.execute(
+                        """SELECT COUNT(DISTINCT wine_label_id)::int AS assigned_count
+                           FROM label_collaborators
+                           WHERE wine_label_id = ANY(%s) AND collaborator_user_id=%s
+                             AND active=TRUE AND can_view=TRUE""",
+                        (label_ids, int(studio_user_id)),
+                    )
+                    persisted = int((cur.fetchone() or {}).get("assigned_count") or 0)
+                    if persisted != len(label_ids):
+                        raise RuntimeError("Verifica persistenza assegnazione studio al lotto fallita")
                 conn.commit()
+                write_audit_event(
+                    action="wine_studio_assignment_changed",
+                    resource_type="wine",
+                    resource_id=wine_id,
+                    actor=user,
+                    request=request,
+                    metadata={"old_studio_ids": old_studio_ids, "new_studio_id": studio_user_id, "label_ids": label_ids},
+                )
                 return RedirectResponse(
                     _with_notice(redirect_to, "msg", "Studio assegnato al lotto"),
                     status_code=303,
@@ -666,6 +750,7 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
             label_ids = [int(row["label_id"]) for row in labels]
             management = _label_management_map(cur, label_ids)
             connected_studios = _connected_studios(cur, int(wine["winery_id"])) if role in ("winery", "admin") else []
+            workflow = _workflow_snapshot(cur, wine, assets, pub_count > 0)
 
     app_base = getattr(request.app.state, "app_base_url", "").rstrip("/")
 
@@ -714,35 +799,20 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
               <button class="btn" type="submit">Rendi bozza</button>
             </form>
             """
-        else:
+        elif workflow["publishable"]:
             publish_action = f"""
             <form method="post" action="/app/wine/{int(wine_id)}/publish" style="display:inline">
               <button class="btn btn-primary" type="submit">Pubblica</button>
             </form>
             """
 
-            if role == "admin":
-                publish_action += f"""
-                <form method="post" action="/app/wine/{int(wine_id)}/publish" style="display:inline"
-                      onsubmit="return confirm('Forzare la pubblicazione anche se i dati obbligatori sono incompleti? Usare solo per test, demo o casi eccezionali.');">
-                  <input type="hidden" name="force" value="1">
-                  <button class="btn btn-danger-soft" type="submit">Forza pubblicazione</button>
-                </form>
-                """
-
-            if role == "admin":
-                publish_action += f"""
-                <form method="post" action="/app/wine/{int(wine_id)}/publish" style="display:inline"
-                      onsubmit="return confirm('Forzare la pubblicazione anche se i dati obbligatori sono incompleti? Usare solo per test o casi eccezionali.');">
-                  <input type="hidden" name="force" value="1">
-                  <button class="btn btn-danger-soft" type="submit">Forza pubblicazione</button>
-                </form>
-                """
+        else:
+            publish_action = f'<a class="btn" href="/app/wine/{int(wine_id)}/review">Controlla cosa manca</a>'
 
     new_label_action = ""
     if role in ("winery", "admin"):
         new_label_action = f"""
-        <a class="btn btn-primary" href="/app/new-label?wine_id={int(wine_id)}">
+        <a class="btn" href="/app/new-label?wine_id={int(wine_id)}">
           + Etichetta
         </a>
         """
@@ -822,6 +892,21 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
         </div>
       </div>
 
+      {render_guided_stepper(int(wine_id), "wine", workflow["completed"])}
+
+      <div class="card" style="margin-top:18px;padding:22px" id="stato-etichetta">
+        <div class="wineHubCardHead"><div><div class="wineHubSmallLabel">Stato etichetta</div><div class="h2">{esc(workflow['state'])}</div></div><span class="pill {'pill-green' if workflow['publishable'] else 'pill-muted'}">{workflow['percent']}% completo</span></div>
+        <div style="height:10px;border-radius:999px;background:#e2e8f0;overflow:hidden;margin:14px 0"><div style="height:100%;width:{workflow['percent']}%;background:#14b8a6"></div></div>
+        {('<div class="note note-ok"><b>Etichetta pronta per la pubblicazione</b></div>' if workflow['publishable'] and not is_published else '')}
+        {('<div class="note"><b>Dati mancanti:</b> ' + esc(', '.join(workflow['missing'])) + '</div>' if workflow['missing'] else '')}
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+          {('<a class="btn btn-primary" href="/app/wine/' + str(int(wine_id)) + '/images">Continua compilazione</a>' if not workflow['publishable'] else '')}
+          {('<a class="btn" target="_blank" href="/preview/' + esc(slug) + '">Apri preview</a>' if slug else '')}
+          {('<a class="btn" target="_blank" href="/e/' + esc(slug) + '">Apri pagina pubblica</a>' if is_published and slug else '')}
+          {('<a class="btn" href="/app/wine/' + str(int(wine_id)) + '/export">Scarica QR</a>' if slug else '')}
+        </div>
+      </div>
+
       <div class="wineHubTabs">
         <a class="wineHubTab active" href="/app/wine/{int(wine_id)}">Overview</a>
         <a class="wineHubTab" href="/app/wine/{int(wine_id)}/images">Immagini</a>
@@ -831,9 +916,9 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
 
       <div class="card wineHubActionBar">
         <div>
-          <div class="h2">Azioni lotto</div>
+          <div class="h2">Cosa vuoi fare adesso?</div>
           <div class="p">
-            Gestisci fronte/retro, immagini, compliance, pubblicazione ed esportazione QR.
+            Continua la compilazione guidata, controlla l’anteprima oppure apri gli strumenti disponibili per questo lotto.
           </div>
         </div>
 

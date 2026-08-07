@@ -1,0 +1,114 @@
+{
+  "catalog_version": "2026.07.4",
+  "score_weights": {
+    "PASS": 0,
+    "WARNING": 35,
+    "ERROR": 100
+  },
+  "rules": [
+    {
+      "rule_id": "QRF-CORE-001",
+      "domain": "wine-core",
+      "title": "Identità del vino",
+      "default_severity": "ERROR",
+      "blocking": true,
+      "field": "wine.wine_name",
+      "legal_basis": [],
+      "human_review_required": true,
+      "active": true,
+      "dependencies": [],
+      "knowledge_ids": ["KB-WINE-CORE-IDENTITY"]
+    },
+    {
+      "rule_id": "QRF-ELABEL-ING-001",
+      "domain": "ingredients",
+      "title": "Dichiarazione degli ingredienti",
+      "default_severity": "ERROR",
+      "blocking": true,
+      "field": "ingredients",
+      "legal_basis": ["Regolamento (UE) 2021/2117"],
+      "human_review_required": true,
+      "active": true,
+      "dependencies": ["QRF-CORE-001"],
+      "knowledge_ids": ["KB-EU-2021-2117-INGREDIENTS"]
+    },
+    {
+      "rule_id": "QRF-ELABEL-ALL-001",
+      "domain": "allergens",
+      "title": "Dichiarazione degli allergeni",
+      "default_severity": "WARNING",
+      "blocking": false,
+      "field": "allergens",
+      "legal_basis": ["Regolamento (UE) n. 1169/2011"],
+      "human_review_required": true,
+      "active": true,
+      "dependencies": ["QRF-ELABEL-ING-001"],
+      "knowledge_ids": ["KB-EU-1169-2011-ALLERGENS"]
+    },
+    {
+      "rule_id": "QRF-ELABEL-NUT-001",
+      "domain": "nutrition",
+      "title": "Valore energetico",
+      "default_severity": "ERROR",
+      "blocking": true,
+      "field": "nutrition.energy",
+      "legal_basis": ["Regolamento (UE) 2021/2117"],
+      "human_review_required": true,
+      "active": true,
+      "dependencies": ["QRF-CORE-001"],
+      "knowledge_ids": ["KB-EU-2021-2117-NUTRITION"]
+    },
+    {
+      "rule_id": "QRF-ELABEL-NUT-002",
+      "domain": "nutrition",
+      "title": "Validità del valore energetico",
+      "default_severity": "ERROR",
+      "blocking": true,
+      "field": "nutrition.energy",
+      "legal_basis": ["Controllo tecnico di integrità: valori energetici non negativi"],
+      "human_review_required": true,
+      "active": true,
+      "dependencies": ["QRF-ELABEL-NUT-001"],
+      "knowledge_ids": ["KB-TECH-NUTRITION-INTEGRITY"]
+    },
+    {
+      "rule_id": "QRF-ELABEL-NUT-003",
+      "domain": "nutrition",
+      "title": "Coerenza tecnica kJ/kcal",
+      "default_severity": "WARNING",
+      "blocking": false,
+      "field": "nutrition.energy",
+      "legal_basis": ["Controllo tecnico di coerenza della conversione energetica"],
+      "human_review_required": true,
+      "active": true,
+      "dependencies": ["QRF-ELABEL-NUT-001"],
+      "knowledge_ids": ["KB-TECH-NUTRITION-INTEGRITY"]
+    },
+    {
+      "rule_id": "QRF-ELABEL-NUT-004",
+      "domain": "nutrition",
+      "title": "Valori nutrizionali principali",
+      "default_severity": "WARNING",
+      "blocking": true,
+      "field": "nutrition",
+      "legal_basis": ["Regolamento (UE) n. 1169/2011"],
+      "human_review_required": true,
+      "active": true,
+      "dependencies": ["QRF-ELABEL-NUT-001"],
+      "knowledge_ids": ["KB-EU-2021-2117-NUTRITION"]
+    },
+    {
+      "rule_id": "QRF-PACK-001",
+      "domain": "environmental-labelling",
+      "title": "Informazioni ambientali dell'imballaggio",
+      "default_severity": "WARNING",
+      "blocking": true,
+      "field": "recycle",
+      "legal_basis": ["Decisione 97/129/CE"],
+      "human_review_required": true,
+      "active": true,
+      "dependencies": ["QRF-CORE-001"],
+      "knowledge_ids": ["KB-EU-97-129-PACKAGING"]
+    }
+  ]
+}

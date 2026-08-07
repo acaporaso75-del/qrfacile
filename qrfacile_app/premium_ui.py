@@ -4,6 +4,7 @@ from typing import Set
 
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
+from psycopg.errors import UniqueViolation
 from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
@@ -14,8 +15,11 @@ from qrfacile_app.auth_core import (
     winery_id_for_owner,
 )
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
+from qrfacile_app.guided_flow import render_guided_stepper
 
 router = APIRouter()
+
+QR_WINES_QR_ITEM_UNIQUE_CONSTRAINT = "uq_qr_wines_qr_item_id"
 
 
 def now() -> int:
@@ -184,16 +188,16 @@ def _studio_assignment_box(
       <label class="newWineWorkOption">
         <input type="radio" name="studio_work_mode" value="self" checked>
         <span>
-          <b>Gestisco io</b>
-          <small>Nessuno studio viene assegnato ora.</small>
+          <b>La cantina gestisce direttamente il lavoro</b>
+          <small>Solo gli utenti autorizzati della cantina potranno modificare e pubblicare.</small>
         </span>
       </label>
 
       <label class="newWineWorkOption">
         <input type="radio" name="studio_work_mode" value="connected" {connected_disabled}>
         <span>
-          <b>Assegna a Studio già collegato</b>
-          <small>Lo studio deve essere collegato alla cantina e poi assegnato a questa etichetta.</small>
+          <b>Affida il lavoro a uno studio grafico collegato</b>
+          <small>Lo studio potrà modificare l’etichetta; la pubblicazione resta sotto il controllo della cantina.</small>
         </span>
       </label>
       <div class="newWineWorkNested">
@@ -202,7 +206,7 @@ def _studio_assignment_box(
           {''.join(opts)}
         </select>
         <div class="note" style="margin-top:10px">
-          Il collegamento generale resta in <b>studio_clients</b>; l'assegnazione operativa usa <b>label_collaborators</b>.
+          Scegli lo studio che preparerà questa etichetta. Potrai cambiare assegnazione dalla dashboard.
         </div>
       </div>
 
@@ -224,35 +228,16 @@ def _create_studio_invite_for_context(
     if not studio_email or "@" not in studio_email or "." not in studio_email:
         return False
 
-    token = secrets.token_urlsafe(24)
-    ts = now()
-    exp = ts + 14 * 86400
-
-    cols = [
-        "token",
-        "winery_id",
-        "inviter_user_id",
-        "studio_email",
-        "can_view",
-        "can_edit",
-        "can_create",
-        "created_at",
-        "expires_at",
-    ]
-    vals = [token, int(winery_id), int(inviter_user_id), studio_email, True, True, False, ts, exp]
-
-    invite_cols = _columns(cur, "studio_invites")
-    if wine_id and "source_wine_id" in invite_cols:
-        cols.append("source_wine_id")
-        vals.append(int(wine_id))
-    if label_id and "source_label_id" in invite_cols:
-        cols.append("source_label_id")
-        vals.append(int(label_id))
-
-    placeholders = ",".join(["%s"] * len(vals))
+    import hashlib, json
+    token = secrets.token_urlsafe(32)
+    invite_type = "label" if label_id else ("wine" if wine_id else "studio")
     cur.execute(
-        f"INSERT INTO studio_invites ({','.join(cols)}) VALUES ({placeholders})",
-        tuple(vals),
+        """INSERT INTO invites(legacy_token,token_hash,invite_type,inviter_user_id,inviter_role,
+             invitee_email,target_role,winery_id,wine_id,label_id,permissions_json,status,expires_at,created_at,send_attempts)
+           VALUES(NULL,%s,%s,%s,'winery',%s,'studio',%s,%s,%s,%s::jsonb,'pending',now()+interval '14 days',now(),0)""",
+        (hashlib.sha256(token.encode()).hexdigest(),invite_type,int(inviter_user_id),studio_email,
+         int(winery_id),int(wine_id) if wine_id else None,int(label_id) if label_id else None,
+         json.dumps({"can_view":True,"can_edit":True,"can_create":False,"can_publish":False})),
     )
     return True
 
@@ -567,6 +552,8 @@ def new_wine_get(
         </div>
       </div>
 
+      {render_guided_stepper(0, "wine")}
+
       <form class="card newWineForm" method="post" action="/app/new-wine">
         <div class="newWineSectionTitle">
           <span>1</span>
@@ -587,7 +574,7 @@ def new_wine_get(
               {''.join(master_opts)}
             </select>
             <div class="note" style="margin-top:10px">
-              Seleziona l’etichetta/prodotto a cui collegare questo lotto.
+              Se scegli un’etichetta esistente, i dati disponibili verranno copiati nel nuovo lotto. Potrai modificarli prima di salvare.
               Se non esiste ancora, creala da
               <a class="dashboardInlineLink" href="/app/new-wine-master">Nuova etichetta</a>.
             </div>
@@ -605,16 +592,16 @@ def new_wine_get(
         <div class="newWineGrid3">
           <div style="grid-column:1 / -1">
             <label>Etichetta selezionata</label>
-            <input class="input" name="wine_name" placeholder="Compilata automaticamente dall’etichetta scelta" readonly>
+            <input class="input" name="wine_name" placeholder="Scegli prima un’etichetta dall’elenco" readonly>
           </div>
 
           <div>
-            <label>Annata opzionale</label>
+            <label>Annata (se dichiarata in etichetta)</label>
             <input class="input" name="vintage" placeholder="2023">
           </div>
 
           <div>
-            <label>Lotto opzionale</label>
+            <label>Codice lotto</label>
             <input class="input" name="lot" placeholder="L001/7">
           </div>
 
@@ -624,7 +611,7 @@ def new_wine_get(
           </div>
 
           <div>
-            <label>Grado alcolico opzionale</label>
+            <label>Grado alcolico (% vol)</label>
             <input class="input" name="alcohol" placeholder="13.5">
           </div>
 
@@ -1142,10 +1129,22 @@ def new_wine_post(
             placeholders = ",".join(["%s"] * len(values))
             cols_sql = ",".join(col_names)
 
-            cur.execute(
-                f"INSERT INTO qr_wines({cols_sql}) VALUES ({placeholders}) RETURNING id",
-                tuple(values),
-            )
+            try:
+                cur.execute(
+                    f"INSERT INTO qr_wines({cols_sql}) VALUES ({placeholders}) RETURNING id",
+                    tuple(values),
+                )
+            except UniqueViolation as exc:
+                conn.rollback()
+                if exc.diag.constraint_name == QR_WINES_QR_ITEM_UNIQUE_CONSTRAINT:
+                    return RedirectResponse(
+                        url=(
+                            f"/app/new-wine?winery_id={int(winery_id)}"
+                            "&err=Esiste%20gi%C3%A0%20un%20vino%20per%20questo%20QR"
+                        ),
+                        status_code=303,
+                    )
+                raise
             wine_id = int(cur.fetchone()["id"])
 
             cur.execute(

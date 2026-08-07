@@ -7,6 +7,9 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.db import pg
+from qrfacile_app.services.recycling_catalog import normalize_recycling_items
+from qrfacile_app.services.storage import versioned_upload_url
+from qrfacile_app.services.wine_compliance_explainability import run_explainable_wine_compliance
 from qrfacile_app import ui
 
 router = APIRouter()
@@ -319,6 +322,30 @@ def _upload_src(path: str) -> str:
     return "/uploads/" + path.lstrip("/")
 
 
+def _label_images_html(image_rows, wine_name: str) -> str:
+    image_cards = []
+    for image_row in image_rows:
+        kind = (image_row.get("kind") or "").strip().lower()
+        img_path = (image_row.get("img_optimized") or image_row.get("img_thumb") or "").strip()
+        if not img_path:
+            continue
+        label = "Fronte etichetta" if kind == "front" else "Retro etichetta"
+        src = versioned_upload_url(img_path, image_row.get("updated_at"))
+        image_cards.append(f"""
+        <figure class="labelImageCard">
+          <img src="{ui.esc(src)}" alt="{ui.esc(label)} {ui.esc(wine_name)}">
+          <figcaption>{ui.esc(label)}</figcaption>
+        </figure>
+        """)
+    if not image_cards:
+        return ""
+    return f"""
+        <section class="labelImages" aria-label="Immagini etichetta">
+          {''.join(image_cards)}
+        </section>
+        """
+
+
 def _is_suspicious_text(value: str) -> bool:
     v = (value or "").strip().lower()
     if not v:
@@ -488,17 +515,40 @@ def _label_missing(locale: str, ingredient_text: str, allergens: list[str], nut:
     return missing
 
 
-def _render_label_page(request: Request, slug: str, *, preview: bool):
+def _public_gate_allows(status: str, missing: list[str], compliance_report: dict) -> bool:
+    return status == "attiva" and not missing and bool(compliance_report.get("publishable"))
+
+
+def _not_published_page(slug: str) -> HTMLResponse:
+    safe_slug = ui.esc(slug)
+    return HTMLResponse(f"""<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Etichetta non ancora pubblicata</title><link rel="stylesheet" href="/static/app.css"></head><body><main style="max-width:760px;margin:60px auto;padding:24px"><div class="card"><div class="h1">Etichetta non ancora pubblicata</div><p>I dati sono in compilazione o devono ancora superare il controllo finale.</p><a class="btn btn-primary" href="/login?next=/preview/{safe_slug}">Accedi per completare o vedere l’anteprima</a></div></main></body></html>""", status_code=200)
+
+
+def _preview_response_headers() -> dict[str, str]:
+    return {
+        "X-Robots-Tag": "noindex, nofollow, noarchive",
+        "X-Frame-Options": "SAMEORIGIN",
+        "Content-Security-Policy": "default-src 'self'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'; object-src 'none'; img-src 'self' data: blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'",
+        "Cache-Control": "no-store",
+    }
+
+
+def _render_label_page(
+    request: Request,
+    slug: str = "",
+    *,
+    preview: bool,
+    wine_id: int | None = None,
+):
     slug = (slug or "").strip()
     locale = choose_language(request)
 
-    if not slug:
+    if not slug and wine_id is None:
         raise HTTPException(404, "Not found")
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(
-                """
+            select_sql = """
                 SELECT
                     qi.id AS qr_item_id,
                     qi.status,
@@ -515,15 +565,15 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
                     w.logo_path,
                     COALESCE(wm.public_theme, 'minimal') AS public_theme,
                     COALESCE(wm.extra_ingredients, '') AS extra_ingredients
-                FROM qr_items qi
-                JOIN qr_wines qw ON qw.qr_item_id = qi.id
+                FROM qr_wines qw
+                LEFT JOIN qr_items qi ON qi.id = qw.qr_item_id
                 JOIN wineries w ON w.id = qw.winery_id
                 LEFT JOIN wine_meta wm ON wm.wine_id = qw.id
-                WHERE qi.slug=%s
-                LIMIT 1
-                """,
-                (slug,),
-            )
+            """
+            if wine_id is not None:
+                cur.execute(select_sql + " WHERE qw.id=%s LIMIT 1", (int(wine_id),))
+            else:
+                cur.execute(select_sql + " WHERE qi.slug=%s LIMIT 1", (slug,))
             row = cur.fetchone()
 
             if not row:
@@ -532,9 +582,11 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
             if preview:
                 _require_preview_access(request, cur, row)
 
+            slug = str(row.get("slug") or "").strip()
+
             status = (row.get("status") or "").strip().lower()
             if not preview and status != "attiva":
-                raise HTTPException(404, "QR non pubblicato")
+                return _not_published_page(slug)
             is_draft = status != "attiva"
 
             cur.execute(
@@ -630,11 +682,14 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
                 """,
                 (int(row["wine_id"]),),
             )
-            recycle_rows = cur.fetchall() or []
+            recycle_rows = list(normalize_recycling_items({
+                item["component"]: dict(item)
+                for item in (cur.fetchall() or [])
+            }).values())
 
             cur.execute(
                 """
-                SELECT kind, img_thumb, img_optimized
+                SELECT kind, img_thumb, img_optimized, updated_at
                 FROM wine_assets
                 WHERE wine_id=%s
                   AND kind IN ('front', 'back')
@@ -664,8 +719,17 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
     public_missing = _label_missing(locale, ingredient_text, allergens, nut, recycle_rows)
     is_incomplete = bool(public_missing)
 
-    if not preview and is_incomplete:
-        raise HTTPException(404, "QR incompleto")
+    compliance_payload = {
+        "wine": dict(row),
+        "nutrition": dict(nut),
+        "ingredients": ingredients,
+        "allergens": allergens,
+        "recycle": {item["component"]: dict(item) for item in recycle_rows},
+        "meta": {"extra_ingredients": extra_ing},
+    }
+    compliance_report = run_explainable_wine_compliance(compliance_payload)
+    if not preview and not _public_gate_allows(status, public_missing, compliance_report):
+        return _not_published_page(slug)
 
     if not preview:
         with pg() as conn:
@@ -696,27 +760,7 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
         </div>
         """
 
-    label_images_html = ""
-    image_cards = []
-    for image_row in image_rows:
-        kind = (image_row.get("kind") or "").strip().lower()
-        img_path = (image_row.get("img_optimized") or image_row.get("img_thumb") or "").strip()
-        if not img_path:
-            continue
-        label = "Fronte etichetta" if kind == "front" else "Retro etichetta"
-        image_cards.append(f"""
-        <figure class="labelImageCard">
-          <img src="{ui.esc(_upload_src(img_path))}" alt="{ui.esc(label)} {ui.esc(wine_name)}">
-          <figcaption>{ui.esc(label)}</figcaption>
-        </figure>
-        """)
-
-    if image_cards:
-        label_images_html = f"""
-        <section class="labelImages" aria-label="Immagini etichetta">
-          {''.join(image_cards)}
-        </section>
-        """
+    label_images_html = _label_images_html(image_rows, wine_name)
 
     allergens_html = ""
 
@@ -796,7 +840,7 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
     warning_html = ""
     qr_definitive_notice = ""
 
-    if preview:
+    if preview and slug:
         qr_definitive_notice = """
         <section class="warningBox" style="border-color:rgba(20,184,166,.26);background:rgba(240,253,250,.92)">
           <div class="warningIcon">i</div>
@@ -808,6 +852,12 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
           </div>
         </section>
         """
+    elif preview:
+        qr_definitive_notice = """
+        <section class="warningBox" style="border-color:rgba(20,184,166,.26);background:rgba(240,253,250,.92)">
+          <div class="warningIcon">i</div><div><div class="warningTitle">Anteprima tecnica</div>
+          <div class="warningText">Anteprima disponibile dopo il salvataggio. Il QR definitivo non è stato ancora creato.</div></div>
+        </section>"""
 
     if preview and is_incomplete:
         warning_html = f"""
@@ -832,10 +882,11 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
 
     lang_links = []
 
+    preview_path = f"/app/wine/{int(row['wine_id'])}/preview" if preview else f"/e/{ui.esc(slug)}"
     for lang_code in SUPPORTED_LOCALES:
         active = " active" if lang_code == locale else ""
         lang_links.append(
-            f"<a class='langLink{active}' href='/{'preview' if preview else 'e'}/{ui.esc(slug)}?lang={lang_code}' hreflang='{lang_code}'>{lang_code.upper()}</a>"
+            f"<a class='langLink{active}' href='{preview_path}?lang={lang_code}' hreflang='{lang_code}'>{lang_code.upper()}</a>"
         )
 
     language_selector = "<nav class='languageSwitch' aria-label='Language'>" + "".join(lang_links) + "</nav>"
@@ -846,7 +897,7 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{ui.esc(wine_name)} · {ui.esc(winery_name)}</title>
-<meta name="robots" content="noindex,nofollow">
+<meta name="robots" content="{'noindex,nofollow,noarchive' if preview else 'index,follow'}">
 <style>
 :root {{
   --bg:{pal["bg"]};
@@ -1672,7 +1723,10 @@ body {{
 </body>
 </html>"""
 
-    return HTMLResponse(html)
+    headers = {}
+    if preview:
+        headers = _preview_response_headers()
+    return HTMLResponse(html, headers=headers)
 
 
 @router.get("/e/{slug}", response_class=HTMLResponse)
@@ -1683,3 +1737,9 @@ def public_label(request: Request, slug: str):
 @router.get("/preview/{slug}", response_class=HTMLResponse)
 def preview_label(request: Request, slug: str):
     return _render_label_page(request, slug, preview=True)
+
+
+@router.get("/app/wine/{wine_id}/preview", response_class=HTMLResponse)
+def preview_wine(request: Request, wine_id: int):
+    """Authenticated preview by stable wine id, including drafts without a slug."""
+    return _render_label_page(request, preview=True, wine_id=wine_id)

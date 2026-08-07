@@ -80,7 +80,7 @@ def _input(name: str, type_: str, placeholder: str, value: str = "", required: b
 
 
 @router.get("/register-winery", response_class=HTMLResponse)
-def register_winery_get(request: Request, invite: str = "", err: str = "", msg: str = ""):
+def register_winery_get(request: Request, invite: str = "", err: str = "", msg: str = "", next: str = ""):
     invite = (invite or "").strip()
 
     actions = top_actions(
@@ -204,6 +204,7 @@ def register_winery_get(request: Request, invite: str = "", err: str = "", msg: 
 
             <form method="post" action="/register-winery" style="margin-top:26px">
               <input type="hidden" name="invite" value="{esc(invite)}">
+              <input type="hidden" name="next" value="{esc(next if next.startswith('/') and not next.startswith('//') else '')}">
 
               <div class="grid2 register-form-grid">
                 <div>
@@ -414,6 +415,7 @@ def register_winery_post(
     city: str = Form(""),
     province: str = Form(""),
     invite: str = Form(""),
+    next: str = Form(""),
 ):
     email = (email or "").strip().lower()
     password = password or ""
@@ -522,4 +524,5 @@ def register_winery_post(
 
             conn.commit()
 
-    return RedirectResponse("/login?created=1", status_code=303)
+    target = next if next.startswith("/") and not next.startswith("//") else ""
+    return RedirectResponse(f"/login?created=1&next={target}" if target else "/login?created=1", status_code=303)
