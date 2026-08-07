@@ -161,7 +161,15 @@ def invitation_center(request:Request,msg:str=""):
     if str(user.get("role"))=="winery":
         create=f"""<form class='card' method='post' action='/app/invitations'>{csrf_input(request)}<div class='h2'>Nuovo invito</div><input class='input' type='email' name='recipient_email' required placeholder='email destinatario'><select class='input' name='invite_type'><option value='studio'>Studio grafico</option><option value='collaborator'>Collaboratore interno</option><option value='wine'>Singolo vino</option><option value='label'>Singola etichetta</option></select><input class='input' type='number' name='wine_id' placeholder='ID vino (se applicabile)'><input class='input' type='number' name='label_id' placeholder='ID etichetta (se applicabile)'><select class='input' name='preset'><option value='view'>Visualizzazione</option><option value='graphic'>Modifica grafica</option><option value='full'>Creazione e modifica</option></select><button class='btn btn-primary'>Crea invito</button></form>"""
     body=f"<div class='h1'>Centro inviti</div><div class='p'>Inviti inviati e ricevuti, senza esposizione dei token.</div>{create}<div style='display:grid;gap:12px;margin-top:16px'>{''.join(cards) or '<div class=\"card\">Nessun invito.</div>'}</div>"
-    return HTMLResponse(page(request,user,"Centro inviti",body,msg=msg))
+    return HTMLResponse(page(
+        title="Centro inviti",
+        subtitle="Inviti inviati e ricevuti",
+        body_html=body,
+        msg=msg,
+        user_email=str(user.get("email") or ""),
+        role=str(user.get("role") or ""),
+        credits=user.get("credits") if isinstance(user.get("credits"), dict) else None,
+    ))
 
 
 @router.post("/app/invitations",response_class=HTMLResponse)
@@ -175,4 +183,11 @@ def create(request:Request,recipient_email:str=Form(...),invite_type:str=Form(..
     result=create_invitation(invite_type=invite_type,inviter=user,recipient_email=recipient_email,winery_id=int(row[0]),wine_id=wine_id,label_id=label_id,permissions=profiles.get(preset,{}))
     base=(getattr(request.app.state,"app_base_url","") or f"{request.url.scheme}://{request.headers.get('host','')}").rstrip('/')
     link=f"{base}/app/invite/{result['invite_type']}/accept/{result.pop('raw_token')}"
-    return HTMLResponse(page(request,user,"Invito creato",f"<div class='card'><div class='h1'>Invito creato</div><div class='p'>Questo link viene mostrato una sola volta.</div><input class='input' readonly value='{esc(link)}'><a class='btn' href='/app/invitations'>Centro inviti</a></div>"))
+    return HTMLResponse(page(
+        title="Invito creato",
+        subtitle="Condivisione sicura dell'accesso",
+        body_html=f"<div class='card'><div class='h1'>Invito creato</div><div class='p'>Questo link viene mostrato una sola volta.</div><input class='input' readonly value='{esc(link)}'><a class='btn' href='/app/invitations'>Centro inviti</a></div>",
+        user_email=str(user.get("email") or ""),
+        role=str(user.get("role") or ""),
+        credits=user.get("credits") if isinstance(user.get("credits"), dict) else None,
+    ))

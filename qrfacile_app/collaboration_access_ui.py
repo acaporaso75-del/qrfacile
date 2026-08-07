@@ -145,4 +145,11 @@ def wine_access_center(request: Request, wine_id: int):
     user = require_any_role(request, ("admin", "winery", "studio"))
     data = list_wine_access(user, wine_id)
     role = str(user.get("role") or "").lower()
-    return HTMLResponse(page(request, user, "Accessi etichette", _access_html(wine_id, data, role)))
+    return HTMLResponse(page(
+        title="Accessi etichette",
+        subtitle="Autorizzazioni e collaborazione",
+        body_html=_access_html(wine_id, data, role),
+        user_email=str(user.get("email") or ""),
+        role=role,
+        credits=user.get("credits") if isinstance(user.get("credits"), dict) else None,
+    ))

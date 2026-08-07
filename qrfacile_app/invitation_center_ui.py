@@ -134,4 +134,11 @@ def winery_invitation_center(request: Request):
     </div>
     <div class='inviteGrid'>{''.join(cards) if cards else "<div class='card'><div class='p'>Nessun invito registrato.</div></div>"}</div>
     """
-    return HTMLResponse(page(request, user, "Centro inviti", body))
+    return HTMLResponse(page(
+        title="Centro inviti",
+        subtitle="Collaborazioni e stato degli inviti",
+        body_html=body,
+        user_email=str(user.get("email") or ""),
+        role=str(user.get("role") or ""),
+        credits=user.get("credits") if isinstance(user.get("credits"), dict) else None,
+    ))
