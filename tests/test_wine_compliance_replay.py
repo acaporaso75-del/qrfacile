@@ -7,6 +7,7 @@ from qrfacile_app.services.wine_compliance_replay import (
     compare_replays,
     sha256_payload,
     verify_replay_snapshot,
+    stored_replay_integrity_valid,
 )
 
 
@@ -69,6 +70,20 @@ def test_tampered_replay_is_rejected_by_integrity_check():
     tampered = deepcopy(snapshot)
     tampered["payload"]["wine"]["wine_name"] = "Nome alterato"
     assert verify_replay_snapshot(tampered) is False
+
+
+def test_stored_replay_integrity_rejects_denormalized_hash_mismatch():
+    snapshot = build_replay_snapshot(_payload())
+    item = {
+        "replay_id": snapshot["replay_id"],
+        "wine_id": snapshot["wine_id"],
+        "catalog_version": snapshot["catalog_version"],
+        "content_hash": "0" * 64,
+        "score": snapshot["report"]["score"],
+        "publishable": snapshot["report"]["publishable"],
+    }
+    assert verify_replay_snapshot(snapshot) is True
+    assert stored_replay_integrity_valid(item, snapshot) is False
 
 
 def test_compare_replays_reports_data_score_and_advisor_changes():

@@ -145,6 +145,7 @@ def validate_runtime_config(
             "STATIC_DIR",
             "APP_BASE_URL",
             "DATABASE_URL",
+            "PAYPAL_MODE",
         )
         missing = [name for name in required if not _clean(values.get(name))]
         if missing:
@@ -158,6 +159,7 @@ def validate_runtime_config(
         ):
             if _is_production_path(path):
                 errors.append(f"{label} punta a un percorso produttivo: {path}")
+                continue
             if not path.is_dir():
                 errors.append(f"{label} non è una directory leggibile: {path}")
 
@@ -191,6 +193,10 @@ def validate_runtime_config(
             errors.append(f"host database staging inatteso: {config.database_host or '<assente>'}")
         if config.database_port not in (None, 5432):
             errors.append(f"porta database staging inattesa: {config.database_port}")
+
+        paypal_mode = _clean(values.get("PAYPAL_MODE")).lower()
+        if paypal_mode != "sandbox":
+            errors.append("PAYPAL_MODE staging deve essere sandbox")
 
     if errors:
         raise RuntimeError("Configurazione runtime non sicura: " + "; ".join(errors))

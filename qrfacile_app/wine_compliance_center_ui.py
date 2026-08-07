@@ -59,8 +59,8 @@ def _compact_compliance_html(report: dict, wine_id: int) -> str:
         </div>
         <div class='wineComplianceActions'>
           <a class='btn btn-primary' href='/app/wine/{int(wine_id)}/compliance-advisor'>Piano di correzione</a>
-          <a class='btn' href='/app/wine/{int(wine_id)}/compliance-replays'>Storico replay</a>
-          <a class='btn' href='/app/wine/{int(wine_id)}/compliance-report'>Apri report completo</a>
+          <a class='btn' href='/app/wine/{int(wine_id)}/compliance-replays'>Storico verifiche</a>
+          <a class='btn' href='/app/wine/{int(wine_id)}/compliance-report'>Report di conformità</a>
         </div>
       </div>
 

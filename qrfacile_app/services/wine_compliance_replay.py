@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import uuid
 from datetime import date, datetime, timezone
@@ -84,6 +85,27 @@ def verify_replay_snapshot(snapshot: Mapping[str, Any]) -> bool:
     return str(snapshot.get("content_hash") or "") == sha256_payload(unsigned)
 
 
+def stored_replay_integrity_valid(
+    item: Mapping[str, Any], snapshot: Mapping[str, Any]
+) -> bool:
+    """Verify the signed snapshot and its denormalized database metadata."""
+    if not verify_replay_snapshot(snapshot):
+        return False
+    report = snapshot.get("report") or {}
+    comparisons = (
+        (item.get("content_hash"), snapshot.get("content_hash")),
+        (item.get("replay_id"), snapshot.get("replay_id")),
+        (item.get("wine_id"), snapshot.get("wine_id")),
+        (item.get("catalog_version"), snapshot.get("catalog_version")),
+        (item.get("score"), report.get("score")),
+        (bool(item.get("publishable")), bool(report.get("publishable"))),
+    )
+    return all(
+        hmac.compare_digest(str(stored or ""), str(signed or ""))
+        for stored, signed in comparisons
+    )
+
+
 def persist_replay(snapshot: Mapping[str, Any]) -> dict[str, Any]:
     if not verify_replay_snapshot(snapshot):
         raise ValueError("Replay non integro: hash del contenuto non valido")
@@ -164,7 +186,7 @@ def get_replay(replay_id: str) -> dict[str, Any] | None:
     if isinstance(snapshot, str):
         snapshot = json.loads(snapshot)
     item["snapshot"] = snapshot
-    item["integrity_valid"] = verify_replay_snapshot(snapshot)
+    item["integrity_valid"] = stored_replay_integrity_valid(item, snapshot)
     return item
 
 
@@ -186,6 +208,38 @@ def list_replays(wine_id: int, *, limit: int = 100) -> list[dict[str, Any]]:
                 (int(wine_id), safe_limit),
             )
             return [dict(row) for row in cur.fetchall()]
+
+
+def list_verified_replays(wine_id: int, *, limit: int = 100) -> list[dict[str, Any]]:
+    """Return history metadata with integrity verified in one database query."""
+    safe_limit = max(1, min(int(limit), 100))
+    with pg() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT replay_id, wine_id, winery_id, actor_user_id, reason,
+                       replay_schema_version, engine_version, catalog_version,
+                       knowledge_version, snapshot_json, content_hash,
+                       hash_algorithm, score, publishable, created_at
+                FROM wine_compliance_replays
+                WHERE wine_id=%s
+                ORDER BY created_at DESC, id DESC
+                LIMIT %s
+                """,
+                (int(wine_id), safe_limit),
+            )
+            items = []
+            for row in cur.fetchall():
+                item = dict(row)
+                snapshot = item.pop("snapshot_json")
+                if isinstance(snapshot, str):
+                    snapshot = json.loads(snapshot)
+                item["integrity_valid"] = bool(
+                    isinstance(snapshot, Mapping)
+                    and stored_replay_integrity_valid(item, snapshot)
+                )
+                items.append(item)
+            return items
 
 
 def _flatten(value: Any, prefix: str = "") -> dict[str, Any]:

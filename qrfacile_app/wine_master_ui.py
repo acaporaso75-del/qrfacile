@@ -44,7 +44,15 @@ def new_wine_master_get(request: Request, winery_id: int = 0, msg: str = "", err
     allowed_create = _allowed_winery_ids(u, need="create")
 
     if not allowed_view:
-        return HTMLResponse(page("QRFACILE · Nuova etichetta", "Nuova etichetta", "<div class='card'><div class='h2'>Nessuna cantina disponibile</div></div>", err="Nessuna cantina"), status_code=200)
+        return HTMLResponse(page(
+            title="QRFACILE · Nuova etichetta",
+            subtitle="Nuova etichetta",
+            body_html="<div class='card'><div class='h2'>Nessuna cantina disponibile</div></div>",
+            err="Nessuna cantina",
+            user_email=str(u.get("email") or ""),
+            role=role,
+            credits=u.get("credits") if isinstance(u.get("credits"), dict) else None,
+        ), status_code=200)
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:

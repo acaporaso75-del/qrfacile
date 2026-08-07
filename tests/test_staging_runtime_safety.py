@@ -22,6 +22,7 @@ def _safe_staging_env(tmp_path: Path) -> dict[str, str]:
             "postgresql://qrfacile_staging_user:never-print-this-secret"
             "@192.168.1.143:5432/qrfacile_staging_db"
         ),
+        "PAYPAL_MODE": "sandbox",
     }
 
 
@@ -109,3 +110,29 @@ def test_validation_only_parses_configuration_and_never_opens_network(tmp_path, 
     load_runtime_config(_safe_staging_env(tmp_path))
 
     assert contacted == []
+
+
+@pytest.mark.parametrize("mode", ["live", "", "invalid"])
+def test_staging_rejects_non_sandbox_paypal_mode(tmp_path, mode):
+    environ = _safe_staging_env(tmp_path)
+    environ["PAYPAL_MODE"] = mode
+
+    with pytest.raises(RuntimeError, match="PAYPAL_MODE"):
+        load_runtime_config(environ)
+
+
+def test_production_may_use_live_paypal_mode(tmp_path):
+    root = tmp_path / "production-app"
+    for directory in (root, root / "uploads", root / "templates", root / "static"):
+        directory.mkdir(parents=True, exist_ok=True)
+    config = load_runtime_config({
+        "APP_ENV": "production",
+        "APP_ROOT": str(root),
+        "UPLOADS_DIR": str(root / "uploads"),
+        "TEMPLATES_DIR": str(root / "templates"),
+        "STATIC_DIR": str(root / "static"),
+        "APP_BASE_URL": "https://example.test",
+        "DATABASE_URL": "postgresql://app:secret@db.example.test/app",  # pragma: allowlist secret
+        "PAYPAL_MODE": "live",
+    })
+    assert config.environment == "production"

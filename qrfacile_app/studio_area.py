@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.checkout_ui import paypal_checkout_form, paypal_checkout_script
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 
@@ -880,13 +881,16 @@ def studio_winery(request: Request, winery_id: int, msg: str = "", err: str = ""
           </div>
         </details>
 
-        <form method="post" action="/paypal/start" style="margin-top:12px">
-          <input type="hidden" name="pack" value="unlimited">
-          <input type="hidden" name="billing_winery_id" value="{int(winery_id)}">
-          <button class="btn" type="submit">
-            Pacchetto legacy non acquistabile online
-          </button>
-        </form>
+        {paypal_checkout_form(
+            request,
+            pack="unlimited",
+            billing_winery_id=int(winery_id),
+            button_class="btn",
+            disabled=True,
+            disabled_label="Pacchetto legacy non acquistabile online",
+            style="margin-top:12px",
+        )}
+        {paypal_checkout_script()}
       </div>
 
       <div class="studioSectionHead studioSectionTop" id="studio-labels">

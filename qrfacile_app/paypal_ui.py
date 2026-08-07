@@ -1,14 +1,17 @@
 # /opt/qrfacile/qrfacile_app/paypal_ui.py
 
+import logging
 import os
 import time
 import requests
+from urllib.parse import quote_plus, urlsplit
 
 from fastapi import APIRouter, Request, HTTPException, Form
 from fastapi.responses import RedirectResponse, HTMLResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf
 from qrfacile_app.db import pg
 
 from qrfacile_app.pricing_config import (
@@ -16,11 +19,15 @@ from qrfacile_app.pricing_config import (
 )
 
 router = APIRouter()
+logger = logging.getLogger("qrfacile.paypal")
 
 
 PAYPAL_CLIENT_ID = (os.getenv("PAYPAL_CLIENT_ID") or "").strip()
 PAYPAL_SECRET = (os.getenv("PAYPAL_SECRET") or "").strip()
 PAYPAL_MODE = (os.getenv("PAYPAL_MODE") or "sandbox").strip().lower()
+
+if PAYPAL_MODE not in {"sandbox", "live"}:
+    raise RuntimeError("PAYPAL_MODE deve essere sandbox oppure live")
 
 if PAYPAL_MODE == "live":
     PAYPAL_BASE = "https://api-m.paypal.com"
@@ -49,20 +56,26 @@ def _paypal_token() -> str:
             "PayPal non configurato: mancano PAYPAL_CLIENT_ID / PAYPAL_SECRET",
         )
 
-    r = requests.post(
-        f"{PAYPAL_BASE}/v1/oauth2/token",
-        auth=(PAYPAL_CLIENT_ID, PAYPAL_SECRET),
-        data={"grant_type": "client_credentials"},
-        timeout=30,
-    )
+    try:
+        r = requests.post(
+            f"{PAYPAL_BASE}/v1/oauth2/token",
+            auth=(PAYPAL_CLIENT_ID, PAYPAL_SECRET),
+            data={"grant_type": "client_credentials"},
+            timeout=30,
+        )
+    except requests.RequestException as exc:
+        raise RuntimeError("Connessione PayPal non disponibile") from exc
 
     if r.status_code >= 400:
         raise HTTPException(
             500,
-            f"Errore token PayPal: {r.text[:300]}",
+            "Autenticazione PayPal temporaneamente non disponibile",
         )
 
-    data = r.json()
+    try:
+        data = r.json()
+    except ValueError as exc:
+        raise RuntimeError("Risposta PayPal non valida") from exc
     token = data.get("access_token")
 
     if not token:
@@ -72,6 +85,47 @@ def _paypal_token() -> str:
         )
 
     return token
+
+
+def _approve_url(value: object) -> str:
+    url = str(value or "").strip()
+    parsed = urlsplit(url)
+    expected_host = "www.paypal.com" if PAYPAL_MODE == "live" else "www.sandbox.paypal.com"
+    if parsed.scheme != "https" or parsed.hostname != expected_host:
+        raise RuntimeError("Link di approvazione PayPal non valido")
+    return url
+
+
+def _cancel_failed_order(order_id: int) -> None:
+    try:
+        with pg() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE orders SET status='cancelled' WHERE id=%s AND status='pending'",
+                    (int(order_id),),
+                )
+                conn.commit()
+    except Exception:
+        logger.exception("Impossibile annullare l'ordine PayPal fallito %s", order_id)
+
+
+def _checkout_error(order_id: int, exc: Exception) -> RedirectResponse:
+    logger.warning("Checkout PayPal fallito per ordine %s: %s", order_id, type(exc).__name__)
+    _cancel_failed_order(order_id)
+    message = "PayPal non è temporaneamente raggiungibile. Riprova tra qualche minuto."
+    return RedirectResponse(
+        f"/app/billing?err={quote_plus(message)}",
+        status_code=303,
+    )
+
+
+def _capture_error(order_id: int, exc: Exception) -> RedirectResponse:
+    logger.warning("Conferma PayPal fallita per ordine %s: %s", order_id, type(exc).__name__)
+    message = "Non è stato possibile confermare il pagamento. Nessun credito è stato caricato; riprova o contatta l'assistenza."
+    return RedirectResponse(
+        f"/app/billing?err={quote_plus(message)}",
+        status_code=303,
+    )
 
 
 def _billing_winery_id(cur, user: dict) -> int | None:
@@ -157,8 +211,10 @@ def paypal_start(
     request: Request,
     pack: str = Form(...),
     billing_winery_id: int = Form(0),
+    csrf_token: str = Form(""),
 ):
     user = require_any_role(request, ("winery", "studio", "admin"))
+    require_csrf(request, csrf_token)
 
     pack = (pack or "").strip().lower()
 
@@ -230,21 +286,20 @@ def paypal_start(
 
             conn.commit()
 
-    token = _paypal_token()
-
-    return_url = f"{base}/paypal/return?order_id={order_id}"
-    cancel_url = f"{base}/app/billing?err=Pagamento%20annullato"
-
-    r = requests.post(
-        f"{PAYPAL_BASE}/v2/checkout/orders",
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "intent": "CAPTURE",
-            "purchase_units": [
-                {
+    try:
+        token = _paypal_token()
+        return_url = f"{base}/paypal/return?order_id={order_id}"
+        cancel_url = f"{base}/app/billing?err=Pagamento%20annullato"
+        r = requests.post(
+            f"{PAYPAL_BASE}/v2/checkout/orders",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "PayPal-Request-Id": f"qrfacile-order-{order_id}",
+            },
+            json={
+                "intent": "CAPTURE",
+                "purchase_units": [{
                     "reference_id": str(order_id),
                     "custom_id": str(order_id),
                     "description": f"QRFACILE crediti/servizio {data['name']}",
@@ -252,62 +307,50 @@ def paypal_start(
                         "currency_code": "EUR",
                         "value": f"{int(data['amount_cents']) / 100:.2f}",
                     },
-                }
-            ],
-            "application_context": {
-                "brand_name": "QRFACILE",
-                "landing_page": "LOGIN",
-                "user_action": "PAY_NOW",
-                "return_url": return_url,
-                "cancel_url": cancel_url,
+                }],
+                "application_context": {
+                    "brand_name": "QRFACILE",
+                    "landing_page": "LOGIN",
+                    "user_action": "PAY_NOW",
+                    "return_url": return_url,
+                    "cancel_url": cancel_url,
+                },
             },
-        },
-        timeout=30,
-    )
-
-    if r.status_code >= 400:
-        raise HTTPException(
-            500,
-            f"Errore creazione ordine PayPal: {r.text[:500]}",
+            timeout=30,
         )
-
-    pp = r.json()
-
-    paypal_id = pp.get("id")
-
-    if not paypal_id:
-        raise HTTPException(
-            500,
-            "PayPal non ha restituito id ordine",
+        if r.status_code >= 400:
+            raise RuntimeError("Creazione ordine PayPal non disponibile")
+        pp = r.json()
+        if not isinstance(pp, dict):
+            raise RuntimeError("Risposta ordine PayPal non valida")
+        paypal_id = str(pp.get("id") or "").strip()
+        if not paypal_id:
+            raise RuntimeError("PayPal non ha restituito un ordine valido")
+        links = pp.get("links") or []
+        if not isinstance(links, list):
+            raise RuntimeError("Link ordine PayPal non validi")
+        approve_link = next(
+            (link.get("href") for link in links if isinstance(link, dict) and link.get("rel") == "approve"),
+            "",
         )
+        approve_url = _approve_url(approve_link)
+    except (HTTPException, RuntimeError, requests.RequestException, ValueError) as exc:
+        return _checkout_error(order_id, exc)
 
-    approve_url = None
-
-    for link in pp.get("links", []):
-
-        if link.get("rel") == "approve":
-            approve_url = link.get("href")
-            break
-
-    if not approve_url:
-        raise HTTPException(
-            500,
-            "PayPal non ha restituito link approve",
-        )
-
-    with pg() as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-
-            cur.execute(
-                """
-                UPDATE orders
-                SET paypal_order_id=%s
-                WHERE id=%s
-                """,
-                (paypal_id, int(order_id)),
-            )
-
-            conn.commit()
+    try:
+        with pg() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """
+                    UPDATE orders
+                    SET paypal_order_id=%s
+                    WHERE id=%s
+                    """,
+                    (paypal_id, int(order_id)),
+                )
+                conn.commit()
+    except Exception as exc:
+        return _checkout_error(order_id, exc)
 
     return RedirectResponse(
         approve_url,
@@ -382,32 +425,27 @@ def paypal_return(
                     status_code=303,
                 )
 
-    token_api = _paypal_token()
-
-    r = requests.post(
-        f"{PAYPAL_BASE}/v2/checkout/orders/{paypal_order_id}/capture",
-        headers={
-            "Authorization": f"Bearer {token_api}",
-            "Content-Type": "application/json",
-        },
-        timeout=30,
-    )
-
-    if r.status_code >= 400:
-        raise HTTPException(
-            500,
-            f"Errore capture PayPal: {r.text[:500]}",
+    try:
+        token_api = _paypal_token()
+        r = requests.post(
+            f"{PAYPAL_BASE}/v2/checkout/orders/{paypal_order_id}/capture",
+            headers={
+                "Authorization": f"Bearer {token_api}",
+                "Content-Type": "application/json",
+                "PayPal-Request-Id": f"qrfacile-capture-{int(order['id'])}",
+            },
+            timeout=30,
         )
-
-    capture_data = r.json()
-
-    status = (capture_data.get("status") or "").upper()
-
-    if status != "COMPLETED":
-        raise HTTPException(
-            400,
-            f"Pagamento non completato: {status}",
-        )
+        if r.status_code >= 400:
+            raise RuntimeError("Capture PayPal non disponibile")
+        capture_data = r.json()
+        if not isinstance(capture_data, dict):
+            raise RuntimeError("Risposta capture PayPal non valida")
+        status = str(capture_data.get("status") or "").upper()
+        if status != "COMPLETED":
+            raise RuntimeError("Pagamento PayPal non completato")
+    except (HTTPException, RuntimeError, requests.RequestException, ValueError) as exc:
+        return _capture_error(int(order["id"]), exc)
 
     capture_id = ""
 
