@@ -88,4 +88,13 @@ def compliance_advisor_page(request: Request, wine_id: int):
     user = require_any_role(request, ("admin", "studio", "winery"))
     payload = _load_payload(wine_id, user)
     advice = build_compliance_advice(run_explainable_wine_compliance(payload))
-    return HTMLResponse(page(request, user, "Compliance Advisor", _advisor_html(wine_id, advice)))
+    return HTMLResponse(
+        page(
+            title="Compliance Advisor",
+            subtitle="Piano operativo di correzione e conformità",
+            body_html=_advisor_html(wine_id, advice),
+            user_email=str(user.get("email") or ""),
+            role=str(user.get("role") or ""),
+            credits=user.get("credits") if isinstance(user.get("credits"), dict) else None,
+        )
+    )

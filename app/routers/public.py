@@ -4,11 +4,12 @@ from fastapi import APIRouter, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from app.db.conn import db
+from qrfacile_app.services.storage import get_templates_dir
 
 router = APIRouter()
 
 templates = Environment(
-    loader=FileSystemLoader("/opt/qrfacile/templates"),
+    loader=FileSystemLoader(str(get_templates_dir())),
     autoescape=select_autoescape(["html"])
 )
 

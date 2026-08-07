@@ -1,4 +1,3 @@
-import os
 import time
 from fastapi import APIRouter, Request, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -10,8 +9,6 @@ from qrfacile_app import ui
 from qrfacile_app.media_labels import process_label_image
 
 router = APIRouter()
-
-UPLOAD_ROOT = "/opt/qrfacile/uploads"
 
 
 def _fmt_ts(ts: int | None) -> str:

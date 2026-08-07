@@ -2,7 +2,7 @@ name: Compliance CI
 
 on:
   pull_request:
-    branches: [staging]
+    branches: [staging, feature/legal-ai-compliance-2026]
   push:
     branches: [feature/legal-ai-compliance-2026]
 
@@ -14,9 +14,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: qrfacile_test_pr2
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: qrfacile_test_only # pragma: allowlist secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d qrfacile_test_pr2"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      QRFACILE_TEST_DATABASE_URL: postgresql://postgres:qrfacile_test_only@127.0.0.1:5432/qrfacile_test_pr2 # pragma: allowlist secret
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -28,7 +48,17 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-          python -m pip install pytest pip-audit detect-secrets
+          python -m pip install pytest pip-audit detect-secrets pglast
+
+      - name: Check committed diff formatting
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "${BASE_SHA}" ]; then
+            git diff --check "${BASE_SHA}...HEAD"
+          else
+            git diff --check HEAD^..HEAD
+          fi
 
       - name: Compile all Python modules
         run: |
@@ -55,9 +85,17 @@ jobs:
           pytest -q
 
       - name: Check SQL migrations are transactional
+        run: python scripts/check_sql_transactions.py
+
+      - name: Parse staging safety SQL
         run: |
-          for migration in sql/*.sql
-          do
-            test "$(head -n 1 "$migration")" = "BEGIN;"
-            test "$(tail -n 1 "$migration")" = "COMMIT;"
-          done
+          python - <<'PY'
+          from pathlib import Path
+          from pglast import parse_sql
+
+          files = sorted(Path("sql").glob("2026_staging_safety_reconciliation_v1*.sql"))
+          assert len(files) == 4, files
+          for path in files:
+              parse_sql(path.read_text(encoding="utf-8"))
+              print(f"PARSE_OK {path}")
+          PY

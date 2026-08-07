@@ -30,7 +30,7 @@ def test_unsaved_changes_and_field_anchors_exist():
 def test_upload_directory_is_configurable_and_readability_is_checked():
     source = (ROOT / "qrfacile_app" / "wine_images_ui.py").read_text(encoding="utf-8")
     storage = (ROOT / "qrfacile_app" / "services" / "storage.py").read_text(encoding="utf-8")
-    assert 'os.getenv("UPLOADS_DIR")' in storage
+    assert "get_runtime_config(validate=False).uploads_dir" in storage
     assert "target.is_file()" in storage
     assert "os.access" in storage
     assert "cur.rowcount != 1" in source

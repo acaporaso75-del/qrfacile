@@ -1,5 +1,6 @@
 import logging
 import os
+import warnings
 from importlib import import_module
 
 from fastapi import FastAPI, Request
@@ -9,49 +10,96 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from qrfacile_app.compliance_score_middleware import ComplianceScoreMiddleware
 from qrfacile_app.public_recycling_catalog_middleware import PublicRecyclingCatalogMiddleware
+from qrfacile_app.runtime_config import get_runtime_config
 from qrfacile_app.security_middleware import SecurityHeadersMiddleware
-from qrfacile_app.services.storage import get_uploads_dir
 from qrfacile_app.uploads_routes import VersionedUploadStaticFiles
 
 logger = logging.getLogger("qrfacile.main")
 logging.basicConfig(level=logging.INFO)
 
+RUNTIME_CONFIG = get_runtime_config(validate=True)
+
 app = FastAPI(title="QRFACILE")
-app.state.app_base_url = os.getenv("APP_BASE_URL", "").rstrip("/")
+app.state.app_base_url = RUNTIME_CONFIG.app_base_url
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(PublicRecyclingCatalogMiddleware)
 app.add_middleware(ComplianceScoreMiddleware)
 
-APP_ROOT = os.getenv("APP_ROOT", "/opt/qrfacile")
-STATIC_DIR = os.getenv("STATIC_DIR", f"{APP_ROOT}/static")
-UPLOADS_DIR = str(get_uploads_dir())
+APP_ROOT = str(RUNTIME_CONFIG.app_root)
+STATIC_DIR = str(RUNTIME_CONFIG.static_dir)
+UPLOADS_DIR = str(RUNTIME_CONFIG.uploads_dir)
+TEMPLATES_DIR = str(RUNTIME_CONFIG.templates_dir)
 
-try:
-    if os.path.isdir(STATIC_DIR):
-        app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-        logger.info("Mounted /static -> %s", STATIC_DIR)
-except Exception as e:
-    logger.warning("Skip static mount: %s", e)
 
-try:
-    if os.path.isdir(UPLOADS_DIR):
-        app.mount("/uploads", VersionedUploadStaticFiles(directory=UPLOADS_DIR), name="uploads")
-        logger.info("Mounted /uploads -> %s", UPLOADS_DIR)
-except Exception as e:
-    logger.warning("Skip uploads mount: %s", e)
+def _mount_directory(url_path: str, directory: str, *, name: str, uploads: bool = False) -> None:
+    if not os.path.isdir(directory):
+        message = f"Directory obbligatoria non disponibile: {name}={directory}"
+        if RUNTIME_CONFIG.environment == "staging":
+            raise RuntimeError(message)
+        logger.warning(message)
+        return
+
+    static_class = VersionedUploadStaticFiles if uploads else StaticFiles
+    try:
+        app.mount(url_path, static_class(directory=directory), name=name)
+        logger.info("Mounted %s -> %s", url_path, directory)
+    except Exception as exc:
+        if RUNTIME_CONFIG.environment == "staging":
+            raise RuntimeError(f"Mount obbligatorio fallito: {name}") from exc
+        logger.warning("Mount %s non disponibile: %s", name, exc)
+
+
+_mount_directory("/static", STATIC_DIR, name="static")
+_mount_directory("/uploads", UPLOADS_DIR, name="uploads", uploads=True)
+
+
+MANDATORY_ROUTERS = frozenset(
+    {
+        "qrfacile_app.auth_routes",
+        "qrfacile_app.email_verification_ui",
+        "qrfacile_app.landing_routes",
+        "qrfacile_app.health",
+        "qrfacile_app.start_ui",
+        "qrfacile_app.dashboard_ui",
+        "qrfacile_app.label_media_ui",
+        "qrfacile_app.collaboration_management_ui",
+        "qrfacile_app.invitation_management_ui",
+        "qrfacile_app.invitations_ui",
+        "qrfacile_app.invitation_acceptance_ui",
+        "qrfacile_app.invitation_center_ui",
+        "qrfacile_app.secure_publish_ui",
+        "qrfacile_app.recycling_validation_ui",
+        "qrfacile_app.wine_compliance_engine_ui",
+        "qrfacile_app.studio_register_routes",
+        "qrfacile_app.winery_register_routes",
+        "qrfacile_app.public",
+        "qrfacile_app.uploads_routes",
+    }
+)
 
 
 def include_router_safe(module_path: str, router_attr: str = "router") -> None:
+    required = module_path in MANDATORY_ROUTERS
     try:
-        m = import_module(module_path)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="'crypt' is deprecated.*",
+                category=DeprecationWarning,
+            )
+            m = import_module(module_path)
         r = getattr(m, router_attr, None)
         if r is None:
-            logger.warning("Skip module (no router): %s", module_path)
+            if required:
+                raise RuntimeError(f"Router obbligatorio assente: {module_path}.{router_attr}")
+            logger.warning("Router opzionale assente: %s", module_path)
             return
         app.include_router(r)
-        logger.info("Included router: %s", module_path)
-    except Exception as e:
-        logger.warning("Skip module %s (%s)", module_path, e)
+        logger.info("Included %s router: %s", "mandatory" if required else "optional", module_path)
+    except Exception as exc:
+        if required:
+            raise RuntimeError(f"Caricamento router obbligatorio fallito: {module_path}") from exc
+        logger.warning("Router opzionale non caricato: %s (%s)", module_path, exc)
 
 
 @app.exception_handler(StarletteHTTPException)
