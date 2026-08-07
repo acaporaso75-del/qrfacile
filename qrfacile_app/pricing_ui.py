@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
+from qrfacile_app.checkout_ui import paypal_checkout_form, paypal_checkout_script
 from qrfacile_app.ui_shell import page_public, esc
 from qrfacile_app.pricing_config import (
     FREE_WINE_CREDITS_ON_REGISTER,
@@ -88,7 +89,7 @@ def _extra_features(pack: dict) -> str:
     return html
 
 
-def _qr_pack_card(key: str, pack: dict) -> str:
+def _qr_pack_card(request: Request, key: str, pack: dict) -> str:
     label = esc(pack.get("label") or key)
     subtitle = esc(pack.get("subtitle") or "")
     amount_cents = int(pack.get("amount_cents") or 0)
@@ -115,12 +116,12 @@ def _qr_pack_card(key: str, pack: dict) -> str:
         {_extra_features(pack)}
       </div>
 
-      <form method="post" action="/paypal/start" class="priceForm">
-        <input type="hidden" name="pack" value="{esc(key)}">
-        <button class="priceBtn {'primary' if highlight else ''}" type="submit">
-          Acquista
-        </button>
-      </form>
+      {paypal_checkout_form(
+          request,
+          pack=key,
+          button_label="Acquista",
+          button_class=f"priceBtn {'primary' if highlight else ''}",
+      )}
     </article>
     """
 
@@ -145,7 +146,7 @@ def _assisted_card(key: str, service: dict, icon: str) -> str:
 @router.get("/pricing", response_class=HTMLResponse)
 def pricing_page(request: Request):
     qr_cards = "".join([
-        _qr_pack_card(key, pack)
+        _qr_pack_card(request, key, pack)
         for key, pack in list_qr_packs()
     ])
 
@@ -195,6 +196,7 @@ def pricing_page(request: Request):
       <section class="priceGrid">
         {qr_cards}
       </section>
+      {paypal_checkout_script()}
 
       <section class="assistSection">
         <div class="assistIntro">

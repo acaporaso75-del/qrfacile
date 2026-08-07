@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.checkout_ui import paypal_checkout_form, paypal_checkout_script
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 from qrfacile_app.pricing_config import get_purchase_pack, list_billing_packs
@@ -242,7 +243,7 @@ def _reason_label(reason: str) -> str:
     return labels.get(r, reason or "-")
 
 
-def _pack_card(pack_key: str, pack: dict, recommended_pack: str = "") -> str:
+def _pack_card(request: Request, pack_key: str, pack: dict, recommended_pack: str = "") -> str:
     recommended_pack = (recommended_pack or "").strip().lower()
     is_recommended = bool(recommended_pack and pack_key == recommended_pack)
     is_default_featured = (not recommended_pack and pack_key == "pro")
@@ -268,15 +269,13 @@ def _pack_card(pack_key: str, pack: dict, recommended_pack: str = "") -> str:
         credits_line = "Pacchetto operativo"
 
     disabled = bool(pack.get("disabled")) or int(pack.get("amount_cents") or 0) <= 0
-    btn = """
-        <button class="btn billingPackBtn" type="button" disabled>
-          Non acquistabile online
-        </button>
-    """ if disabled else """
-        <button class="btn btn-primary billingPackBtn" type="submit">
-          Acquista ora
-        </button>
-    """
+    checkout = paypal_checkout_form(
+        request,
+        pack=pack_key,
+        button_class="btn btn-primary billingPackBtn" if not disabled else "btn billingPackBtn",
+        disabled=disabled,
+        style="margin-top:auto",
+    )
 
     return f"""
     <article class="billingPack{featured}">
@@ -285,10 +284,7 @@ def _pack_card(pack_key: str, pack: dict, recommended_pack: str = "") -> str:
       <div class="billingPackPrice">{esc(pack.get("price") or "-")}</div>
       <div class="billingPackCredits">{esc(credits_line)}</div>
       <div class="billingPackDesc">{esc(pack.get("desc") or "")}</div>
-      <form method="post" action="/paypal/start" style="margin-top:auto">
-        <input type="hidden" name="pack" value="{esc(pack_key)}">
-        {btn}
-      </form>
+      {checkout}
     </article>
     """
 
@@ -343,7 +339,7 @@ def billing(request: Request, msg: str = "", err: str = ""):
         if not v.get("hidden_in_billing") and k not in hidden_packs
     ]
 
-    pack_cards = "".join(_pack_card(k, v, recommended_pack) for k, v in visible_packs)
+    pack_cards = "".join(_pack_card(request, k, v, recommended_pack) for k, v in visible_packs)
 
     ledger_rows = ""
     for r in ledger:
@@ -433,6 +429,7 @@ def billing(request: Request, msg: str = "", err: str = ""):
       <div class="billingPackGrid">
         {pack_cards}
       </div>
+      {paypal_checkout_script()}
 
       <div class="billingGrid">
         <div class="card billingInfoCard">
@@ -518,6 +515,7 @@ def billing(request: Request, msg: str = "", err: str = ""):
         .billingPackCredits {{ margin-top:7px; color:#0f766e; font-size:13px; font-weight:950; }}
         .billingPackDesc {{ margin-top:10px; color:#64748b; font-size:13px; line-height:1.45; font-weight:750; flex:1; }}
         .billingPackBtn {{ width:100%; justify-content:center; margin-top:16px; }}
+        .checkoutStatus {{ margin-top:8px; color:#0f766e; font-size:12px; font-weight:800; text-align:center; }}
         .billingGrid {{ display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px; }}
         .billingInfoCard, .billingOrdersCard {{ padding:22px; }}
         .billingCardIcon {{ width:58px; height:58px; border-radius:20px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,rgba(191,245,230,.85),rgba(207,232,255,.85)); font-size:26px; margin-bottom:14px; border:1px solid rgba(2,8,23,.06); }}
