@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.db import pg
 
@@ -52,6 +53,7 @@ def my_legal_status(request: Request):
 
 @router.post("/api/me/legal-acceptances")
 async def accept_legal_document(request: Request):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("admin", "winery", "studio"))
     payload = await request.json()
     document_key = str(payload.get("document_key") or "").strip()

@@ -5,6 +5,7 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
 from qrfacile_app.auth_core import require_any_role, studio_allowed_wineries, winery_id_for_owner
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 
 router = APIRouter()
@@ -96,6 +97,7 @@ def new_wine_master_get(request: Request, winery_id: int = 0, msg: str = "", err
 
 @router.post("/app/new-wine-master")
 def new_wine_master_post(request: Request, winery_id: int = Form(...), name: str = Form(...)):
+    require_csrf_or_same_origin(request)
     u = require_any_role(request, ("winery", "studio", "admin"))
 
     # enforce create

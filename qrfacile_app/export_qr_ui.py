@@ -28,6 +28,7 @@ except Exception:
     segno = None
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, esc
 from qrfacile_app.audit import audit_log
@@ -991,6 +992,7 @@ def export_send(
     payload: PackageSendRequest | None = Body(default=None),
     name: str = Query("qrfacile"),
 ):
+    require_csrf_or_same_origin(request)
     u = _require_export_access(request, wine_id)
 
     # studio può esportare, ma invio email è “sensibile”: lo teniamo consentito SOLO a winery/admin

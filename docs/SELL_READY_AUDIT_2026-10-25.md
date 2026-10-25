@@ -28,6 +28,9 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
    i form inviano token CSRF e raggiungono soltanto i servizi canonici auditati.
 10. applica il controllo CSRF/origine alle mutazioni amministrative ad alto impatto:
     crediti, payout, override, registro/revisione AI, incidenti e richieste privacy.
+11. estende lo stesso controllo a tutte le route mutative autenticate rimanenti
+    (creazione, upload, export/invio, selezione contesto, payout e accettazioni legali)
+    e aggiunge un test che impedisce future route autenticate prive del gate.
 
 ## Matrice di conformità
 

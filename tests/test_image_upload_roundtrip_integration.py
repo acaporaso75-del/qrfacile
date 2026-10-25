@@ -2,6 +2,7 @@ import asyncio
 from io import BytesIO
 
 from PIL import Image
+from starlette.requests import Request
 from qrfacile_app import public, uploads_routes, wine_images_ui
 from qrfacile_app.services.storage import versioned_upload_url
 
@@ -46,6 +47,14 @@ class Connection:
     def rollback(self): pass
 
 
+def _same_origin_request():
+    return Request({
+        "type": "http", "method": "POST", "scheme": "https", "path": "/app/wine/41/images/upload",
+        "headers": [(b"host", b"example.test"), (b"origin", b"https://example.test")],
+        "client": ("127.0.0.1", 1),
+    })
+
+
 def test_real_upload_db_redirect_preview_and_file_response_roundtrip(tmp_path, monkeypatch):
     state = {}
     monkeypatch.setenv("UPLOADS_DIR", str(tmp_path))
@@ -55,7 +64,7 @@ def test_real_upload_db_redirect_preview_and_file_response_roundtrip(tmp_path, m
     Image.new("RGB", (160, 240), (30, 90, 120)).save(content, format="PNG")
     upload = AsyncUpload(content.getvalue())
 
-    response = asyncio.run(wine_images_ui.images_upload(object(), 41, "front", upload))
+    response = asyncio.run(wine_images_ui.images_upload(_same_origin_request(), 41, "front", upload))
     assert response.status_code == 303
     assert "Caricato" in response.headers["location"]
     persisted = state[(41, "front")]
@@ -82,7 +91,7 @@ def test_replacement_changes_only_version_and_public_preview_html(tmp_path, monk
     def upload(kind, color):
         content = BytesIO()
         Image.new("RGB", (160, 240), color).save(content, format="PNG")
-        return asyncio.run(wine_images_ui.images_upload(object(), 41, kind, AsyncUpload(content.getvalue())))
+        return asyncio.run(wine_images_ui.images_upload(_same_origin_request(), 41, kind, AsyncUpload(content.getvalue())))
 
     assert upload("front", (200, 10, 10)).status_code == 303
     first = dict(state[(41, "front")])

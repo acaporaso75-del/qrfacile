@@ -20,6 +20,7 @@ ALLOWED_STATUS = {"open", "identity_check", "in_progress", "completed", "rejecte
 
 @router.post("/api/me/privacy-requests")
 async def create_privacy_request(request: Request):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("admin", "winery", "studio"))
     payload: dict[str, Any] = await request.json()
     request_type = str(payload.get("request_type") or "").strip().lower()

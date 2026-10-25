@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.checkout_ui import paypal_checkout_form, paypal_checkout_script
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
@@ -586,6 +587,7 @@ def billing(request: Request, msg: str = "", err: str = ""):
 
 @router.post("/app/billing/request-plan")
 def request_plan(request: Request, pack: str = Form(...)):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery", "admin"))
     pack = (pack or "").strip().lower()
 

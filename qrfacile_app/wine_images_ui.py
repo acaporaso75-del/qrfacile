@@ -12,6 +12,7 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 from qrfacile_app.guided_flow import render_guided_stepper
 from qrfacile_app.services.storage import get_uploads_dir, verify_saved_asset, versioned_upload_url
@@ -780,6 +781,7 @@ def images_page(request: Request, wine_id: int, msg: str = ""):
 
 @router.post("/app/wine/{wine_id}/images/upload")
 async def images_upload(request: Request, wine_id: int, kind: str = Form(...), image: UploadFile = File(...)):
+    require_csrf_or_same_origin(request)
     kind = (kind or "").strip().lower()
 
     if kind not in ("front", "back"):
@@ -902,6 +904,7 @@ async def images_upload(request: Request, wine_id: int, kind: str = Form(...), i
 
 @router.post("/app/wine/{wine_id}/images/delete")
 def images_delete(request: Request, wine_id: int, kind: str = Form(...)):
+    require_csrf_or_same_origin(request)
     kind = (kind or "").strip().lower()
 
     if kind not in ("front", "back"):

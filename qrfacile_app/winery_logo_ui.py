@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app.media import process_logo
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
@@ -430,6 +431,7 @@ def winery_logo_page(request: Request, msg: str = "", err: str = ""):
 
 @router.post("/app/winery/logo")
 def winery_logo_upload(request: Request, logo: UploadFile = File(...)):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery", "admin"))
 
     with pg() as conn:

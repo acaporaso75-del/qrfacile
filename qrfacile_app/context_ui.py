@@ -3,6 +3,7 @@ from fastapi.responses import RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role, studio_allowed_wineries, winery_id_for_owner
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 
 router = APIRouter()
@@ -32,6 +33,7 @@ def _allowed_wineries(user: dict) -> list[int]:
 
 @router.post("/app/set-winery")
 def set_winery(request: Request, winery_id: int = Form(...), next_url: str = Form("/app/dashboard")):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery", "studio", "admin"))
     allowed = _allowed_wineries(user)
 
@@ -56,6 +58,7 @@ def set_winery(request: Request, winery_id: int = Form(...), next_url: str = For
 
 @router.post("/app/clear-winery")
 def clear_winery(request: Request, next_url: str = Form("/app/dashboard")):
+    require_csrf_or_same_origin(request)
     require_any_role(request, ("winery", "studio", "admin"))
 
     target = (next_url or "").strip() or "/app/dashboard"

@@ -8,6 +8,7 @@ from psycopg.errors import UniqueViolation
 from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.util import new_slug
 from qrfacile_app.auth_core import (
     require_any_role,
@@ -951,6 +952,7 @@ def new_wine_post(
     studio_work_mode: str = Form("self"),
     invite_studio_email: str = Form(""),
 ):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery", "studio", "admin"))
 
     require_any_role(
@@ -1614,6 +1616,7 @@ def new_label_create(
     assigned_studio_user_id: int = Form(0),
     invite_studio_email: str = Form(""),
 ):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery", "studio", "admin"))
 
     with pg() as conn:
