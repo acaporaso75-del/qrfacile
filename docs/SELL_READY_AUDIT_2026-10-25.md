@@ -133,4 +133,3 @@ autorizzazione non comprende staging, deploy, produzione, merge o servizi Live.
 - AI Act, Regolamento (UE) 2024/1689: https://eur-lex.europa.eu/eli/reg/2024/1689/oj
 - European Accessibility Act, Direttiva (UE) 2019/882: https://eur-lex.europa.eu/eli/dir/2019/882/oj
 - Linee guida cookie del Garante: https://www.garanteprivacy.it/home/docweb/-/docweb-display/docweb/9677876
-
