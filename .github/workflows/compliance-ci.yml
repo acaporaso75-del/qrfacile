@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [staging, feature/legal-ai-compliance-2026]
   push:
-    branches: [feature/legal-ai-compliance-2026]
+    branches: [staging, feature/legal-ai-compliance-2026]
 
 permissions:
   contents: read
