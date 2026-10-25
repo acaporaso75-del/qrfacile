@@ -10,6 +10,8 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.csrf_core import require_csrf_or_same_origin
+from qrfacile_app.navigation_security import safe_local_path
+from qrfacile_app.ui_shell import esc
 from qrfacile_app.db import pg
 from qrfacile_app import ui
 
@@ -150,6 +152,7 @@ def _check_access(cur, user: dict, slug: str) -> dict:
 def send_form(request: Request, slug: str = "", back: str = "/app/dashboard"):
     user, conn = require_any_role(request, ["winery", "studio", "admin"])
     conn.close()
+    back = safe_local_path(back)
 
     header = ui.header(
         "Invio tipografia",
@@ -163,9 +166,9 @@ def send_form(request: Request, slug: str = "", back: str = "/app/dashboard"):
     body = header + f"""
 <div class="card">
   <form method="post" action="/app/print/send">
-    <input type="hidden" name="back" value="{back}">
+    <input type="hidden" name="back" value="{esc(back)}">
     <label>Slug</label>
-    <input name="slug" value="{slug}" readonly>
+    <input name="slug" value="{esc(slug)}" readonly>
 
     <div class="grid2">
       <div>
@@ -246,6 +249,6 @@ Note: {note}
 """
 
         _send_mail(to_email, subject, body, filename, data, mime)
-        return RedirectResponse(back, status_code=303)
+        return RedirectResponse(safe_local_path(back), status_code=303)
     finally:
         conn.close()

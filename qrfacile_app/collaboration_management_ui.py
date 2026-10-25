@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse
 from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.csrf_core import require_csrf_or_same_origin
+from qrfacile_app.navigation_security import safe_local_path
 from qrfacile_app.services.collaboration_management import (
     assign_studio_to_label,
     clear_label_collaboration,
@@ -19,6 +20,7 @@ router = APIRouter(tags=["collaboration-management"])
 
 
 def _return(url: str, *, msg: str = "", err: str = "") -> RedirectResponse:
+    url = safe_local_path(url)
     sep = "&" if "?" in url else "?"
     if msg:
         url = f"{url}{sep}msg={quote_plus(msg)}"

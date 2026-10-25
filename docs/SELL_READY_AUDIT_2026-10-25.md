@@ -52,6 +52,9 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
     errori di digitazione prima della creazione dell'account.
 21. codifica sempre i dettagli delle eccezioni HTTP prima di inserirli nelle
     pagine HTML, eliminando un percorso di cross-site scripting riflesso.
+22. centralizza la validazione delle destinazioni di ritorno: selezione cantina,
+    gestione Studio e invio tipografia rifiutano redirect esterni, slash codificati
+    e caratteri di controllo; il cookie contesto usa Secure sotto HTTPS.
 
 ## Matrice di conformità
 

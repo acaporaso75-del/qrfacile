@@ -75,3 +75,8 @@ branded 403/404/405 pages and all other HTML error responses. Request-derived
 error text can therefore no longer become executable markup through this path.
 The email-verification error page applies the same escaping before embedding a
 service error in its branded response.
+
+User-controlled return destinations in winery-context selection, label
+collaboration and print sending pass through one same-origin path validator.
+Protocol-relative, encoded-slash, backslash and control-character variants fall
+back to the dashboard. The active-winery context cookie is Secure under HTTPS.
