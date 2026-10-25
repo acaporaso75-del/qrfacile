@@ -11,16 +11,20 @@ def test_management_service_forces_studio_publish_false():
     assert "revoke_studio_connection" in text
 
 
-def test_safe_routes_are_registered_before_legacy_acl():
-    text = (ROOT / "qrfacile_app" / "main.py").read_text(encoding="utf-8")
-    safe = text.index('include_router_safe("qrfacile_app.collaboration_management_ui")')
-    legacy = text.index('include_router_safe("qrfacile_app.label_acl_ui")')
-    assert safe < legacy
+def test_only_safe_label_mutation_routes_are_registered():
+    safe = (ROOT / "qrfacile_app" / "collaboration_management_ui.py").read_text(encoding="utf-8")
+    legacy = (ROOT / "qrfacile_app" / "label_acl_ui.py").read_text(encoding="utf-8")
+    for route in ("acl/assign", "acl/clear", "management/set"):
+        decorator = f'@router.post("/app/label/{{label_id}}/{route}")'
+        assert safe.count(decorator) == 1
+        assert decorator not in legacy
+    assert "csrf_input(request)" in legacy
+    assert 'name="profile" value="graphic"' in legacy
 
 
 def test_sensitive_collaboration_posts_have_origin_check_and_audit():
     text = (ROOT / "qrfacile_app" / "collaboration_management_ui.py").read_text(encoding="utf-8")
-    assert text.count("_same_origin(request)") >= 5
+    assert text.count("require_csrf_or_same_origin(request") >= 5
     for event in (
         "label_collaborator_assigned",
         "label_collaborator_removed",
@@ -28,6 +32,17 @@ def test_sensitive_collaboration_posts_have_origin_check_and_audit():
         "studio_winery_access_revoked",
     ):
         assert event in text
+
+
+def test_studio_connection_mutations_have_one_canonical_route_and_csrf_fields():
+    management = (ROOT / "qrfacile_app" / "collaboration_management_ui.py").read_text(encoding="utf-8")
+    settings = (ROOT / "qrfacile_app" / "winery_settings_ui.py").read_text(encoding="utf-8")
+    for route in ("/app/settings/studios/set", "/app/settings/studios/revoke"):
+        assert management.count(f'@router.post("{route}")') == 1
+        assert f'@router.post("{route}")' not in settings
+        assert f'action="{route}"' in settings
+    assert settings.count("{csrf_html}") == 2
+    assert 'csrf_token: str = Form("")' in management
 
 
 def test_access_center_has_one_clear_three_step_flow():

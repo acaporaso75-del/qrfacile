@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from psycopg.rows import dict_row
@@ -83,12 +86,30 @@ def _load_payload(wine_id: int, user: dict) -> dict:
     }
 
 
-def _report_html(report: dict) -> str:
+def _evidence_html(value) -> str:
+    if not value:
+        return "—"
+    if isinstance(value, dict):
+        return "<dl class='ceEvidence'>" + "".join(
+            f"<dt>{esc(str(key).replace('_', ' ').capitalize())}</dt>"
+            f"<dd>{esc(json.dumps(item, ensure_ascii=False, default=str) if isinstance(item, (dict, list)) else str(item))}</dd>"
+            for key, item in value.items()
+        ) + "</dl>"
+    return esc(str(value))
+
+
+def _report_html(report: dict, *, verified_at: datetime | None = None) -> str:
+    verification_time = (verified_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    verification_label = verification_time.strftime("%d/%m/%Y %H:%M UTC")
+    counts = report.get("counts") or {}
+    score = esc(str(report.get("score") if report.get("score") is not None else "—"))
+    warning_count = esc(str(counts.get("WARNING") or 0))
     rows = []
     for item in report["results"]:
-        status = item["status"]
+        status = str(item.get("status") or "")
         badge_class = {"PASS": "ok", "WARNING": "warn", "ERROR": "err"}.get(status, "")
         remediation = item.get("remediation") or "—"
+        evidence_html = _evidence_html(item.get("evidence"))
         sources = item.get("knowledge") or []
         source_html = "".join(
             f"<div class='ceSource'><b>{esc(source.get('reference') or source.get('title') or '')}</b>"
@@ -99,15 +120,22 @@ def _report_html(report: dict) -> str:
             f"""
             <tr>
               <td><span class='ceBadge {badge_class}'>{esc(status)}</span></td>
-              <td><b>{esc(item['title'])}</b><div class='ceRule'>{esc(item['rule_id'])} · {esc(item['version'])}</div></td>
-              <td>{esc(item['explanation'])}</td>
+              <td><b>{esc(str(item.get('title') or ''))}</b><div class='ceRule'>{esc(str(item.get('rule_id') or ''))} · {esc(str(item.get('version') or ''))}</div></td>
+              <td>{esc(str(item.get('explanation') or ''))}</td>
+              <td>{evidence_html}</td>
               <td>{esc(remediation)}</td>
               <td>{source_html}</td>
             </tr>
             """
         )
 
-    publish_text = "Nessun errore bloccante" if report["publishable"] else "Pubblicazione da bloccare"
+    publishable = bool(report.get("publishable"))
+    blocking_count = int(report.get("blocking_error_count") or sum(
+        1 for item in report.get("results", [])
+        if item.get("status") == "ERROR" and item.get("blocking")
+    ))
+    general_status = "Conforme ai controlli automatici" if publishable else "Correzioni obbligatorie"
+    publish_text = "Sì" if publishable else "No"
     return f"""
     <style>
       .ceGrid{{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}}
@@ -119,23 +147,26 @@ def _report_html(report: dict) -> str:
       .ceBadge.ok{{background:#dcfce7;color:#166534}}.ceBadge.warn{{background:#fef3c7;color:#92400e}}.ceBadge.err{{background:#fee2e2;color:#991b1b}}
       .ceRule{{font-size:12px;color:var(--muted);margin-top:4px}}
       .ceSource{{display:grid;gap:3px;margin-bottom:8px}}.ceSource span{{font-size:12px;color:var(--muted)}}
+      .ceEvidence{{margin:0;display:grid;grid-template-columns:minmax(110px,auto) 1fr;gap:4px 8px}}
+      .ceEvidence dt{{font-weight:700}}.ceEvidence dd{{margin:0;overflow-wrap:anywhere}}
       @media(max-width:900px){{.ceGrid{{grid-template-columns:repeat(2,1fr)}}.ceTable{{display:block;overflow:auto}}}}
     </style>
     <div class='card'>
-      <div class='h1'>Compliance Engine</div>
-      <div class='p'>Motore deterministico {esc(report['engine_version'])} · catalogo {esc(report['catalog_version'])} · knowledge {esc(report['knowledge_version'])}. Il risultato supporta la revisione umana e non costituisce certificazione automatica.</div>
+      <div class='h1'>Report di conformità</div>
+      <div class='p'>Verifica automatica leggibile e motivata. Il risultato supporta la revisione umana e non costituisce certificazione automatica.</div>
       <div class='ceGrid'>
-        <div class='ceMetric'><span>Score</span><b>{report['score']}/100</b></div>
-        <div class='ceMetric'><span>PASS</span><b>{report['counts']['PASS']}</b></div>
-        <div class='ceMetric'><span>WARNING</span><b>{report['counts']['WARNING']}</b></div>
-        <div class='ceMetric'><span>ERROR</span><b>{report['counts']['ERROR']}</b></div>
+        <div class='ceMetric'><span>Score</span><b>{score}/100</b></div>
+        <div class='ceMetric'><span>Pubblicabile</span><b>{publish_text}</b></div>
+        <div class='ceMetric'><span>Errori bloccanti</span><b>{blocking_count}</b></div>
+        <div class='ceMetric'><span>Avvisi</span><b>{warning_count}</b></div>
       </div>
-      <div class='p'><b>{esc(publish_text)}</b> · Revisione umana obbligatoria.</div>
+      <div class='p'><b>Stato generale: {esc(general_status)}</b></div>
+      <div class='p'>Versione motore {esc(str(report.get('engine_version') or ''))} · catalogo regole {esc(str(report.get('catalog_version') or ''))} · base conoscenza {esc(str(report.get('knowledge_version') or ''))} · verifica del {esc(verification_label)}.</div>
     </div>
     <div class='card' style='margin-top:14px'>
       <div class='h2'>Esiti motivati</div>
       <table class='ceTable'>
-        <thead><tr><th>Esito</th><th>Controllo</th><th>Motivazione</th><th>Azione consigliata</th><th>Fonte e contesto</th></tr></thead>
+        <thead><tr><th>Esito</th><th>Regola</th><th>Motivo</th><th>Evidenza</th><th>Azione correttiva</th><th>Fonte e contesto</th></tr></thead>
         <tbody>{''.join(rows)}</tbody>
       </table>
     </div>
@@ -148,7 +179,14 @@ def compliance_report(request: Request, wine_id: int):
     payload = _load_payload(wine_id, user)
     report = run_explainable_wine_compliance(payload)
     body = _report_html(report)
-    return HTMLResponse(page(request, user, "Compliance Engine", body))
+    return HTMLResponse(page(
+        title="Report di conformità",
+        subtitle="Esito motivato della verifica corrente",
+        body_html=body,
+        user_email=str(user.get("email") or ""),
+        role=str(user.get("role") or ""),
+        credits=user.get("credits") if isinstance(user.get("credits"), dict) else None,
+    ))
 
 
 @router.get("/api/wines/{wine_id}/compliance-report", response_class=JSONResponse)

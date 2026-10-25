@@ -102,10 +102,10 @@ def _score_widget(wine_id: int) -> str:
         +'<div class="qrfScoreState '+(blocked?'blocked':'ready')+'">'
         +(blocked?'Sono presenti errori bloccanti.':'Nessun errore bloccante rilevato.')
         +' Revisione umana obbligatoria.</div>'
-        +'<a class="qrfScoreLink" href="/app/wine/{wine_id}/compliance-report">Apri il report motivato →</a>';
+        +'<a class="qrfScoreLink" href="/app/wine/{wine_id}/compliance-report">Apri il report di conformità →</a>';
     }})
     .catch(function(){{
-      box.innerHTML='<div class="qrfScoreTitle">Compliance Engine</div><div class="qrfScoreState blocked">Score temporaneamente non disponibile. Apri il report dettagliato.</div><a class="qrfScoreLink" href="/app/wine/{wine_id}/compliance-report">Apri il report →</a>';
+      box.innerHTML='<div class="qrfScoreTitle">Compliance Engine</div><div class="qrfScoreState blocked">Score temporaneamente non disponibile. Apri il report di conformità.</div><a class="qrfScoreLink" href="/app/wine/{wine_id}/compliance-report">Apri il report di conformità →</a>';
     }});
 }})();
 </script>

@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
+from qrfacile_app.checkout_ui import paypal_checkout_form, paypal_checkout_script
 from qrfacile_app.ui_shell import page_public, esc
 from qrfacile_app.pricing_config import (
     FREE_WINE_CREDITS_ON_REGISTER,
@@ -39,7 +40,7 @@ def _main_feature(pack: dict) -> str:
     return f"""
     <div class="priceFeature main">
       <span>✓</span>
-      <b>{qty} crediti QR vino</b>
+      <b>{qty} unità per nuove etichette ogni anno</b>
     </div>
 
     <div class="priceFeature">
@@ -47,6 +48,7 @@ def _main_feature(pack: dict) -> str:
       <div>
         <b>{standard_qr} QR vino da {QR_STANDARD_YEARS} anni</b><br>
         oppure {extended_qr} QR vino da {QR_EXTENDED_YEARS} anni
+        {'+ 1 unità residua' if qty % QR_EXTENDED_CREDIT_COST else ''}
       </div>
     </div>
     """
@@ -88,7 +90,7 @@ def _extra_features(pack: dict) -> str:
     return html
 
 
-def _qr_pack_card(key: str, pack: dict) -> str:
+def _qr_pack_card(request: Request, key: str, pack: dict) -> str:
     label = esc(pack.get("label") or key)
     subtitle = esc(pack.get("subtitle") or "")
     amount_cents = int(pack.get("amount_cents") or 0)
@@ -108,19 +110,20 @@ def _qr_pack_card(key: str, pack: dict) -> str:
         </div>
       </div>
 
-      <div class="priceValue">{price}</div>
+      <div class="priceValue">{price}<small> / anno</small></div>
+      <p>IVA esclusa · solo clienti professionali</p>
 
       <div class="priceFeatures">
         {_main_feature(pack)}
         {_extra_features(pack)}
       </div>
 
-      <form method="post" action="/paypal/start" class="priceForm">
-        <input type="hidden" name="pack" value="{esc(key)}">
-        <button class="priceBtn {'primary' if highlight else ''}" type="submit">
-          Acquista
-        </button>
-      </form>
+      {paypal_checkout_form(
+          request,
+          pack=key,
+          button_label="Acquista",
+          button_class=f"priceBtn {'primary' if highlight else ''}",
+      )}
     </article>
     """
 
@@ -145,7 +148,7 @@ def _assisted_card(key: str, service: dict, icon: str) -> str:
 @router.get("/pricing", response_class=HTMLResponse)
 def pricing_page(request: Request):
     qr_cards = "".join([
-        _qr_pack_card(key, pack)
+        _qr_pack_card(request, key, pack)
         for key, pack in list_qr_packs()
     ])
 
@@ -161,10 +164,10 @@ def pricing_page(request: Request):
 
       <section class="pricingHero">
         <div class="pricingEyebrow">Prezzi QRFACILE</div>
-        <h1>Scegli il pacchetto di crediti QR vino più adatto alla tua cantina</h1>
+        <h1>Pacchetti annuali Wine per la tua cantina</h1>
         <p>
-          Paghi solo i crediti che usi. Nessun abbonamento obbligatorio.
-          QR pronti per la stampa in pochi minuti.
+          Acquisti nuove etichette per 12 mesi, con rinnovo manuale e senza addebiti automatici.
+          I QR già creati restano consultabili per la durata scelta, anche senza rinnovo.
         </p>
       </section>
 
@@ -188,13 +191,20 @@ def pricing_page(request: Request):
         </div>
         <div>
           <b>+{QR_UPGRADE_10_TO_25_CREDIT_COST} credito</b>
-          <span>upgrade da {QR_STANDARD_YEARS} a {QR_EXTENDED_YEARS} anni</span>
+          <span>upgrade da {QR_STANDARD_YEARS} a {QR_EXTENDED_YEARS} anni su richiesta al supporto</span>
         </div>
       </section>
 
       <section class="priceGrid">
         {qr_cards}
       </section>
+      <p>10 anni: 1 unità. Conservazione estesa 25 anni: 2 unità.
+      Le unità annuali non utilizzate scadono dopo 12 mesi dall'acquisto, senza proroga al rinnovo.
+      Restano possibili le correzioni dei dati obbligatori delle etichette esistenti.
+      I crediti acquistati con le precedenti offerte conservano le condizioni originarie.</p>
+      <p>Studi grafici, gestione multi-cantina e grandi volumi:
+      <a href="/support">richiedi un preventivo</a>.</p>
+      {paypal_checkout_script()}
 
       <section class="assistSection">
         <div class="assistIntro">
@@ -666,5 +676,24 @@ def pricing_page(request: Request):
     return HTMLResponse(page_public(
         title="Prezzi QRFACILE | QR code per etichetta digitale vino",
         subtitle="Prezzi",
-        body_html=body
+        body_html=body,
+        description="QRFACILE Wine B2B: Start 99€, Cantina 179€, Business 299€ all'anno, IVA esclusa. Etichette conservate per 10 o 25 anni, rinnovo manuale.",
+        canonical_path="/pricing",
+        structured_data={
+            "@context": "https://schema.org",
+            "@type": "OfferCatalog",
+            "name": "Pacchetti QRFACILE Wine",
+            "url": "https://www.qrfacile.it/pricing",
+            "itemListElement": [
+                {
+                    "@type": "Offer",
+                    "name": pack["label"],
+                    "price": f"{int(pack['amount_cents']) / 100:.2f}",
+                    "priceCurrency": "EUR",
+                    "priceSpecification": {"@type": "UnitPriceSpecification", "price": f"{int(pack['amount_cents']) / 100:.2f}", "priceCurrency": "EUR", "valueAddedTaxIncluded": False, "billingDuration": "P1Y"},
+                    "url": "https://www.qrfacile.it/pricing",
+                }
+                for _, pack in list_qr_packs()
+            ],
+        },
     ))

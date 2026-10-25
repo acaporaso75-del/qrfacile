@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.services.compliance_service import (
     AI_POLICY_VERSION,
     get_compliance_status,
@@ -14,6 +16,7 @@ from qrfacile_app.services.compliance_service import (
 from qrfacile_app.ui_shell import page_public
 
 router = APIRouter(tags=["compliance"])
+logger = logging.getLogger("qrfacile.compliance")
 
 
 @router.get("/ai-policy", response_class=HTMLResponse)
@@ -41,6 +44,8 @@ def ai_policy(request: Request):
         subtitle="AI Policy",
         body_html=body,
         actions_html='<a class="btn" href="/legal">Note legali</a><a class="btn" href="/privacy">Privacy</a>',
+        description="Policy QRFACILE per trasparenza, supervisione umana, dati e responsabilità nell’uso di funzioni AI.",
+        canonical_path="/ai-policy",
     ))
 
 
@@ -49,15 +54,17 @@ def compliance_status(request: Request):
     require_any_role(request, ("admin",))
     try:
         return get_compliance_status()
-    except Exception as exc:
+    except Exception:
+        logger.exception("Impossibile leggere lo stato compliance")
         return JSONResponse(
             status_code=503,
-            content={"ok": False, "error": "database_unavailable", "detail": str(exc)},
+            content={"ok": False, "error": "database_unavailable"},
         )
 
 
 @router.post("/api/admin/compliance/ai-usage")
 async def register_ai_usage(request: Request):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("admin", "winery", "studio"))
     payload: dict[str, Any] = await request.json()
     record = register_ai_usage_record(user_id=int(user["id"]), payload=payload)

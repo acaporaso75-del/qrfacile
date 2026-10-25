@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, esc
 from qrfacile_app.ui_layout import pill
@@ -15,7 +16,7 @@ def _balances(cur, user_id: int) -> dict:
     cur.execute(
         """
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
         """,
@@ -497,6 +498,7 @@ def menu_alias():
 
 @router.post("/app/start/select")
 def select_mode(request: Request, mode: str = Form(...)):
+    require_csrf_or_same_origin(request)
     u = require_any_role(request, ("winery", "studio", "admin"))
     role = (u.get("role") or "").strip().lower()
     mode = (mode or "").strip().lower()

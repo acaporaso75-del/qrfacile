@@ -64,9 +64,11 @@ def test_no_literal_assignments_to_credential_names():
 def test_sensitive_actions_are_not_exposed_by_get():
     findings = [item for item in scan() if item.code == "unsafe_state_change_get"]
     assert not findings
-    source = (ROOT / "qrfacile_app" / "studio_settings_ui.py").read_text(encoding="utf-8")
-    assert '@router.get("/app/invite/studio/accept/{token}"' not in source
-    assert '@router.post("/app/invite/studio/accept/{token}")' in source
+    legacy = (ROOT / "qrfacile_app" / "studio_settings_ui.py").read_text(encoding="utf-8")
+    secure = (ROOT / "qrfacile_app" / "invitation_acceptance_ui.py").read_text(encoding="utf-8")
+    assert '@router.get("/app/invite/studio/accept/{token}"' not in legacy
+    assert '@router.post("/app/invite/studio/accept/{token}")' not in legacy
+    assert '@router.post("/app/invite/studio/accept/{token}")' in secure
 
 
 def test_verified_accounts_require_a_valid_one_time_token():

@@ -1,5 +1,4 @@
 import time
-import hashlib
 
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse
@@ -154,13 +153,6 @@ def day_utc() -> str:
     return time.strftime("%Y-%m-%d", time.gmtime())
 
 
-def fp_hash(request: Request) -> str:
-    ip = (request.client.host if request.client else "") or ""
-    ua = request.headers.get("user-agent", "") or ""
-    lang = request.headers.get("accept-language", "") or ""
-    return hashlib.sha256(f"{ip}|{ua}|{lang}".encode()).hexdigest()[:24]
-
-
 def choose_language(request: Request) -> str:
     query_lang = (request.query_params.get("lang") or "").strip().lower()
 
@@ -204,32 +196,6 @@ def choose_language(request: Request) -> str:
 
 def tr(locale: str, key: str) -> str:
     return LOCALES.get(locale, LOCALES["it"]).get(key, LOCALES["it"].get(key, key))
-
-
-def track_scan(cur, slug: str, request: Request):
-    day = day_utc()
-    fp = fp_hash(request)
-    ts = now_epoch()
-
-    cur.execute(
-        """
-        INSERT INTO qr_scan_dedup(slug, day, fp_hash, created_at)
-        VALUES (%s,%s,%s,%s)
-        ON CONFLICT (slug, day, fp_hash) DO NOTHING
-        """,
-        (slug, day, fp, ts),
-    )
-
-    if cur.rowcount == 1:
-        cur.execute(
-            """
-            INSERT INTO qr_scans_daily(slug, day, scans)
-            VALUES (%s,%s,1)
-            ON CONFLICT (slug, day)
-            DO UPDATE SET scans = qr_scans_daily.scans + 1
-            """,
-            (slug, day),
-        )
 
 
 def _pick_first_col(cur, table: str, candidates: list[str]) -> str | None:
@@ -483,13 +449,17 @@ def _require_preview_access(request: Request, cur, qr_row: dict):
         cur.execute(
             """
             SELECT 1
-            FROM studio_clients
-            WHERE studio_user_id=%s
-              AND winery_id=%s
-              AND can_view=TRUE
+            FROM wine_labels wl
+            JOIN label_collaborators lc ON lc.wine_label_id=wl.id
+            JOIN studio_clients sc
+              ON sc.studio_user_id=lc.collaborator_user_id
+             AND sc.winery_id=wl.winery_id
+            WHERE wl.wine_id=%s
+              AND lc.collaborator_user_id=%s
+              AND lc.active=TRUE AND lc.can_view=TRUE AND sc.can_view=TRUE
             LIMIT 1
             """,
-            (uid, winery_id),
+            (int(qr_row.get("wine_id") or 0), uid),
         )
         if cur.fetchone():
             return user
@@ -731,15 +701,6 @@ def _render_label_page(
     if not preview and not _public_gate_allows(status, public_missing, compliance_report):
         return _not_published_page(slug)
 
-    if not preview:
-        with pg() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                try:
-                    track_scan(cur, slug, request)
-                except Exception:
-                    pass
-            conn.commit()
-
     if is_draft:
         status_label = tr(locale, "technical_draft")
         status_class = "draft"
@@ -897,7 +858,7 @@ def _render_label_page(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{ui.esc(wine_name)} · {ui.esc(winery_name)}</title>
-<meta name="robots" content="{'noindex,nofollow,noarchive' if preview else 'index,follow'}">
+<meta name="robots" content="noindex,nofollow,noarchive">
 <style>
 :root {{
   --bg:{pal["bg"]};

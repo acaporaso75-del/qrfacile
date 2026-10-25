@@ -80,7 +80,7 @@ def assign_studio_to_label(
             cur.execute(
                 """
                 SELECT can_view, can_edit, can_create
-                FROM studio_clients
+                FROM studio_clients /* security-review: selection-only */
                 WHERE winery_id=%s AND studio_user_id=%s AND can_view=TRUE
                 LIMIT 1
                 """,

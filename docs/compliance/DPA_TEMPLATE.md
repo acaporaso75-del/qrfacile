@@ -13,7 +13,7 @@ Il trattamento riguarda erogazione, hosting, manutenzione, sicurezza, backup, as
 - dati utenti e referenti aziendali;
 - credenziali, sessioni e log;
 - dati di prodotto e contenuti caricati;
-- eventuali dati tecnici delle scansioni QR;
+- log tecnici dell'area riservata; le pagine pubbliche e-label `/e/` non registrano dati delle scansioni;
 - prompt e output AI, ove attivati.
 
 Interessati: utenti della piattaforma, referenti del cliente, collaboratori, visitatori delle pagine QR nei limiti dei dati tecnici trattati.

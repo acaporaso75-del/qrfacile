@@ -7,6 +7,15 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 
+def paypal_checkout_origin() -> str:
+    mode = (os.getenv("PAYPAL_MODE") or "sandbox").strip().lower()
+    return (
+        "https://www.paypal.com"
+        if mode == "live"
+        else "https://www.sandbox.paypal.com"
+    )
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Apply conservative browser security headers to every response.
 
@@ -29,7 +38,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "default-src 'self'; "
             "base-uri 'self'; "
             "frame-ancestors 'none'; "
-            "form-action 'self'; "
+            f"form-action 'self' {paypal_checkout_origin()}; "
             "object-src 'none'; "
             "img-src 'self' data: blob:; "
             "font-src 'self' data:; "

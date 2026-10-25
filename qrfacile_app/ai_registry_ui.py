@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.services.ai_registry_service import list_ai_systems, upsert_ai_system
 
 router = APIRouter(prefix="/admin/compliance", tags=["ai-registry"])
@@ -63,8 +64,8 @@ input,textarea,select{{padding:10px;border:1px solid #bbb;border-radius:8px}} te
 <label>Modello<input name="model" required></label>
 <label>Versione modello<input name="model_version"></label>
 <label>Classificazione rischio<select name="risk_classification"><option>minimal</option><option selected>limited</option><option>high</option><option>prohibited</option></select></label>
-<label>Stato<select name="status"><option selected>draft</option><option>assessment</option><option>approved</option><option>suspended</option><option>retired</option></select></label>
-<label>Retention giorni<input name="retention_days" type="number" min="0"></label>
+<label>Stato<select name="status"><option selected>draft</option><option>assessment</option><option>suspended</option><option>retired</option></select></label>
+<label>Retention giorni<input name="retention_days" type="number" min="0" max="3650"></label>
 <label class="full">Descrizione<textarea name="description" required></textarea></label>
 <label class="full">Finalità prevista<textarea name="intended_purpose" required></textarea></label>
 <label class="full">Procedura supervisione umana<textarea name="human_oversight_procedure" required></textarea></label>
@@ -77,7 +78,7 @@ input,textarea,select{{padding:10px;border:1px solid #bbb;border-radius:8px}} te
 <label><input type="checkbox" name="special_category_data_allowed"> Ammette categorie particolari</label>
 <label><input type="checkbox" name="transparency_notice_required" checked> Informativa trasparenza richiesta</label>
 <label><input type="checkbox" name="human_oversight_required" checked> Supervisione umana richiesta</label>
-<label><input type="checkbox" name="auto_publish_allowed"> Pubblicazione automatica consentita</label>
+<label title="Richiede un futuro workflow separato di approvazione legale e sicurezza"><input type="checkbox" disabled> Pubblicazione automatica non disponibile</label>
 <label><input type="checkbox" name="training_data_reuse_allowed"> Riutilizzo dati per training consentito</label>
 <label><input type="checkbox" name="dpa_verified"> DPA verificato</label>
 <div class="full"><button class="btn btn-primary" type="submit">Salva nel registro</button></div>
@@ -117,6 +118,7 @@ def save_ai_system(
     training_data_reuse_allowed: str | None = Form(None),
     dpa_verified: str | None = Form(None),
 ):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("admin",))
     payload = {
         "system_key": system_key,
@@ -133,7 +135,7 @@ def save_ai_system(
         "output_categories": _split_values(output_categories),
         "risk_classification": risk_classification,
         "status": status,
-        "retention_days": int(retention_days) if retention_days.strip() else None,
+        "retention_days": retention_days.strip() or None,
         "transfer_mechanism": transfer_mechanism or None,
         "contains_personal_data": contains_personal_data is not None,
         "special_category_data_allowed": special_category_data_allowed is not None,

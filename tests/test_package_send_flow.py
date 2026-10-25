@@ -41,7 +41,11 @@ def send(monkeypatch):
     monkeypatch.setattr(package_ui, "_smtp_send_zip", lambda *_args: None)
     monkeypatch.setattr(package_ui, "audit_log", lambda *_args, **_kwargs: None)
     app = SimpleNamespace(state=SimpleNamespace(app_base_url="https://staging.example.test"))
-    request = Request({"type": "http", "method": "POST", "path": "/", "headers": [], "client": ("127.0.0.1", 1), "app": app})
+    request = Request({
+        "type": "http", "method": "POST", "scheme": "https", "path": "/",
+        "headers": [(b"host", b"staging.example.test"), (b"origin", b"https://staging.example.test")],
+        "client": ("127.0.0.1", 1), "app": app,
+    })
 
     def call(payload, wine_id=10):
         model = None if payload is None else package_ui.PackageSendRequest(**payload)

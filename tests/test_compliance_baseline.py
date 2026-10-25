@@ -1,5 +1,15 @@
 from pathlib import Path
 
+import pytest
+from fastapi import HTTPException
+
+from qrfacile_app.services.compliance_service import (
+    MAX_AI_USAGE_METADATA_BYTES,
+    MAX_AI_USAGE_VALUE_BYTES,
+    _serialized_json,
+    _usage_label,
+)
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -133,3 +143,18 @@ def test_migration_is_idempotent_for_new_compliance_columns():
     assert "ADD COLUMN IF NOT EXISTS" in text
     assert "IF NOT EXISTS (" in text
     assert "uq_legal_acceptances_user_document_version" in text
+
+
+def test_ai_usage_payloads_are_bounded_and_structured():
+    assert _usage_label({"provider": " local "}, "provider") == "local"
+    assert _serialized_json({"ok": True}, "Input AI", MAX_AI_USAGE_VALUE_BYTES) == '{"ok": true}'
+    with pytest.raises(HTTPException):
+        _serialized_json({"blob": "x" * MAX_AI_USAGE_VALUE_BYTES}, "Input AI", MAX_AI_USAGE_VALUE_BYTES)
+    with pytest.raises(HTTPException):
+        _serialized_json({"blob": "x" * MAX_AI_USAGE_METADATA_BYTES}, "Metadati AI", MAX_AI_USAGE_METADATA_BYTES)
+
+
+def test_compliance_status_does_not_disclose_database_exception_details():
+    text = (ROOT / "qrfacile_app" / "compliance_ui.py").read_text(encoding="utf-8")
+    assert '"error": "database_unavailable"' in text
+    assert '"detail": str(exc)' not in text

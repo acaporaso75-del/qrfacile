@@ -8,7 +8,7 @@ from psycopg.rows import dict_row
 from qrfacile_app.db import pg
 from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.auth_core import require_any_role
-from qrfacile_app.csrf_core import require_csrf_or_same_origin
+from qrfacile_app.csrf_core import csrf_input, require_csrf_or_same_origin
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 from qrfacile_app.guided_flow import render_guided_stepper
 from qrfacile_app.services.storage import versioned_upload_url
@@ -34,7 +34,7 @@ def _balances(cur, user_id: int) -> dict:
     cur.execute(
         """
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
         """,
@@ -91,17 +91,21 @@ def _load_wine(cur, wine_id: int) -> dict:
     return r
 
 
-def _studio_can_access_wine(cur, studio_user_id: int, winery_id: int) -> bool:
+def _studio_can_access_wine(cur, studio_user_id: int, wine_id: int) -> bool:
     cur.execute(
         """
         SELECT 1
-        FROM studio_clients
-        WHERE studio_user_id=%s
-          AND winery_id=%s
-          AND can_view=TRUE
+        FROM wine_labels wl
+        JOIN label_collaborators lc ON lc.wine_label_id=wl.id
+        JOIN studio_clients sc
+          ON sc.studio_user_id=lc.collaborator_user_id
+         AND sc.winery_id=wl.winery_id
+        WHERE wl.wine_id=%s
+          AND lc.collaborator_user_id=%s
+          AND lc.active=TRUE AND lc.can_view=TRUE AND sc.can_view=TRUE
         LIMIT 1
         """,
-        (int(studio_user_id), int(winery_id)),
+        (int(wine_id), int(studio_user_id)),
     )
     return bool(cur.fetchone())
 
@@ -259,7 +263,7 @@ def _connected_studio_count(cur, winery_id: int) -> int:
     cur.execute(
         """
         SELECT COUNT(*)::int AS cnt
-        FROM studio_clients sc
+        FROM studio_clients sc /* security-review: selection-only */
         JOIN users u ON u.id = sc.studio_user_id
         WHERE sc.winery_id=%s
           AND lower(u.role)='studio'
@@ -277,7 +281,7 @@ def _connected_studios(cur, winery_id: int) -> list[dict]:
           u.id AS studio_user_id,
           u.email,
           COALESCE(s.company_name, '') AS company_name
-        FROM studio_clients sc
+        FROM studio_clients sc /* security-review: selection-only */
         JOIN users u ON u.id = sc.studio_user_id
         LEFT JOIN studios s ON s.user_id = u.id
         WHERE sc.winery_id=%s
@@ -493,7 +497,7 @@ def _assign_wine_management(cur, wine: dict, label_ids: list[int], studio_user_i
     cur.execute(
         """
         SELECT can_view, can_edit, can_create
-        FROM studio_clients
+        FROM studio_clients /* security-review: selection-only */
         WHERE winery_id=%s
           AND studio_user_id=%s
           AND can_view=TRUE
@@ -725,7 +729,7 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
                     raise HTTPException(403, "Forbidden")
 
             elif role == "studio":
-                if not _studio_can_access_wine(cur, uid, int(wine["winery_id"])):
+                if not _studio_can_access_wine(cur, uid, int(wine_id)):
                     raise HTTPException(403, "Forbidden")
 
             assets = _wine_assets(cur, int(wine_id))
@@ -796,12 +800,14 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
         if is_published:
             publish_action = f"""
             <form method="post" action="/app/wine/{int(wine_id)}/unpublish" style="display:inline">
+              {csrf_input(request)}
               <button class="btn" type="submit">Rendi bozza</button>
             </form>
             """
         elif workflow["publishable"]:
             publish_action = f"""
             <form method="post" action="/app/wine/{int(wine_id)}/publish" style="display:inline">
+              {csrf_input(request)}
               <button class="btn btn-primary" type="submit">Pubblica</button>
             </form>
             """

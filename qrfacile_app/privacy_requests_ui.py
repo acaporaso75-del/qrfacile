@@ -9,23 +9,33 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 
 router = APIRouter(tags=["privacy-requests"])
 
 ALLOWED_TYPES = {"access", "rectification", "erasure", "restriction", "portability", "objection"}
 ALLOWED_STATUS = {"open", "identity_check", "in_progress", "completed", "rejected"}
+MAX_PRIVACY_TEXT_LENGTH = 4000
+
+
+def _bounded_text(value: Any, field_name: str) -> str:
+    text = str(value or "").strip()
+    if len(text) > MAX_PRIVACY_TEXT_LENGTH:
+        raise HTTPException(status_code=422, detail=f"{field_name}: massimo {MAX_PRIVACY_TEXT_LENGTH} caratteri")
+    return text
 
 
 @router.post("/api/me/privacy-requests")
 async def create_privacy_request(request: Request):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("admin", "winery", "studio"))
     payload: dict[str, Any] = await request.json()
     request_type = str(payload.get("request_type") or "").strip().lower()
     if request_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=422, detail="Tipo di richiesta privacy non valido")
 
-    details = str(payload.get("details") or "").strip()
+    details = _bounded_text(payload.get("details"), "Dettagli")
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute("SELECT to_regclass('public.privacy_requests')")
@@ -64,7 +74,8 @@ def my_privacy_requests(request: Request):
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
-                SELECT id, request_type, status, submitted_at, due_at, completed_at
+                SELECT id, request_type, status, submitted_at, due_at, updated_at,
+                       completed_at, resolution
                 FROM privacy_requests
                 WHERE user_id=%s
                 ORDER BY submitted_at DESC
@@ -106,13 +117,14 @@ def admin_privacy_requests(request: Request, status: str | None = None):
 
 @router.post("/api/admin/privacy-requests/{request_id}/status")
 async def update_privacy_request(request_id: int, request: Request):
+    require_csrf_or_same_origin(request)
     admin = require_any_role(request, ("admin",))
     payload = await request.json()
     status = str(payload.get("status") or "").strip()
     if status not in ALLOWED_STATUS:
         raise HTTPException(status_code=422, detail="Stato non valido")
 
-    resolution = str(payload.get("resolution") or "").strip()
+    resolution = _bounded_text(payload.get("resolution"), "Risoluzione")
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
@@ -122,7 +134,7 @@ async def update_privacy_request(request_id: int, request: Request):
                     resolution=%s,
                     handled_by_user_id=%s,
                     updated_at=now(),
-                    completed_at=CASE WHEN %s IN ('completed','rejected') THEN now() ELSE completed_at END
+                    completed_at=CASE WHEN %s IN ('completed','rejected') THEN now() ELSE NULL END
                 WHERE id=%s
                 RETURNING id, user_id, request_type, status, due_at, completed_at
                 """,

@@ -7,6 +7,8 @@ from fastapi.responses import RedirectResponse
 
 from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
+from qrfacile_app.navigation_security import safe_local_path
 from qrfacile_app.services.collaboration_management import (
     assign_studio_to_label,
     clear_label_collaboration,
@@ -17,16 +19,8 @@ from qrfacile_app.services.collaboration_management import (
 router = APIRouter(tags=["collaboration-management"])
 
 
-def _same_origin(request: Request) -> None:
-    origin = (request.headers.get("origin") or "").rstrip("/")
-    if not origin:
-        return
-    expected = f"{request.url.scheme}://{request.headers.get('host', '')}".rstrip("/")
-    if origin != expected:
-        raise HTTPException(403, "Origine richiesta non valida")
-
-
 def _return(url: str, *, msg: str = "", err: str = "") -> RedirectResponse:
+    url = safe_local_path(url)
     sep = "&" if "?" in url else "?"
     if msg:
         url = f"{url}{sep}msg={quote_plus(msg)}"
@@ -41,8 +35,9 @@ def safe_label_assign(
     label_id: int,
     studio_user_id: int = Form(...),
     profile: str = Form("graphic"),
+    csrf_token: str = Form(""),
 ):
-    _same_origin(request)
+    require_csrf_or_same_origin(request, csrf_token)
     actor = require_any_role(request, ("winery", "admin"))
     result = assign_studio_to_label(
         actor=actor,
@@ -68,8 +63,8 @@ def safe_label_assign(
 
 
 @router.post("/app/label/{label_id}/acl/clear")
-def safe_label_clear(request: Request, label_id: int):
-    _same_origin(request)
+def safe_label_clear(request: Request, label_id: int, csrf_token: str = Form("")):
+    require_csrf_or_same_origin(request, csrf_token)
     actor = require_any_role(request, ("winery", "admin"))
     result = clear_label_collaboration(actor=actor, label_id=label_id)
     write_audit_event(
@@ -93,8 +88,9 @@ def safe_label_management_set(
     label_id: int,
     management_value: str = Form(...),
     return_to: str = Form(""),
+    csrf_token: str = Form(""),
 ):
-    _same_origin(request)
+    require_csrf_or_same_origin(request, csrf_token)
     actor = require_any_role(request, ("winery", "admin"))
     value = str(management_value or "").strip().lower()
     if value == "invite":
@@ -138,8 +134,9 @@ def safe_studio_permissions(
     request: Request,
     sc_id: int = Form(...),
     preset: str = Form(...),
+    csrf_token: str = Form(""),
 ):
-    _same_origin(request)
+    require_csrf_or_same_origin(request, csrf_token)
     actor = require_any_role(request, ("winery", "admin"))
     updated = update_studio_connection_profile(actor=actor, studio_client_id=sc_id, profile=preset)
     write_audit_event(
@@ -154,8 +151,8 @@ def safe_studio_permissions(
 
 
 @router.post("/app/settings/studios/revoke")
-def safe_studio_revoke(request: Request, sc_id: int = Form(...)):
-    _same_origin(request)
+def safe_studio_revoke(request: Request, sc_id: int = Form(...), csrf_token: str = Form("")):
+    require_csrf_or_same_origin(request, csrf_token)
     actor = require_any_role(request, ("winery", "admin"))
     result = revoke_studio_connection(actor=actor, studio_client_id=sc_id)
     write_audit_event(

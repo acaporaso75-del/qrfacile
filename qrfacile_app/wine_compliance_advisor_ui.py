@@ -61,8 +61,8 @@ def _advisor_html(wine_id: int, advice: dict) -> str:
       </div>
       <div class='caNext'>{next_html}</div>
       <div class='row' style='margin-top:14px'>
-        <a class='btn' href='/app/wine/{int(wine_id)}/compliance-report'>Report completo</a>
-        <a class='btn' href='/app/wine/{int(wine_id)}/compliance-replays'>Storico replay</a>
+        <a class='btn' href='/app/wine/{int(wine_id)}/compliance-report'>Report di conformità</a>
+        <a class='btn' href='/app/wine/{int(wine_id)}/compliance-replays'>Storico verifiche</a>
       </div>
     </div>
     <div class='card' style='margin-top:14px'>

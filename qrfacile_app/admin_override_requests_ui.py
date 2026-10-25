@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 
@@ -20,7 +21,7 @@ def _balances(cur, user_id: int) -> dict:
     cur.execute(
         """
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
         """,
@@ -478,6 +479,7 @@ def override_requests_page(request: Request, status: str = "pending"):
 
 @router.post("/admin/override-requests/{request_id}/mark-reviewed")
 def mark_reviewed(request: Request, request_id: int):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("admin",))
 
     with pg() as conn:
@@ -504,6 +506,7 @@ def mark_reviewed(request: Request, request_id: int):
 
 @router.post("/admin/override-requests/{request_id}/reject")
 def reject_request(request: Request, request_id: int):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("admin",))
 
     with pg() as conn:

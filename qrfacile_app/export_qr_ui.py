@@ -28,6 +28,7 @@ except Exception:
     segno = None
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, esc
 from qrfacile_app.audit import audit_log
@@ -64,6 +65,8 @@ PRESETS = {
     "label_pro": {"label": "Retro etichetta Premium · 25mm · 600dpi · PNG",  "fmt": "png", "size_mm": 25, "dpi": 600},
     "carton":    {"label": "Cartone / Scatola · 30mm · 300dpi · PNG",        "fmt": "png", "size_mm": 30, "dpi": 300},
     "fair":      {"label": "Fiera / Stand · 40mm · 300dpi · PNG",            "fmt": "png", "size_mm": 40, "dpi": 300},
+    "vector_svg":{"label": "Vettoriale tipografia · SVG",                         "fmt": "svg", "size_mm": 25, "dpi": 600},
+    "square_pdf":{"label": "PDF quadrato · 25mm",                                 "fmt": "pdf", "size_mm": 25, "dpi": 600},
     "a4_pdf":    {"label": "PDF A4 pronto stampa · QR centrato",             "fmt": "pdf_a4", "size_mm": 25, "dpi": 600},
 }
 
@@ -84,7 +87,7 @@ def _balances(cur, user_id: int) -> dict:
     cur.execute(
         """
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
         """,
@@ -991,6 +994,7 @@ def export_send(
     payload: PackageSendRequest | None = Body(default=None),
     name: str = Query("qrfacile"),
 ):
+    require_csrf_or_same_origin(request)
     u = _require_export_access(request, wine_id)
 
     # studio può esportare, ma invio email è “sensibile”: lo teniamo consentito SOLO a winery/admin

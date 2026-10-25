@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any
 
@@ -8,12 +9,38 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 
 router = APIRouter(tags=["compliance-incidents"])
 
 SEVERITIES = {"low", "medium", "high", "critical"}
 STATUSES = {"open", "investigating", "contained", "closed"}
+MAX_INCIDENT_CATEGORY_LENGTH = 120
+MAX_INCIDENT_SUMMARY_LENGTH = 4000
+MAX_INCIDENT_EVIDENCE_BYTES = 20_000
+
+
+def _incident_text(value: Any, field_name: str, max_length: int) -> str:
+    text = str(value or "").strip()
+    if not text:
+        raise HTTPException(status_code=422, detail=f"{field_name} obbligatorio")
+    if len(text) > max_length:
+        raise HTTPException(status_code=422, detail=f"{field_name}: massimo {max_length} caratteri")
+    return text
+
+
+def _incident_evidence(value: Any) -> str:
+    evidence = value or {}
+    if not isinstance(evidence, dict):
+        raise HTTPException(status_code=422, detail="Le evidenze devono essere un oggetto JSON")
+    try:
+        encoded = json.dumps(evidence, ensure_ascii=False)
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise HTTPException(status_code=422, detail="Evidenze JSON non valide") from exc
+    if len(encoded.encode("utf-8")) > MAX_INCIDENT_EVIDENCE_BYTES:
+        raise HTTPException(status_code=422, detail=f"Evidenze: massimo {MAX_INCIDENT_EVIDENCE_BYTES} byte")
+    return encoded
 
 
 @router.get("/api/admin/compliance/incidents")
@@ -51,15 +78,15 @@ def list_incidents(request: Request, status: str | None = None):
 
 @router.post("/api/admin/compliance/incidents")
 async def create_incident(request: Request):
+    require_csrf_or_same_origin(request)
     admin = require_any_role(request, ("admin",))
     payload = await request.json()
     severity = str(payload.get("severity") or "").strip().lower()
     if severity not in SEVERITIES:
         raise HTTPException(status_code=422, detail="Gravità non valida")
-    category = str(payload.get("category") or "").strip()
-    summary = str(payload.get("summary") or "").strip()
-    if not category or not summary:
-        raise HTTPException(status_code=422, detail="Categoria e sintesi obbligatorie")
+    category = _incident_text(payload.get("category"), "Categoria", MAX_INCIDENT_CATEGORY_LENGTH)
+    summary = _incident_text(payload.get("summary"), "Sintesi", MAX_INCIDENT_SUMMARY_LENGTH)
+    evidence = _incident_evidence(payload.get("evidence"))
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -77,7 +104,7 @@ async def create_incident(request: Request):
                     summary,
                     bool(payload.get("personal_data_involved", False)),
                     int(admin["id"]),
-                    __import__("json").dumps(payload.get("evidence") or {}, ensure_ascii=False),
+                    evidence,
                 ),
             )
             row = cur.fetchone()
@@ -96,6 +123,7 @@ async def create_incident(request: Request):
 
 @router.post("/api/admin/compliance/incidents/{incident_id}/status")
 async def update_incident(incident_id: int, request: Request):
+    require_csrf_or_same_origin(request)
     admin = require_any_role(request, ("admin",))
     payload = await request.json()
     status = str(payload.get("status") or "").strip().lower()
@@ -108,7 +136,7 @@ async def update_incident(incident_id: int, request: Request):
                 """
                 UPDATE compliance_incidents
                 SET status=%s,
-                    closed_at=CASE WHEN %s='closed' THEN now() ELSE closed_at END,
+                    closed_at=CASE WHEN %s='closed' THEN now() ELSE NULL END,
                     authority_notification_required=COALESCE(%s, authority_notification_required),
                     authority_notified_at=CASE WHEN %s THEN COALESCE(authority_notified_at, now()) ELSE authority_notified_at END,
                     data_subject_notification_required=COALESCE(%s, data_subject_notification_required),

@@ -29,11 +29,19 @@ def test_secure_publish_blocks_studio_role_and_audits():
     assert "Override non necessario" in text
 
 
-def test_secure_publish_router_precedes_legacy_publish_router():
-    text = (ROOT / "qrfacile_app" / "main.py").read_text(encoding="utf-8")
-    safe = text.index('include_router_safe("qrfacile_app.secure_publish_ui")')
-    legacy = text.index('include_router_safe("qrfacile_app.publish_routes")')
-    assert safe < legacy
+def test_only_secure_publish_mutation_routes_are_registered():
+    safe = (ROOT / "qrfacile_app" / "secure_publish_ui.py").read_text(encoding="utf-8")
+    legacy = (ROOT / "qrfacile_app" / "publish_routes.py").read_text(encoding="utf-8")
+    for route in ("publish", "unpublish", "request-publish-override"):
+        decorator = f'@router.post("/app/wine/{{wine_id}}/{route}")'
+        assert safe.count(decorator) == 1
+        assert decorator not in legacy
+
+
+def test_wine_hub_publish_forms_emit_csrf_tokens():
+    text = (ROOT / "qrfacile_app" / "wine_hub_ui.py").read_text(encoding="utf-8")
+    assert "csrf_input(request)" in text
+    assert text.count("{csrf_input(request)}") >= 2
 
 
 def test_override_request_is_audited():
@@ -61,7 +69,8 @@ def test_manual_post_without_csrf_or_origin_is_rejected():
 
 def test_studio_registration_requires_email_verification():
     source = (ROOT / "qrfacile_app" / "studio_register_routes.py").read_text(encoding="utf-8")
-    assert "VALUES (%s,%s,'studio',%s,0,'modulare',0)" in source
+    assert "email_verification_required" in source
+    assert "VALUES (%s,%s,'studio',%s,0,TRUE,'modulare',0)" in source
 
 
 def test_studio_publish_permission_is_not_offered_by_acl_ui():

@@ -421,6 +421,17 @@ def home(request: Request):
         subtitle="Home",
         body_html=body,
         actions_html=actions,
+        description="QRFACILE è la piattaforma Enolab per QR dinamici. Il modulo Wine gestisce etichette digitali vino, dati obbligatori e file QR per la stampa.",
+        canonical_path="/",
+        structured_data={
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "Enolab S.r.l.",
+            "brand": {"@type": "Brand", "name": "QRFACILE"},
+            "url": "https://www.qrfacile.it/",
+            "email": "info@enolab.it",
+            "vatID": "IT01413300623",
+        },
     ))
 
 
@@ -846,6 +857,18 @@ def wine_home(request: Request):
         subtitle="Wine",
         body_html=body,
         actions_html=actions,
+        description="Etichetta digitale vino per cantine e studi grafici: ingredienti, allergeni, valori nutrizionali, riciclo, QR dinamico ed export per tipografia.",
+        canonical_path="/wine",
+        structured_data={
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            "name": "QRFACILE Wine",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "url": "https://www.qrfacile.it/wine",
+            "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR", "description": "3 crediti iniziali gratuiti"},
+            "provider": {"@type": "Organization", "name": "Enolab S.r.l."},
+        },
     ))
 
 
@@ -2039,7 +2062,7 @@ body {
     <div class="heroText">
       <div class="eyebrow">QRFACILE · Etichetta digitale vino</div>
 
-      <h1>Il QR del vino,<br>fatto semplice.<br><span>Senza abbonamento obbligatorio.</span></h1>
+      <h1>Il QR del vino,<br>fatto semplice.<br><span>Pacchetti annuali, rinnovo manuale.</span></h1>
 
       <p>
         Crea QR vino per l’etichetta digitale, gestisci lotti, ingredienti,
@@ -2057,7 +2080,7 @@ body {
         </div>
         <div style="border:1px solid rgba(2,8,23,.10);background:rgba(255,255,255,.82);border-radius:18px;padding:12px">
           <b style="display:block;font-size:18px">+1 credito</b>
-          <span style="display:block;margin-top:4px;color:#64748b;font-size:12px;font-weight:850">upgrade 10 → 25 anni</span>
+          <span style="display:block;margin-top:4px;color:#64748b;font-size:12px;font-weight:850">upgrade 10 → 25 anni su richiesta al supporto</span>
         </div>
       </div>
 

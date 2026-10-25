@@ -73,28 +73,18 @@ def _studio_can_access_label(cur, studio_user_id: int, label_id: int, winery_id:
     cur.execute(
         """
         SELECT 1
-        FROM studio_clients sc
-        WHERE sc.studio_user_id=%s
-          AND sc.winery_id=%s
-          AND sc.can_view=TRUE
-        LIMIT 1
-        """,
-        (int(studio_user_id), int(winery_id)),
-    )
-    if not cur.fetchone():
-        return False
-
-    cur.execute(
-        """
-        SELECT 1
         FROM label_collaborators lc
+        JOIN studio_clients sc
+          ON sc.studio_user_id=lc.collaborator_user_id
+         AND sc.winery_id=%s
         WHERE lc.wine_label_id=%s
           AND lc.collaborator_user_id=%s
           AND lc.active=TRUE
           AND lc.can_view=TRUE
+          AND sc.can_view=TRUE
         LIMIT 1
         """,
-        (int(label_id), int(studio_user_id)),
+        (int(winery_id), int(label_id), int(studio_user_id)),
     )
     return bool(cur.fetchone())
 

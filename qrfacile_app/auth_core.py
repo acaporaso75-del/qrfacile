@@ -8,6 +8,7 @@ from psycopg.rows import dict_row
 from qrfacile_app.db import pg
 
 COOKIE = "session_token"
+SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 14
 
 
 def now() -> int:
@@ -56,30 +57,31 @@ def _session_user_id(token: str) -> Optional[int]:
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
-            # Prima prova app_sessions, se esiste
-            try:
-                cur.execute(
-                    "SELECT user_id FROM app_sessions WHERE token=%s LIMIT 1",
-                    (token,),
-                )
-                r = cur.fetchone()
-                if r and r.get("user_id"):
-                    return int(r["user_id"])
-            except Exception:
-                # app_sessions può non esistere in alcune installazioni
-                conn.rollback()
-
-            # Fallback su sessions
-            try:
-                cur.execute(
-                    "SELECT user_id FROM sessions WHERE token=%s LIMIT 1",
-                    (token,),
-                )
-                r = cur.fetchone()
-                if r and r.get("user_id"):
-                    return int(r["user_id"])
-            except Exception:
-                conn.rollback()
+            cutoff = now() - SESSION_MAX_AGE_SECONDS
+            app_attempts = (
+                ("SELECT user_id FROM app_sessions WHERE token=%s AND expires_at>now() LIMIT 1", (token,)),
+                ("SELECT user_id FROM app_sessions WHERE token=%s AND expires_at>%s LIMIT 1", (token, now())),
+                ("SELECT user_id FROM app_sessions WHERE token=%s AND created_at>=%s LIMIT 1", (token, cutoff)),
+            )
+            session_attempts = (
+                ("SELECT user_id FROM sessions WHERE token=%s AND created_at>=%s LIMIT 1", (token, cutoff)),
+                (
+                    "SELECT user_id FROM sessions WHERE token=%s AND created_at>=now()-(%s * interval '1 second') LIMIT 1",
+                    (token, SESSION_MAX_AGE_SECONDS),
+                ),
+            )
+            for attempts in (app_attempts, session_attempts):
+                for statement, params in attempts:
+                    try:
+                        cur.execute(statement, params)
+                        r = cur.fetchone()
+                        if r and r.get("user_id"):
+                            return int(r["user_id"])
+                        # The query shape is valid; try the fallback table, not weaker shapes.
+                        break
+                    except Exception:
+                        # Compatibility attempts cover missing tables/columns and timestamp/epoch variants.
+                        conn.rollback()
 
     return None
 
@@ -89,7 +91,7 @@ def _load_user(user_id: int) -> Optional[Dict[str, Any]]:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
-                SELECT id, email, role
+                SELECT id, email, role, email_verified, email_verification_required
                 FROM users
                 WHERE id=%s
                 LIMIT 1
@@ -162,6 +164,13 @@ def require_any_role(
     role = (u.get("role") or "").lower().strip()
     authorization_role = "studio" if role == "collaborator" else role
     roles_set = {r.lower().strip() for r in roles}
+
+    if role != "admin" and bool(u.get("email_verification_required")) and not bool(u.get("email_verified")):
+        raise HTTPException(
+            status_code=303,
+            detail="Verifica email richiesta",
+            headers={"Location": "/verify-email-required"},
+        )
 
     if authorization_role not in roles_set:
         _forbidden()

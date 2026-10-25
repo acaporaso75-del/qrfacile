@@ -274,7 +274,6 @@ def _upsert_override_request(
     return int(cur.fetchone()["id"])
 
 
-@router.post("/app/wine/{wine_id}/publish")
 def publish_wine(request: Request, wine_id: int, force: str = Form("")):
     user = require_any_role(request, ("winery", "studio", "admin"))
 
@@ -317,7 +316,6 @@ def publish_wine(request: Request, wine_id: int, force: str = Form("")):
     )
 
 
-@router.post("/app/wine/{wine_id}/request-publish-override")
 def request_publish_override(
     request: Request,
     wine_id: int,
@@ -359,7 +357,6 @@ def request_publish_override(
     )
 
 
-@router.post("/app/wine/{wine_id}/unpublish")
 def unpublish_wine(request: Request, wine_id: int):
     user = require_any_role(request, ("winery", "studio", "admin"))
 

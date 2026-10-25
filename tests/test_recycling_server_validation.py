@@ -4,11 +4,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_server_validation_route_precedes_legacy_save_route():
-    main = (ROOT / "qrfacile_app" / "main.py").read_text(encoding="utf-8")
-    guard = main.index('include_router_safe("qrfacile_app.recycling_validation_ui")')
-    legacy = main.index('include_router_safe("qrfacile_app.wine_compliance_ui")')
-    assert guard < legacy
+def test_only_server_validated_compliance_save_route_is_registered():
+    guard = (ROOT / "qrfacile_app" / "recycling_validation_ui.py").read_text(encoding="utf-8")
+    legacy = (ROOT / "qrfacile_app" / "wine_compliance_ui.py").read_text(encoding="utf-8")
+    route = '@router.post("/app/wine/{wine_id}/compliance/save")'
+    assert guard.count(route) == 1
+    assert route not in legacy
+    assert 'require_csrf_or_same_origin(request, _text(form, "csrf_token"))' in guard
+
+
+def test_compliance_forms_emit_csrf_and_mutations_validate_it():
+    text = (ROOT / "qrfacile_app" / "wine_compliance_ui.py").read_text(encoding="utf-8")
+    assert "csrf_html = csrf_input(request)" in text
+    assert text.count("{csrf_html}") >= 4
+    assert text.count("require_csrf_or_same_origin(request, csrf_token)") >= 2
 
 
 def test_server_validation_persists_only_after_catalog_checks():

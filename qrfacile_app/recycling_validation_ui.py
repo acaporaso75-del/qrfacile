@@ -7,6 +7,7 @@ from fastapi.responses import RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app.services.recycling_catalog import is_recycling_item_filled, validate_recycling_items
 from qrfacile_app.services.recycling_persistence import RecyclingPersistenceError, persist_recycling_component
@@ -46,6 +47,7 @@ def _text(form, name: str, default: str = "") -> str:
 @router.post("/app/wine/{wine_id}/compliance/save")
 async def validated_compliance_save(request: Request, wine_id: int):
     form = await request.form()
+    require_csrf_or_same_origin(request, _text(form, "csrf_token"))
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:

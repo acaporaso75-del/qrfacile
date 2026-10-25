@@ -1,11 +1,16 @@
 import time
+from urllib.parse import quote_plus
 
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 from passlib.hash import pbkdf2_sha256
 
 from qrfacile_app.db import pg
+from qrfacile_app.legal_core import record_registration_acceptances
+from qrfacile_app.fiscal_profile import normalized_italian_fiscal_profile
+from qrfacile_app.password_policy import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, new_password_error
+from qrfacile_app.services.email_verification import create_verification
 from qrfacile_app.ui_shell import page, top_actions, esc
 
 router = APIRouter()
@@ -71,10 +76,42 @@ def _invite_is_valid(inv: dict) -> tuple[bool, str]:
 
 def _input(name: str, type_: str, placeholder: str, value: str = "", required: bool = False) -> str:
     req = "required" if required else ""
+    labels = {
+        "email": "Email",
+        "password": "Password",  # pragma: allowlist secret
+        "password_confirm": "Conferma password",  # pragma: allowlist secret
+        "name": "Nome cantina",
+        "vat": "Partita IVA",
+        "sdi": "Codice SDI",
+        "pec": "PEC",
+        "phone": "Telefono",
+        "contact_name": "Nome del referente",
+        "contact_phone": "Telefono del referente",
+        "city": "Città",
+        "province": "Provincia",
+        "billing_address": "Indirizzo di fatturazione",
+        "billing_cap": "CAP di fatturazione",
+    }
+    autocompletes = {
+        "email": "email",
+        "password": "new-password",  # pragma: allowlist secret
+        "password_confirm": "new-password",  # pragma: allowlist secret
+        "name": "organization",
+        "pec": "email",
+        "phone": "tel",
+        "contact_name": "name",
+        "contact_phone": "tel",
+        "city": "address-level2",
+        "province": "address-level1",
+        "billing_address": "street-address",
+        "billing_cap": "postal-code",
+    }
+    autocomplete = autocompletes.get(name, "off")
 
     return f"""
-<input class="input" name="{esc(name)}" type="{esc(type_)}" value="{esc(value)}"
-  placeholder="{esc(placeholder)}" {req}
+<input class="input" id="{esc(name)}" name="{esc(name)}" type="{esc(type_)}" value="{esc(value)}"
+  aria-label="{esc(labels.get(name, name.replace('_', ' ').title()))}"
+  autocomplete="{esc(autocomplete)}" placeholder="{esc(placeholder)}" {req}{f' minlength="{MIN_PASSWORD_LENGTH}" maxlength="{MAX_PASSWORD_LENGTH}"' if type_ == 'password' else ''}
   style="width:100%;font-size:15px;padding:14px 15px;border-radius:14px">
 """.strip()
 
@@ -122,9 +159,9 @@ def register_winery_get(request: Request, invite: str = "", err: str = "", msg: 
                         perms_txt = ", ".join(perms) if perms else "-"
 
                         pack_labels = {
-                            "start": "Start · 20 crediti · €29",
-                            "pro": "Cantina · 60 crediti · €79",
-                            "plus": "Business · 200 crediti · €199",
+                            "annual_start": "Start · 15 unità/anno · €99 + IVA",
+                            "annual_winery": "Cantina · 50 unità/anno · €179 + IVA",
+                            "annual_business": "Business · 100 unità/anno · €299 + IVA",
                             "unlimited": "Non disponibile online",
                         }
                         recommended_pack = (inv.get("recommended_pack") or "").strip().lower()
@@ -213,14 +250,21 @@ def register_winery_get(request: Request, invite: str = "", err: str = "", msg: 
                 </div>
 
                 <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Password (min 8)</label>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Password (min {MIN_PASSWORD_LENGTH})</label>
                   {_input("password", "password", "••••••••", "", True)}
                 </div>
               </div>
 
-              <div style="margin-top:14px">
-                <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Nome Cantina</label>
-                {_input("name", "text", "Cantina XYZ", "", True)}
+              <div class="grid2 register-form-grid" style="margin-top:14px">
+                <div>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Conferma password</label>
+                  {_input("password_confirm", "password", "Ripeti la password", "", True)}
+                </div>
+
+                <div>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Nome Cantina</label>
+                  {_input("name", "text", "Cantina XYZ", "", True)}
+                </div>
               </div>
 
               <div class="grid2 register-form-grid" style="margin-top:14px">
@@ -234,6 +278,18 @@ def register_winery_get(request: Request, invite: str = "", err: str = "", msg: 
                   {_input("sdi", "text", "XXXXXXX", "", True)}
                 </div>
               </div>
+
+              <fieldset style="margin-top:20px;padding:16px;border:1px solid rgba(15,23,42,.14);border-radius:14px">
+                <legend style="font-weight:800;padding:0 6px">Condizioni e privacy</legend>
+                <label style="display:flex;gap:10px;align-items:flex-start;line-height:1.45">
+                  <input type="checkbox" name="terms_accepted" value="yes" required style="margin-top:4px">
+                  <span>Ho letto e accetto i <a href="/terms" target="_blank" rel="noopener">Termini di servizio</a> (versione 25/10/2026).</span>
+                </label>
+                <label style="display:flex;gap:10px;align-items:flex-start;line-height:1.45;margin-top:10px">
+                  <input type="checkbox" name="privacy_acknowledged" value="yes" required style="margin-top:4px">
+                  <span>Dichiaro di aver letto l’<a href="/privacy" target="_blank" rel="noopener">informativa privacy</a> (versione 25/10/2026). Non è un consenso marketing.</span>
+                </label>
+              </fieldset>
 
               <div class="grid2 register-form-grid" style="margin-top:14px">
                 <div>
@@ -261,15 +317,28 @@ def register_winery_get(request: Request, invite: str = "", err: str = "", msg: 
 
               <div class="grid2 register-form-grid" style="margin-top:14px">
                 <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Città opzionale</label>
-                  {_input("city", "text", "Benevento")}
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Indirizzo di fatturazione</label>
+                  {_input("billing_address", "text", "Via..., n°", "", True)}
                 </div>
 
                 <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Provincia opzionale</label>
-                  {_input("province", "text", "BN")}
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Città</label>
+                  {_input("city", "text", "Benevento", "", True)}
                 </div>
               </div>
+
+              <div class="grid2 register-form-grid" style="margin-top:14px">
+                <div>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">CAP</label>
+                  {_input("billing_cap", "text", "82100", "", True)}
+                </div>
+
+                <div>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Provincia</label>
+                  {_input("province", "text", "BN", "", True)}
+                </div>
+              </div>
+              <input type="hidden" name="billing_country" value="IT">
 
               <div class="register-actions" style="
                 margin-top:22px;
@@ -405,6 +474,7 @@ def register_winery_post(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
+    password_confirm: str = Form(...),
     name: str = Form(...),
     vat: str = Form(...),
     sdi: str = Form(...),
@@ -412,8 +482,13 @@ def register_winery_post(
     phone: str = Form(""),
     contact_name: str = Form(...),
     contact_phone: str = Form(...),
-    city: str = Form(""),
-    province: str = Form(""),
+    billing_address: str = Form(...),
+    city: str = Form(...),
+    billing_cap: str = Form(...),
+    province: str = Form(...),
+    billing_country: str = Form("IT"),
+    terms_accepted: str = Form(""),
+    privacy_acknowledged: str = Form(""),
     invite: str = Form(""),
     next: str = Form(""),
 ):
@@ -423,8 +498,34 @@ def register_winery_post(
     if "@" not in email:
         return RedirectResponse("/register-winery?err=Email%20non%20valida", status_code=303)
 
-    if len(password) < 8:
-        return RedirectResponse("/register-winery?err=Password%20minimo%208%20caratteri", status_code=303)
+    policy_error = new_password_error(password)
+    if policy_error:
+        return RedirectResponse(f"/register-winery?err={quote_plus(policy_error)}", status_code=303)
+
+    if password != (password_confirm or ""):
+        return RedirectResponse("/register-winery?err=Le%20password%20non%20coincidono", status_code=303)
+
+    if terms_accepted != "yes" or privacy_acknowledged != "yes":
+        return RedirectResponse(
+            "/register-winery?err=Devi%20accettare%20i%20Termini%20e%20confermare%20la%20Privacy",
+            status_code=303,
+        )
+
+    try:
+        fiscal = normalized_italian_fiscal_profile({
+            "name": name,
+            "vat": vat,
+            "sdi": sdi,
+            "pec": pec,
+            "billing_address": billing_address,
+            "city": city,
+            "billing_cap": billing_cap,
+            "province": province,
+            "billing_country": billing_country,
+        })
+    except HTTPException as exc:
+        message = quote_plus(str(exc.detail))
+        return RedirectResponse(f"/register-winery?err={message}", status_code=303)
 
     invite = (invite or "").strip()
 
@@ -445,8 +546,10 @@ def register_winery_post(
             try:
                 cur.execute(
                     """
-                    INSERT INTO users (email, pass_hash, role, created_at, email_verified)
-                    VALUES (%s,%s,'winery',%s,1)
+                    INSERT INTO users (
+                      email, pass_hash, role, created_at, email_verified, email_verification_required
+                    )
+                    VALUES (%s,%s,'winery',%s,0,TRUE)
                     RETURNING id
                     """,
                     (email, _hash_pw(password), now()),
@@ -462,19 +565,25 @@ def register_winery_post(
 
             cur.execute(
                 """
-                INSERT INTO wineries (owner_user_id, name, vat, sdi, pec, phone, city, province, created_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                INSERT INTO wineries (
+                  owner_user_id, name, vat, sdi, pec, phone, city, province,
+                  billing_address, billing_cap, billing_country, created_at
+                )
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 RETURNING id
                 """,
                 (
                     user_id,
-                    (name or "").strip(),
-                    (vat or "").strip(),
-                    (sdi or "").strip(),
-                    (pec or "").strip(),
+                    fiscal["name"],
+                    fiscal["vat"],
+                    fiscal["sdi"],
+                    fiscal["pec"],
                     (phone or "").strip(),
-                    (city or "").strip(),
-                    (province or "").strip(),
+                    fiscal["city"],
+                    fiscal["province"],
+                    fiscal["billing_address"],
+                    fiscal["billing_cap"],
+                    fiscal["billing_country"],
                     now(),
                 ),
             )
@@ -522,7 +631,18 @@ def register_winery_post(
                     (now(), user_id, winery_id, inv["token"]),
                 )
 
+            record_registration_acceptances(cur, user_id=user_id, request=request)
+
             conn.commit()
+
+    try:
+        base_url = str(getattr(request.app.state, "app_base_url", "") or "").rstrip("/")
+        if not base_url:
+            base_url = f"{request.url.scheme}://{request.headers.get('host', '')}".rstrip("/")
+        create_verification(user_id=user_id, base_url=base_url)
+    except Exception:
+        # Account remains restricted and can retry from /verify-email-required.
+        pass
 
     target = next if next.startswith("/") and not next.startswith("//") else ""
     return RedirectResponse(f"/login?created=1&next={target}" if target else "/login?created=1", status_code=303)

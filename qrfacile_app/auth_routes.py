@@ -5,22 +5,32 @@ import os
 import smtplib
 import hashlib
 import logging
+from urllib.parse import quote
 from email.message import EmailMessage
 
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
+from psycopg import sql
 from passlib.hash import pbkdf2_sha256
 
 from qrfacile_app.db import pg
 from qrfacile_app.auth import COOKIE, SESSION_MAX_AGE_SECONDS
+from qrfacile_app.password_policy import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, new_password_error
 from qrfacile_app.ui_shell import page, top_actions, esc
 
 router = APIRouter()
 logger = logging.getLogger("qrfacile.auth_routes")
 
 PASSWORD_RESET_TTL_SECONDS = 60 * 60
+PASSWORD_RESET_WINDOW_SECONDS = 60 * 60
+PASSWORD_RESET_MAX_REQUESTS = 5
 PASSWORD_RESET_NEUTRAL_MSG = "Se l’email è registrata, riceverai un link per reimpostare la password."  # pragma: allowlist secret
+LOGIN_FAILURE_WINDOW_SECONDS = 15 * 60
+LOGIN_FAILURE_RETENTION_SECONDS = 24 * 60 * 60
+LOGIN_IDENTITY_MAX_FAILURES = 10
+LOGIN_IP_MAX_FAILURES = 50
+INVALID_LOGIN_HASH = "$pbkdf2-sha256$29000$lBLi/D.HsBYCIERIKaVUqg$Zy8JIhNq.YFMAYcld2I4LY0UhNxNTY2/KPs6E7XkZxs"  # pragma: allowlist secret
 
 
 
@@ -46,13 +56,80 @@ def _delete_session(token: str) -> None:
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute("DELETE FROM sessions WHERE token=%s", (token,))
+            for index, table in enumerate(("app_sessions", "sessions")):
+                savepoint = f"logout_session_{index}"
+                cur.execute(sql.SQL("SAVEPOINT {}").format(sql.Identifier(savepoint)))
+                try:
+                    cur.execute(sql.SQL("DELETE FROM {} WHERE token=%s").format(sql.Identifier(table)), (token,))
+                except Exception:
+                    cur.execute(sql.SQL("ROLLBACK TO SAVEPOINT {}").format(sql.Identifier(savepoint)))
+                finally:
+                    cur.execute(sql.SQL("RELEASE SAVEPOINT {}").format(sql.Identifier(savepoint)))
         conn.commit()
+
+
+def _revoke_user_sessions(cur, user_id: int) -> None:
+    for index, table in enumerate(("app_sessions", "sessions")):
+        savepoint = f"revoke_user_sessions_{index}"
+        cur.execute(sql.SQL("SAVEPOINT {}").format(sql.Identifier(savepoint)))
+        try:
+            cur.execute(sql.SQL("DELETE FROM {} WHERE user_id=%s").format(sql.Identifier(table)), (int(user_id),))
+        except Exception:
+            cur.execute(sql.SQL("ROLLBACK TO SAVEPOINT {}").format(sql.Identifier(savepoint)))
+        finally:
+            cur.execute(sql.SQL("RELEASE SAVEPOINT {}").format(sql.Identifier(savepoint)))
 
 
 
 def _clean_email(email: str) -> str:
     return "".join((email or "").split()).strip().lower()
+
+
+def _login_identity_hash(email: str) -> str:
+    return hashlib.sha256(_clean_email(email).encode("utf-8")).hexdigest()
+
+
+def _login_client_ip(request: Request) -> str:
+    try:
+        return (request.client.host or "")[:80]
+    except Exception:
+        return ""
+
+
+def _lock_login_rate_limit(cur, identity_hash: str, client_ip: str) -> None:
+    # Serialize checks for the same identity/IP, otherwise concurrent attempts
+    # could all observe the counter before any failure is recorded.
+    lock_keys = {
+        int.from_bytes(hashlib.sha256(value.encode("utf-8")).digest()[:8], "big", signed=True)
+        for value in (identity_hash, client_ip)
+        if value
+    }
+    for lock_key in sorted(lock_keys):
+        cur.execute("SELECT pg_advisory_xact_lock(%s)", (lock_key,))
+
+
+def _login_rate_limited(cur, identity_hash: str, client_ip: str, current_time: int) -> bool:
+    _lock_login_rate_limit(cur, identity_hash, client_ip)
+    cur.execute(
+        "DELETE FROM login_failures WHERE created_at < %s",
+        (current_time - LOGIN_FAILURE_RETENTION_SECONDS,),
+    )
+    window_start = current_time - LOGIN_FAILURE_WINDOW_SECONDS
+    cur.execute(
+        """
+        SELECT
+          COUNT(*) FILTER (WHERE identity_hash=%s) AS identity_failures,
+          COUNT(*) FILTER (WHERE client_ip=%s AND client_ip<>'') AS ip_failures
+        FROM login_failures
+        WHERE created_at >= %s
+        """,
+        (identity_hash, client_ip, window_start),
+    )
+    counts = cur.fetchone() or {}
+    return (
+        int(counts.get("identity_failures") or 0) >= LOGIN_IDENTITY_MAX_FAILURES
+        or int(counts.get("ip_failures") or 0) >= LOGIN_IP_MAX_FAILURES
+    )
 
 
 def _base_url(request: Request) -> str:
@@ -174,8 +251,8 @@ def _reset_token_error(row: dict | None) -> str:
 
 
 def _forgot_password_body(msg: str = "", err: str = "") -> str:
-    notice = f'<div class="note" style="margin-top:16px">{esc(msg)}</div>' if msg else ""
-    error = f'<div class="note note-err" style="margin-top:16px">{esc(err)}</div>' if err else ""
+    notice = f'<div class="note" role="status" aria-live="polite" style="margin-top:16px">{esc(msg)}</div>' if msg else ""
+    error = f'<div class="note note-err" role="alert" style="margin-top:16px">{esc(err)}</div>' if err else ""
     return f"""
     <section style="max-width:760px;margin:34px auto 0;padding:0 20px">
       <div class="card" style="padding:28px">
@@ -187,8 +264,8 @@ def _forgot_password_body(msg: str = "", err: str = "") -> str:
         {error}
         <form method="post" action="/forgot-password" style="margin-top:22px;display:grid;gap:14px">
           <div>
-            <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Email</label>
-            <input class="input" name="email" type="email" required autocomplete="email" placeholder="nome@azienda.it"
+            <label for="forgot-email" style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Email</label>
+            <input class="input" id="forgot-email" name="email" type="email" required autocomplete="email" placeholder="nome@azienda.it"
               style="width:100%;font-size:16px;padding:15px 15px;border-radius:14px">
           </div>
           <button class="btn btn-primary" type="submit" style="width:100%;font-size:16px;padding:15px 18px;border-radius:16px">
@@ -202,7 +279,7 @@ def _forgot_password_body(msg: str = "", err: str = "") -> str:
 
 
 def _reset_password_body(token: str, err: str = "") -> str:
-    error = f'<div class="note note-err" style="margin-top:16px">{esc(err)}</div>' if err else ""
+    error = f'<div class="note note-err" role="alert" style="margin-top:16px">{esc(err)}</div>' if err else ""
     return f"""
     <section style="max-width:760px;margin:34px auto 0;padding:0 20px">
       <div class="card" style="padding:28px">
@@ -214,13 +291,13 @@ def _reset_password_body(token: str, err: str = "") -> str:
         <form method="post" action="/reset-password" style="margin-top:22px;display:grid;gap:14px">
           <input type="hidden" name="token" value="{esc(token)}">
           <div>
-            <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Nuova password</label>
-            <input class="input" name="password" type="password" required minlength="8" autocomplete="new-password"
-              placeholder="Almeno 8 caratteri" style="width:100%;font-size:16px;padding:15px 15px;border-radius:14px">
+            <label for="reset-password" style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Nuova password</label>
+            <input class="input" id="reset-password" name="password" type="password" required minlength="{MIN_PASSWORD_LENGTH}" maxlength="{MAX_PASSWORD_LENGTH}" autocomplete="new-password"
+              placeholder="Almeno {MIN_PASSWORD_LENGTH} caratteri" style="width:100%;font-size:16px;padding:15px 15px;border-radius:14px">
           </div>
           <div>
-            <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Conferma password</label>
-            <input class="input" name="password_confirm" type="password" required minlength="8" autocomplete="new-password"
+            <label for="reset-password-confirm" style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Conferma password</label>
+            <input class="input" id="reset-password-confirm" name="password_confirm" type="password" required minlength="{MIN_PASSWORD_LENGTH}" maxlength="{MAX_PASSWORD_LENGTH}" autocomplete="new-password"
               placeholder="Ripeti la password" style="width:100%;font-size:16px;padding:15px 15px;border-radius:14px">
           </div>
           <button class="btn btn-primary" type="submit" style="width:100%;font-size:16px;padding:15px 18px;border-radius:16px">
@@ -259,16 +336,32 @@ def forgot_password_post(request: Request, email: str = Form(...)):
             with pg() as conn:
                 with conn.cursor(row_factory=dict_row) as cur:
                     cur.execute(
-                        "SELECT id, email FROM users WHERE lower(email)=lower(%s) LIMIT 1",
+                        "SELECT id, email FROM users WHERE lower(email)=lower(%s) LIMIT 1 FOR UPDATE",
                         (email,),
                     )
                     u = cur.fetchone()
 
                     if u:
-                        raw_token = secrets.token_urlsafe(32)
                         ts = now()
+                        cur.execute(
+                            """SELECT COUNT(*) AS request_count
+                               FROM password_reset_tokens
+                               WHERE user_id=%s AND created_at>=%s""",
+                            (int(u["id"]), ts - PASSWORD_RESET_WINDOW_SECONDS),
+                        )
+                        request_count = int((cur.fetchone() or {}).get("request_count") or 0)
+                        if request_count >= PASSWORD_RESET_MAX_REQUESTS:
+                            conn.commit()
+                            return forgot_password_get(request, msg=PASSWORD_RESET_NEUTRAL_MSG)
+
+                        raw_token = secrets.token_urlsafe(32)
                         exp = ts + PASSWORD_RESET_TTL_SECONDS
                         request_ip = _reset_request_ip(request)
+                        cur.execute(
+                            """UPDATE password_reset_tokens SET used_at=%s
+                               WHERE user_id=%s AND used_at IS NULL""",
+                            (ts, int(u["id"])),
+                        )
                         cur.execute(
                             """
                             INSERT INTO password_reset_tokens
@@ -356,11 +449,12 @@ def reset_password_post(
     password = password or ""
     password_confirm = password_confirm or ""
 
-    if len(password) < 8:
+    policy_error = new_password_error(password)
+    if policy_error:
         return HTMLResponse(page(
             title="QRFACILE · Reimposta password",
             subtitle="Reimposta password",
-            body_html=_reset_password_body(token, err="Password minimo 8 caratteri."),
+            body_html=_reset_password_body(token, err=policy_error),
             actions_html=top_actions(("/login", "Login"), ("/forgot-password", "Richiedi nuovo link")),
             msg="",
             err="",
@@ -402,7 +496,7 @@ def reset_password_post(
                     """,
                     (ts, user_id),
                 )
-                cur.execute("DELETE FROM sessions WHERE user_id=%s", (user_id,))
+                _revoke_user_sessions(cur, user_id)
                 conn.commit()
     except Exception as e:
         logger.warning("Password reset update failed: %s", str(e)[:180])
@@ -461,19 +555,19 @@ def login_get(request: Request, expired: str = "", created: str = "", reset: str
               <input type="hidden" name="next" value="{esc(next)}">
               <div style="display:grid;gap:14px">
                 <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">
+                  <label for="login-email" style="display:block;margin-bottom:7px;font-weight:700;color:#334155">
                     Email
                   </label>
-                  <input class="input" name="email" type="email" required
+                  <input class="input" id="login-email" name="email" type="email" required
                     placeholder="nome@azienda.it" autocomplete="email"
                     style="width:100%;font-size:16px;padding:15px 15px;border-radius:14px">
                 </div>
 
                 <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">
+                  <label for="login-password" style="display:block;margin-bottom:7px;font-weight:700;color:#334155">
                     Password
                   </label>
-                  <input class="input" name="password" type="password" required
+                  <input class="input" id="login-password" name="password" type="password" required
                     placeholder="••••••••" autocomplete="current-password"
                     style="width:100%;font-size:16px;padding:15px 15px;border-radius:14px">
                   <div style="margin-top:8px;text-align:right">
@@ -658,27 +752,44 @@ def login_post(
     password: str = Form(...),
     next: str = Form(""),
 ):
-    email = (email or "").strip().lower()
+    email = _clean_email(email)
     password = password or ""
+    identity_hash = _login_identity_hash(email)
+    client_ip = _login_client_ip(request)
+    current_time = now()
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
+            if _login_rate_limited(cur, identity_hash, client_ip, current_time):
+                conn.commit()
+                return login_get(request, err="Credenziali non valide", next=next)
+
             cur.execute(
-                "SELECT id, email, pass_hash, role FROM users WHERE lower(email)=lower(%s) LIMIT 1",
+                """SELECT id, email, pass_hash, role, email_verified, email_verification_required
+                   FROM users WHERE lower(email)=lower(%s) LIMIT 1""",
                 (email,),
             )
             u = cur.fetchone()
 
-    if not u:
-        return login_get(request, err="Credenziali non valide", next=next)
+            # Verify a real hash even for unknown identities so the response
+            # does not expose account existence through a cheap timing path.
+            password_hash = u["pass_hash"] if u else INVALID_LOGIN_HASH
+            try:
+                ok = pbkdf2_sha256.verify(password, password_hash)
+            except Exception:
+                ok = False
 
-    try:
-        ok = pbkdf2_sha256.verify(password, u["pass_hash"])
-    except Exception:
-        ok = False
+            if not u or not ok:
+                cur.execute(
+                    """INSERT INTO login_failures (identity_hash, client_ip, created_at)
+                       VALUES (%s,%s,%s)""",
+                    (identity_hash, client_ip, current_time),
+                )
+                conn.commit()
+                return login_get(request, err="Credenziali non valide", next=next)
 
-    if not ok:
-        return login_get(request, err="Credenziali non valide", next=next)
+            cur.execute("DELETE FROM login_failures WHERE identity_hash=%s", (identity_hash,))
+            conn.commit()
 
     token = _create_session(int(u["id"]))
 
@@ -688,6 +799,13 @@ def login_post(
     if not next_url.startswith("/") or next_url.startswith("//"):
         next_url = "/app/start"
 
+    if (
+        (u.get("role") or "").lower().strip() != "admin"
+        and bool(u.get("email_verification_required"))
+        and not bool(u.get("email_verified"))
+    ):
+        next_url = f"/verify-email-required?next={quote(next_url, safe='/')}"
+
     resp = RedirectResponse(next_url, status_code=303)
     resp.set_cookie(
         key=COOKIE,
@@ -695,6 +813,7 @@ def login_post(
         httponly=True,
         max_age=SESSION_MAX_AGE_SECONDS,
         samesite="lax",
+        secure=(request.url.scheme == "https" or _base_url(request).lower().startswith("https://")),
         path="/",
     )
     return resp

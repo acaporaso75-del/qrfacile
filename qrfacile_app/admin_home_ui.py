@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, esc
 
@@ -28,6 +29,51 @@ def _set_active_winery_id(cur, user_id: int, winery_id: int | None) -> None:
     )
 
 
+def _relation_columns(cur, table: str) -> set[str]:
+    cur.execute(
+        """
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema='public' AND table_name=%s
+        """,
+        (table,),
+    )
+    return {str(row["column_name"]) for row in (cur.fetchall() or [])}
+
+
+def _load_revenue_kpi(cur, out: dict) -> None:
+    order_columns = _relation_columns(cur, "orders")
+    required = {"amount_cents", "status", "payment_environment"}
+    out["orders_revenue_available"] = required <= order_columns
+    if out["orders_revenue_available"]:
+        cur.execute(
+            """
+            SELECT
+              COALESCE(SUM(amount_cents) FILTER (
+                WHERE status='paid' AND payment_environment='live'
+              ), 0) AS live_cents,
+              COALESCE(SUM(amount_cents) FILTER (
+                WHERE status='paid' AND payment_environment='sandbox'
+              ), 0) AS sandbox_cents,
+              COALESCE(SUM(amount_cents) FILTER (
+                WHERE status='paid' AND payment_environment='manual'
+              ), 0) AS manual_cents,
+              COALESCE(SUM(amount_cents) FILTER (
+                WHERE status='paid' AND payment_environment='unknown'
+              ), 0) AS unknown_cents
+            FROM orders
+            """
+        )
+        totals = cur.fetchone() or {}
+        for key in ("live", "sandbox", "manual", "unknown"):
+            out[f"revenue_{key}_eur"] = float(totals.get(f"{key}_cents") or 0) / 100.0
+
+    legacy_columns = _relation_columns(cur, "credit_orders")
+    out["legacy_revenue_available"] = {"amount_cents", "status"} <= legacy_columns
+    if out["legacy_revenue_available"]:
+        cur.execute("SELECT COALESCE(SUM(amount_cents),0) AS s FROM credit_orders WHERE status='paid'")
+        out["revenue_legacy_eur"] = float((cur.fetchone() or {}).get("s") or 0) / 100.0
+
+
 def _kpi(cur) -> dict:
     out = {}
 
@@ -46,11 +92,7 @@ def _kpi(cur) -> dict:
     cur.execute("SELECT COUNT(*) AS n FROM qr_items WHERE qr_type='external'")
     out["external_qr"] = int((cur.fetchone() or {}).get("n") or 0)
 
-    try:
-        cur.execute("SELECT COALESCE(SUM(amount_cents),0) AS s FROM credit_orders WHERE status='paid'")
-        out["revenue_eur"] = float((cur.fetchone() or {}).get("s") or 0) / 100.0
-    except Exception:
-        out["revenue_eur"] = 0.0
+    _load_revenue_kpi(cur, out)
 
     since = _now_epoch() - (30 * 24 * 3600)
 
@@ -144,6 +186,25 @@ def admin_home(request: Request, q: str = "", msg: str = "", err: str = ""):
         ("/logout", "Logout"),
     )
 
+    if kpi["orders_revenue_available"]:
+        order_revenue_html = f"""
+          <div class="p"><b>{kpi['revenue_live_eur']:.2f}€</b></div>
+          <div class="muted" style="font-size:12px;margin-top:6px">
+            Sandbox: {kpi['revenue_sandbox_eur']:.2f}€ ·
+            Manuale: {kpi['revenue_manual_eur']:.2f}€ ·
+            Storico non classificato: {kpi['revenue_unknown_eur']:.2f}€
+          </div>
+        """
+    else:
+        order_revenue_html = """
+          <div class="note note-warn"><b>Non disponibile</b>: migrazione ambiente pagamenti non applicata.</div>
+        """
+    legacy_revenue_html = (
+        f"<div class='muted' style='font-size:12px;margin-top:6px'>Legacy credit_orders: {kpi['revenue_legacy_eur']:.2f}€</div>"
+        if kpi["legacy_revenue_available"]
+        else "<div class='muted' style='font-size:12px;margin-top:6px'>Legacy credit_orders: non disponibile</div>"
+    )
+
     kpi_html = f"""
     <div class="card" style="margin-top:14px">
       <div class="h2">Statistiche piattaforma</div>
@@ -169,8 +230,9 @@ def admin_home(request: Request, q: str = "", msg: str = "", err: str = ""):
           <div class="p"><b>{kpi['external_qr']}</b> creati</div>
         </div>
         <div class="card">
-          <div class="h2">Ricavi (paid)</div>
-          <div class="p"><b>{kpi['revenue_eur']:.2f}€</b></div>
+          <div class="h2">Incassi Live verificati</div>
+          {order_revenue_html}
+          {legacy_revenue_html}
         </div>
       </div>
     </div>
@@ -258,6 +320,7 @@ def admin_home(request: Request, q: str = "", msg: str = "", err: str = ""):
 
 @router.post("/admin/set-winery")
 def admin_set_winery(request: Request, winery_id: str = Form("")):
+    require_csrf_or_same_origin(request)
     """
     Compat legacy: manteniamo questa route, ma reindirizziamo alla logica nuova.
     """

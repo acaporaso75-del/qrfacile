@@ -1,17 +1,23 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
+from qrfacile_app.csrf_core import csrf_input
 from qrfacile_app.services.ai_review_service import (
     VALID_REVIEW_DECISIONS,
     list_pending_ai_reviews,
     review_ai_output_record,
 )
+from qrfacile_app.ui_shell import esc
 
 router = APIRouter(prefix="/admin/compliance", tags=["ai-review"])
+logger = logging.getLogger("qrfacile.ai_review")
 
 
 @router.get("/ai-review", response_class=HTMLResponse)
@@ -19,20 +25,29 @@ def ai_review_queue(request: Request):
     require_any_role(request, ("admin",))
     try:
         records = list_pending_ai_reviews()
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Schema compliance non disponibile: {exc}")
+    except Exception:
+        logger.exception("Impossibile caricare la coda di revisione AI")
+        raise HTTPException(status_code=503, detail="Schema compliance non disponibile")
 
     rows = []
     for item in records:
         personal = "Sì" if item.get("contains_personal_data") else "No"
+        record_id = int(item["id"])
+        risk = str(item.get("risk_classification") or "")
+        approve_control = (
+            '<span title="Gli output proibiti non possono essere approvati">Approvazione non consentita</span>'
+            if risk == "prohibited"
+            else '<button name="decision" value="approved" type="submit">Approva</button>'
+        )
         rows.append(f"""
         <tr>
-          <td>{item['id']}</td><td>{item['created_at']}</td><td>{item['use_case']}</td>
-          <td>{item['provider']} / {item['model']}</td><td>{item['risk_classification']}</td>
+          <td>{record_id}</td><td>{esc(str(item.get('created_at') or ''))}</td><td>{esc(str(item.get('use_case') or ''))}</td>
+          <td>{esc(str(item.get('provider') or ''))} / {esc(str(item.get('model') or ''))}</td><td>{esc(risk)}</td>
           <td>{personal}</td>
           <td>
-            <form method="post" action="/admin/compliance/ai-review/{item['id']}" style="display:flex;gap:8px">
-              <button name="decision" value="approved" type="submit">Approva</button>
+            <form method="post" action="/admin/compliance/ai-review/{record_id}" style="display:flex;gap:8px">
+              {csrf_input(request)}
+              {approve_control}
               <button name="decision" value="rejected" type="submit">Rifiuta</button>
             </form>
           </td>
@@ -51,6 +66,7 @@ def ai_review_queue(request: Request):
 
 @router.post("/ai-review/{record_id}")
 def review_ai_output(request: Request, record_id: int, decision: str = Form(...)):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("admin",))
     if decision not in VALID_REVIEW_DECISIONS:
         raise HTTPException(status_code=422, detail="Decisione non valida")
@@ -61,7 +77,9 @@ def review_ai_output(request: Request, record_id: int, decision: str = Form(...)
             reviewer_user_id=int(user["id"]),
             decision=decision,
         )
-    except ValueError:
+    except ValueError as exc:
+        if str(exc) == "prohibited_risk_cannot_be_approved":
+            raise HTTPException(status_code=422, detail="Un output classificato come proibito non può essere approvato")
         raise HTTPException(status_code=422, detail="Decisione non valida")
 
     if not row:

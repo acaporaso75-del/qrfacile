@@ -604,7 +604,7 @@ def studios_invite_post(
 
             placeholders = ",".join(["%s"] * len(vals))
             cur.execute(
-                f"INSERT INTO studio_invites ({','.join(cols)}) VALUES ({placeholders})",
+                f"INSERT INTO studio_invites /* security-review: unrouted-legacy */ ({','.join(cols)}) VALUES ({placeholders})",
                 tuple(vals),
             )
             conn.commit()
@@ -729,8 +729,7 @@ def _legacy_studio_accept_invite_unrouted(request: Request, token: str):
     return RedirectResponse(_invite_redirect_target(inv), status_code=303)
 
 
-@router.post("/app/invite/studio/accept/{token}")
-def studio_accept_invite_post(request: Request, token: str):
+def _legacy_studio_accept_invite_post_unrouted(request: Request, token: str):
     user = require_any_role(request, ("studio", "admin"))
     role = (user.get("role") or "").lower().strip()
 
