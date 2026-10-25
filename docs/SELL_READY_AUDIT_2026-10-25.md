@@ -37,6 +37,8 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
     i due schemi legacy supportati, senza affidarsi soltanto alla durata del cookie.
 14. revoca le sessioni di entrambi gli schemi compatibili al logout e dopo un
     reset password riuscito; il cookie di sessione è marcato Secure su HTTPS.
+15. limita a cinque per ora gli invii di verifica email usando un lock sul record
+    utente, così richieste concorrenti non possono aggirare il limite.
 
 ## Matrice di conformità
 

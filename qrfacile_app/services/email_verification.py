@@ -15,6 +15,7 @@ from qrfacile_app.db import pg
 
 TOKEN_TTL_HOURS = 24
 MAX_SEND_ATTEMPTS = 5
+SEND_WINDOW_MINUTES = 60
 
 
 def token_hash(token: str) -> str:
@@ -67,12 +68,35 @@ def create_verification(*, user_id: int, base_url: str) -> dict[str, Any]:
     expires = datetime.now(timezone.utc) + timedelta(hours=TOKEN_TTL_HOURS)
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute("SELECT email, email_verified FROM users WHERE id=%s LIMIT 1", (int(user_id),))
+            cur.execute(
+                """SELECT email, email_verified, verification_sent_at, verification_attempts
+                   FROM users WHERE id=%s LIMIT 1 FOR UPDATE""",
+                (int(user_id),),
+            )
             user = cur.fetchone()
             if not user:
                 raise HTTPException(404, "Utente non trovato")
             if bool(user.get("email_verified")):
                 return {"already_verified": True, "email_sent": False}
+            window_started = user.get("verification_sent_at")
+            attempts = int(user.get("verification_attempts") or 0)
+            window_open = bool(
+                window_started
+                and window_started >= datetime.now(timezone.utc) - timedelta(minutes=SEND_WINDOW_MINUTES)
+            )
+            if window_open and attempts >= MAX_SEND_ATTEMPTS:
+                raise HTTPException(429, "Troppi invii di verifica: riprova tra un'ora")
+            cur.execute(
+                """UPDATE users
+                   SET verification_sent_at=now(),
+                       verification_attempts=CASE
+                         WHEN verification_sent_at IS NULL
+                           OR verification_sent_at < now()-(%s * interval '1 minute') THEN 1
+                         ELSE verification_attempts+1
+                       END
+                   WHERE id=%s""",
+                (SEND_WINDOW_MINUTES, int(user_id)),
+            )
             cur.execute(
                 "UPDATE email_verification_tokens SET revoked_at=now() WHERE user_id=%s AND used_at IS NULL AND revoked_at IS NULL",
                 (int(user_id),),
@@ -99,10 +123,6 @@ def create_verification(*, user_id: int, base_url: str) -> dict[str, Any]:
                 WHERE token_hash=%s
                 """,
                 (sent, error or None, hashed),
-            )
-            cur.execute(
-                "UPDATE users SET verification_sent_at=now(), verification_attempts=verification_attempts+1 WHERE id=%s",
-                (int(user_id),),
             )
         conn.commit()
     return {**row, "email_sent": sent, "email_error": error}

@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from uuid import uuid4
+from datetime import datetime, timezone
 
 import psycopg
 import pytest
@@ -10,6 +11,7 @@ from psycopg.conninfo import conninfo_to_dict
 from starlette.requests import Request
 
 from qrfacile_app import auth_core
+from qrfacile_app.services import email_verification
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -28,6 +30,11 @@ def test_verification_service_uses_strong_tokens_and_sha256():
     assert "secrets.token_urlsafe(32)" in text
     assert "hashlib.sha256" in text
     assert "TOKEN_TTL_HOURS = 24" in text
+    assert "MAX_SEND_ATTEMPTS = 5" in text
+    assert "SEND_WINDOW_MINUTES = 60" in text
+    assert "LIMIT 1 FOR UPDATE" in text
+    assert "raise HTTPException(429" in text
+    assert "verification_attempts+1" in text
     assert "UPDATE users SET email_verified=TRUE" in text
     assert "used_at=now()" in text
 
@@ -68,6 +75,35 @@ def test_required_unverified_account_is_redirected_before_role_access(monkeypatc
         auth_core.require_any_role(request, ("winery",))
     assert exc.value.status_code == 303
     assert exc.value.headers["Location"] == "/verify-email-required"
+
+
+def test_verification_resend_rate_limit_is_checked_under_user_row_lock(monkeypatch):
+    class Cursor:
+        def __init__(self):
+            self.queries = []
+        def __enter__(self): return self
+        def __exit__(self, *_args): return False
+        def execute(self, statement, params): self.queries.append((" ".join(statement.split()), params))
+        def fetchone(self):
+            return {
+                "email": "new@example.test", "email_verified": False,
+                "verification_sent_at": datetime.now(timezone.utc),
+                "verification_attempts": email_verification.MAX_SEND_ATTEMPTS,
+            }
+    class Connection:
+        def __init__(self): self.cursor_instance = Cursor()
+        def __enter__(self): return self
+        def __exit__(self, *_args): return False
+        def cursor(self, **_kwargs): return self.cursor_instance
+        def commit(self): raise AssertionError("rate-limited request must not commit")
+
+    connection = Connection()
+    monkeypatch.setattr(email_verification, "pg", lambda: connection)
+    with pytest.raises(HTTPException) as exc:
+        email_verification.create_verification(user_id=7, base_url="https://example.test")
+    assert exc.value.status_code == 429
+    assert "FOR UPDATE" in connection.cursor_instance.queries[0][0]
+    assert not any("INSERT INTO email_verification_tokens" in query for query, _ in connection.cursor_instance.queries)
 
 
 def test_email_enforcement_migration_preserves_existing_accounts_and_defaults_new_ones():

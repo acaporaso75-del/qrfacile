@@ -44,3 +44,8 @@ Logout and successful password reset revoke tokens from both compatible session
 tables inside savepoints, so an optional missing table cannot undo the password
 change. Session cookies receive the `Secure` attribute whenever the request or
 configured application base URL uses HTTPS.
+
+Verification-email creation locks the user row and reserves one of at most five
+send attempts in a rolling 60-minute window before releasing the transaction.
+Concurrent resend requests therefore cannot bypass the limit; provider delivery
+success or failure is recorded on the hashed token without exposing it.
