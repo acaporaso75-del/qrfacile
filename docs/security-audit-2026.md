@@ -53,3 +53,11 @@ success or failure is recorded on the hashed token without exposing it.
 Password-reset requests lock the matched user, allow at most five requests per
 60 minutes, keep the same public response for existing, missing and limited
 accounts, and invalidate older unused links before creating a replacement.
+
+Failed logins are recorded by SHA-256 identity hash and client address, never by
+plain email. Transaction advisory locks make the 10-per-identity and 50-per-IP
+limits within 15 minutes safe against concurrent attempts. Unknown identities
+still run a real password-hash verification, and every rejected login uses the
+same public error. Apply `sql/2026_login_rate_limit.sql` before this application
+revision is enabled; records older than 24 hours are removed during subsequent
+login attempts, and the migration is transaction-wrapped and idempotent.

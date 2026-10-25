@@ -25,6 +25,11 @@ PASSWORD_RESET_TTL_SECONDS = 60 * 60
 PASSWORD_RESET_WINDOW_SECONDS = 60 * 60
 PASSWORD_RESET_MAX_REQUESTS = 5
 PASSWORD_RESET_NEUTRAL_MSG = "Se l’email è registrata, riceverai un link per reimpostare la password."  # pragma: allowlist secret
+LOGIN_FAILURE_WINDOW_SECONDS = 15 * 60
+LOGIN_FAILURE_RETENTION_SECONDS = 24 * 60 * 60
+LOGIN_IDENTITY_MAX_FAILURES = 10
+LOGIN_IP_MAX_FAILURES = 50
+INVALID_LOGIN_HASH = "$pbkdf2-sha256$29000$lBLi/D.HsBYCIERIKaVUqg$Zy8JIhNq.YFMAYcld2I4LY0UhNxNTY2/KPs6E7XkZxs"  # pragma: allowlist secret
 
 
 
@@ -77,6 +82,53 @@ def _revoke_user_sessions(cur, user_id: int) -> None:
 
 def _clean_email(email: str) -> str:
     return "".join((email or "").split()).strip().lower()
+
+
+def _login_identity_hash(email: str) -> str:
+    return hashlib.sha256(_clean_email(email).encode("utf-8")).hexdigest()
+
+
+def _login_client_ip(request: Request) -> str:
+    try:
+        return (request.client.host or "")[:80]
+    except Exception:
+        return ""
+
+
+def _lock_login_rate_limit(cur, identity_hash: str, client_ip: str) -> None:
+    # Serialize checks for the same identity/IP, otherwise concurrent attempts
+    # could all observe the counter before any failure is recorded.
+    lock_keys = {
+        int.from_bytes(hashlib.sha256(value.encode("utf-8")).digest()[:8], "big", signed=True)
+        for value in (identity_hash, client_ip)
+        if value
+    }
+    for lock_key in sorted(lock_keys):
+        cur.execute("SELECT pg_advisory_xact_lock(%s)", (lock_key,))
+
+
+def _login_rate_limited(cur, identity_hash: str, client_ip: str, current_time: int) -> bool:
+    _lock_login_rate_limit(cur, identity_hash, client_ip)
+    cur.execute(
+        "DELETE FROM login_failures WHERE created_at < %s",
+        (current_time - LOGIN_FAILURE_RETENTION_SECONDS,),
+    )
+    window_start = current_time - LOGIN_FAILURE_WINDOW_SECONDS
+    cur.execute(
+        """
+        SELECT
+          COUNT(*) FILTER (WHERE identity_hash=%s) AS identity_failures,
+          COUNT(*) FILTER (WHERE client_ip=%s AND client_ip<>'') AS ip_failures
+        FROM login_failures
+        WHERE created_at >= %s
+        """,
+        (identity_hash, client_ip, window_start),
+    )
+    counts = cur.fetchone() or {}
+    return (
+        int(counts.get("identity_failures") or 0) >= LOGIN_IDENTITY_MAX_FAILURES
+        or int(counts.get("ip_failures") or 0) >= LOGIN_IP_MAX_FAILURES
+    )
 
 
 def _base_url(request: Request) -> str:
@@ -698,11 +750,18 @@ def login_post(
     password: str = Form(...),
     next: str = Form(""),
 ):
-    email = (email or "").strip().lower()
+    email = _clean_email(email)
     password = password or ""
+    identity_hash = _login_identity_hash(email)
+    client_ip = _login_client_ip(request)
+    current_time = now()
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
+            if _login_rate_limited(cur, identity_hash, client_ip, current_time):
+                conn.commit()
+                return login_get(request, err="Credenziali non valide", next=next)
+
             cur.execute(
                 """SELECT id, email, pass_hash, role, email_verified, email_verification_required
                    FROM users WHERE lower(email)=lower(%s) LIMIT 1""",
@@ -710,16 +769,25 @@ def login_post(
             )
             u = cur.fetchone()
 
-    if not u:
-        return login_get(request, err="Credenziali non valide", next=next)
+            # Verify a real hash even for unknown identities so the response
+            # does not expose account existence through a cheap timing path.
+            password_hash = u["pass_hash"] if u else INVALID_LOGIN_HASH
+            try:
+                ok = pbkdf2_sha256.verify(password, password_hash)
+            except Exception:
+                ok = False
 
-    try:
-        ok = pbkdf2_sha256.verify(password, u["pass_hash"])
-    except Exception:
-        ok = False
+            if not u or not ok:
+                cur.execute(
+                    """INSERT INTO login_failures (identity_hash, client_ip, created_at)
+                       VALUES (%s,%s,%s)""",
+                    (identity_hash, client_ip, current_time),
+                )
+                conn.commit()
+                return login_get(request, err="Credenziali non valide", next=next)
 
-    if not ok:
-        return login_get(request, err="Credenziali non valide", next=next)
+            cur.execute("DELETE FROM login_failures WHERE identity_hash=%s", (identity_hash,))
+            conn.commit()
 
     token = _create_session(int(u["id"]))
 
