@@ -1,13 +1,13 @@
 # QRFACILE — confronto prezzi e proposta — 25 ottobre 2026
 
-## Listino QRFACILE osservato
+## Listino QRFACILE precedente (storico, non più proposto)
 
 - 3 crediti gratuiti;
 - Start: 20 crediti, EUR 29;
 - Cantina: 60 crediti, EUR 79;
 - Business: 200 crediti, EUR 199;
 - 1 credito mantiene una e-label per 10 anni, 2 crediti per 25 anni;
-- nessun abbonamento obbligatorio;
+- nessun abbonamento obbligatorio nel precedente modello;
 - assistenza: EUR 79 fino a 5 QR, EUR 149 fino a 20 QR.
 
 ## Concorrenti verificati sui listini ufficiali
@@ -39,21 +39,23 @@ QRFACILE non deve competere solo sul prezzo: il vantaggio difendibile è support
 italiano Enolab, durata esplicita, collaborazione con studi grafici, export per
 tipografia e controlli di compliance con revisione umana.
 
-## Proposta commerciale da validare, non applicata
+## Decisione commerciale applicata localmente, non ancora rilasciata
 
-### Self-service senza rinnovo obbligatorio
+### Pacchetti annuali Wine B2B, rinnovo manuale
 
-| Pacchetto | Crediti 10 anni | Prezzo netto proposto |
+| Pacchetto | Unità utilizzabili entro 12 mesi | Prezzo netto |
 |---|---:|---:|
-| Prova | 1 | gratuito |
-| Start | 5 | EUR 59 |
-| Cantina | 20 | EUR 149 |
-| Business | 60 | EUR 299 |
-| Enterprise | oltre 60 | preventivo |
+| Start | 15 | EUR 99/anno |
+| Cantina | 50 | EUR 179/anno |
+| Business | 100 | EUR 299/anno |
+| Studio, multi-cantina, grandi volumi | — | preventivo |
 
-Il credito per 25 anni resta pari a due crediti. Per quantità grandi conviene un
-preventivo che includa infrastruttura, supporto e responsabilità operativa, non un
-pacchetto da 200 quasi gratuito.
+Un QR da 10 anni usa una unità; l’opzione da 25 anni ne usa due. Il rinnovo è
+manuale e non genera addebiti automatici. Le unità inutilizzate scadono dopo
+12 mesi senza riporto; i QR già creati restano disponibili per la durata scelta.
+I crediti acquistati con le precedenti offerte mantengono le condizioni originarie.
+I prezzi sono IVA esclusa e il checkout automatico è limitato alle cantine
+professionali italiane in regime IVA ordinario; gli altri casi richiedono preventivo.
 
 ### Servizi assistiti
 
@@ -62,14 +64,21 @@ pacchetto da 200 quasi gratuito.
 - import massivo, revisione documentale o gestione annuale: preventivo;
 - evitare espressioni come "certificazione legale" o "conformità garantita".
 
-## Decisioni necessarie prima del cambio prezzo
+## Decisioni già assunte
 
-1. prezzi IVA inclusa o esclusa;
-2. solo B2B o anche consumatori;
-3. Italia soltanto o vendite UE/extra-UE;
-4. fatturazione elettronica e gestione rimborsi;
-5. costo annuo reale di hosting, backup, supporto e manutenzione normativa;
-6. trattamento dei clienti già registrati e dei crediti già acquistati.
+1. prezzi IVA esclusa;
+2. vendita B2B;
+3. checkout automatico solo per cantine italiane con IVA ordinaria;
+4. tutela delle condizioni dei clienti e ordini storici;
+5. rinnovo manuale, senza abbonamento PayPal automatico.
 
-Il cambio listino non è incluso in questa tranche: richiede approvazione commerciale
-esplicita e aggiornamento coordinato di prezzi, Termini, checkout e fatturazione.
+## Decisioni ancora necessarie prima del rilascio
+
+1. processo di fatturazione elettronica e gestione rimborsi;
+2. gestione fiscale verificata per vendite UE/extra-UE e regimi speciali;
+3. costo annuo reale di hosting, backup, supporto e manutenzione normativa;
+4. test PayPal Sandbox e collaudo browser sullo staging autorizzato.
+
+Il cambio listino è implementato e testato soltanto sul ramo locale
+`codex/qrfacile-sell-ready`. Non è stato eseguito alcun push, deploy,
+aggiornamento di produzione o attivazione PayPal Live.

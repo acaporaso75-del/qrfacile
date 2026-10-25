@@ -7,6 +7,7 @@ import pytest
 from starlette.requests import Request
 
 from qrfacile_app import seo_ui
+from qrfacile_app.admin_home_ui import _load_revenue_kpi
 from qrfacile_app.legal_core import REQUIRED_LEGAL_DOCUMENTS, record_registration_acceptances
 from qrfacile_app.legal_pages import privacy, terms
 from qrfacile_app.ui_shell import page_public
@@ -130,5 +131,73 @@ def test_paid_revenue_is_partitioned_by_payment_environment():
     assert "payment_environment IN ('live', 'sandbox', 'manual', 'unknown')" in migration
     assert "payment_environment='live'" in admin
     assert "payment_environment='sandbox'" in admin
+    assert "payment_environment='manual'" in admin
     assert "PAYPAL_MODE" in paypal
     assert "Incassi Live verificati" in admin
+    assert "migrazione ambiente pagamenti non applicata" in admin
+    assert 'out["revenue_live_eur"] = 0.0' not in admin
+
+
+class _RevenueCursor:
+    def __init__(self, columns, totals=None, legacy_cents=0):
+        self.columns = columns
+        self.totals = totals or {}
+        self.legacy_cents = legacy_cents
+        self.last_sql = ""
+        self.last_params = ()
+        self.queries = []
+
+    def execute(self, sql, params=()):
+        self.last_sql = " ".join(sql.split())
+        self.last_params = params
+        self.queries.append((self.last_sql, params))
+
+    def fetchall(self):
+        table = self.last_params[0]
+        return [{"column_name": value} for value in self.columns.get(table, set())]
+
+    def fetchone(self):
+        if "FROM orders" in self.last_sql:
+            return self.totals
+        if "FROM credit_orders" in self.last_sql:
+            return {"s": self.legacy_cents}
+        return {}
+
+
+def test_admin_revenue_kpi_separates_payment_environments_and_legacy():
+    cursor = _RevenueCursor(
+        {
+            "orders": {"amount_cents", "status", "payment_environment"},
+            "credit_orders": {"amount_cents", "status"},
+        },
+        {
+            "live_cents": 12078, "sandbox_cents": 21838,
+            "manual_cents": 36478, "unknown_cents": 2900,
+        },
+        legacy_cents=7900,
+    )
+    result = {}
+    _load_revenue_kpi(cursor, result)
+    assert result == {
+        "orders_revenue_available": True,
+        "revenue_live_eur": 120.78,
+        "revenue_sandbox_eur": 218.38,
+        "revenue_manual_eur": 364.78,
+        "revenue_unknown_eur": 29.0,
+        "legacy_revenue_available": True,
+        "revenue_legacy_eur": 79.0,
+    }
+
+
+def test_admin_revenue_kpi_reports_missing_migration_instead_of_false_zero():
+    cursor = _RevenueCursor({
+        "orders": {"amount_cents", "status"},
+        "credit_orders": set(),
+    })
+    result = {}
+    _load_revenue_kpi(cursor, result)
+    assert result == {
+        "orders_revenue_available": False,
+        "legacy_revenue_available": False,
+    }
+    assert not any("FROM orders" in sql for sql, _ in cursor.queries)

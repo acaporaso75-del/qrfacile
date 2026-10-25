@@ -53,7 +53,7 @@ The 2026-10-25 legal version is still unreleased; its public terms hash has been
 
 ## Local verification
 
-Final local result after Studio-access hardening: **279 passed, 0 skipped** using an isolated native
+Final local result after Studio-access and revenue-reporting hardening: **281 passed, 0 skipped** using an isolated native
 PostgreSQL 16.15 database bound to 127.0.0.1. This includes the two-connection overspend test and
 the staging reconciliation migration/rollback test. The separate in-memory PostgreSQL/PGlite run
 also passed all **18** assertions.

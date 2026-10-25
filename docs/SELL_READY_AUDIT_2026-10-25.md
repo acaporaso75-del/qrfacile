@@ -10,12 +10,16 @@ push, deploy, PayPal Live, modifica di credenziali, merge o pubblicazione.
 
 QRFACILE ha una base tecnica utilizzabile, ma non è ancora corretto dichiararlo
 commercialmente e legalmente "completo". La tranche locale chiude quattro difetti
-misurabili:
+misurabili, poi estese con il listino annuale e il rafforzamento degli accessi Studio:
 
 1. rimuove fingerprint e conteggio delle scansioni dalle pagine e-label `/e/`;
 2. registra accettazione dei Termini e presa visione Privacy con versione ed evidenza;
 3. separa incassi PayPal Live, Sandbox, manuali e storici non classificati;
 4. aggiunge metadati SEO, sitemap, robots e informazioni per crawler AI.
+5. introduce pacchetti annuali Wine B2B con prezzi netti, IVA italiana esposta,
+   condizioni ordine congelate e unità inutilizzate in scadenza senza alterare i QR;
+6. richiede agli Studi sia il collegamento alla cantina sia l’assegnazione
+   esplicita della singola etichetta sui percorsi operativi.
 
 ## Matrice di conformità
 
@@ -30,11 +34,11 @@ misurabili:
 | Accessibilità | Parziale | Aggiunti nomi accessibili e autocomplete ai form di registrazione; manca un audit WCAG completo con tastiera, screen reader, contrasto, zoom e flussi autenticati in staging. |
 | Sicurezza account | Non completo | Password reset e sessioni presenti; MFA admin non risulta implementata. Verifica email non è applicata in modo uniforme e richiede piano di migrazione. |
 | Continuità | Evidenza staging esistente | Esistono runbook e restore staging; occorre prova periodica di restore del perimetro produttivo e owner operativo. |
-| Pagamenti e fatture | Non pronto per Live | Il codice distingue gli ambienti, ma PayPal Live, IVA, documento fiscale, riconciliazione e rimborsi richiedono decisione contabile e test end-to-end. |
+| Pagamenti e fatture | Sandbox-ready nel codice, non pronto per Live | Il checkout annuale calcola imponibile, IVA ordinaria italiana e totale, congela le condizioni ordine e distingue Live/Sandbox/manuale/storico. Documento fiscale, riconciliazione, rimborsi e casi fiscali non ordinari richiedono processo contabile e test end-to-end. |
 
 ## Requisiti prima di poter dire "vendibile"
 
-- decisione scritta se i prezzi esposti sono IVA inclusa o esclusa e per quali paesi/clienti;
+- conferma contabile del flusso B2B Italia a prezzi IVA esclusa e procedura per casi fiscali speciali/esteri;
 - processo di fatturazione/ricevuta e riconciliazione ordine-pagamento-documento fiscale;
 - validazione legale finale di Termini, Privacy e DPA sui rapporti reali;
 - MFA amministratori e piano coerente di verifica email;
