@@ -47,7 +47,7 @@ def verify_email_page(request: Request, token: str):
         write_audit_event(action="email_verified", resource_type="user", resource_id=result["user_id"], request=request)
         return HTMLResponse(page_public(title="QRFACILE · Email verificata", subtitle="Verifica email", body_html=body))
     except HTTPException as exc:
-        body = f"<div class='card'><div class='h1'>Verifica non riuscita</div><div class='p'>{exc.detail}</div><div class='row' style='margin-top:14px'><a class='btn' href='/login'>Torna al login</a></div></div>"
+        body = f"<div class='card'><div class='h1'>Verifica non riuscita</div><div class='p'>{esc(str(exc.detail))}</div><div class='row' style='margin-top:14px'><a class='btn' href='/login'>Torna al login</a></div></div>"
         return HTMLResponse(page_public(title="QRFACILE · Verifica email", subtitle="Verifica email", body_html=body), status_code=exc.status_code)
 
 

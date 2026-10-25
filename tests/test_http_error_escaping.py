@@ -1,9 +1,10 @@
 import asyncio
 
-from starlette.exceptions import HTTPException
+from fastapi import HTTPException
 from starlette.requests import Request
 
 from qrfacile_app.main import http_exception_handler
+from qrfacile_app import email_verification_ui
 
 
 def _request():
@@ -20,3 +21,16 @@ def test_http_exception_details_are_escaped_in_all_html_responses():
         body = response.body.decode("utf-8")
         assert malicious not in body
         assert "&lt;script&gt;" in body
+
+    def reject(_token):
+        raise HTTPException(400, malicious)
+
+    original = email_verification_ui.verify_email
+    email_verification_ui.verify_email = reject
+    try:
+        response = email_verification_ui.verify_email_page(_request(), "untrusted-token")
+        body = response.body.decode("utf-8")
+        assert malicious not in body
+        assert "&lt;script&gt;" in body
+    finally:
+        email_verification_ui.verify_email = original
