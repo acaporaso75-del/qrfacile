@@ -94,4 +94,3 @@ def test_preview_propagates_unauthorized_and_missing_wine_without_500(monkeypatc
     with pytest.raises(HTTPException) as exc:
         public.preview_wine(_request(), 999)
     assert exc.value.status_code == status
-
