@@ -11,6 +11,7 @@ from email.message import EmailMessage
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
+from psycopg import sql
 from passlib.hash import pbkdf2_sha256
 
 from qrfacile_app.db import pg
@@ -47,8 +48,28 @@ def _delete_session(token: str) -> None:
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute("DELETE FROM sessions WHERE token=%s", (token,))
+            for index, table in enumerate(("app_sessions", "sessions")):
+                savepoint = f"logout_session_{index}"
+                cur.execute(sql.SQL("SAVEPOINT {}").format(sql.Identifier(savepoint)))
+                try:
+                    cur.execute(sql.SQL("DELETE FROM {} WHERE token=%s").format(sql.Identifier(table)), (token,))
+                except Exception:
+                    cur.execute(sql.SQL("ROLLBACK TO SAVEPOINT {}").format(sql.Identifier(savepoint)))
+                finally:
+                    cur.execute(sql.SQL("RELEASE SAVEPOINT {}").format(sql.Identifier(savepoint)))
         conn.commit()
+
+
+def _revoke_user_sessions(cur, user_id: int) -> None:
+    for index, table in enumerate(("app_sessions", "sessions")):
+        savepoint = f"revoke_user_sessions_{index}"
+        cur.execute(sql.SQL("SAVEPOINT {}").format(sql.Identifier(savepoint)))
+        try:
+            cur.execute(sql.SQL("DELETE FROM {} WHERE user_id=%s").format(sql.Identifier(table)), (int(user_id),))
+        except Exception:
+            cur.execute(sql.SQL("ROLLBACK TO SAVEPOINT {}").format(sql.Identifier(savepoint)))
+        finally:
+            cur.execute(sql.SQL("RELEASE SAVEPOINT {}").format(sql.Identifier(savepoint)))
 
 
 
@@ -403,7 +424,7 @@ def reset_password_post(
                     """,
                     (ts, user_id),
                 )
-                cur.execute("DELETE FROM sessions WHERE user_id=%s", (user_id,))
+                _revoke_user_sessions(cur, user_id)
                 conn.commit()
     except Exception as e:
         logger.warning("Password reset update failed: %s", str(e)[:180])
@@ -704,6 +725,7 @@ def login_post(
         httponly=True,
         max_age=SESSION_MAX_AGE_SECONDS,
         samesite="lax",
+        secure=(request.url.scheme == "https" or _base_url(request).lower().startswith("https://")),
         path="/",
     )
     return resp

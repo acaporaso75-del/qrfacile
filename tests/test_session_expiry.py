@@ -1,4 +1,5 @@
 from qrfacile_app import auth_core
+from qrfacile_app import auth_routes
 
 
 class _Cursor:
@@ -71,3 +72,11 @@ def test_no_unbounded_session_lookup_remains():
     assert "FROM sessions WHERE token=%s LIMIT 1" not in source
     assert "FROM app_sessions WHERE token=%s LIMIT 1" not in source
     assert "SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 14" in source
+
+
+def test_logout_and_password_reset_revoke_both_supported_session_tables():
+    source = __import__("pathlib").Path(auth_routes.__file__).read_text(encoding="utf-8")
+    assert 'for index, table in enumerate(("app_sessions", "sessions"))' in source
+    assert "_revoke_user_sessions(cur, user_id)" in source
+    assert 'secure=(request.url.scheme == "https"' in source
+    assert 'DELETE FROM sessions WHERE user_id=%s' not in source

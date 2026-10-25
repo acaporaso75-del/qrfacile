@@ -35,6 +35,8 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
     gli account storici; invio iniziale e reinvio protetto sono presenti, ma SMTP va provato in staging.
 13. applica anche lato server la scadenza delle sessioni dopo 14 giorni, inclusi
     i due schemi legacy supportati, senza affidarsi soltanto alla durata del cookie.
+14. revoca le sessioni di entrambi gli schemi compatibili al logout e dopo un
+    reset password riuscito; il cookie di sessione è marcato Secure su HTTPS.
 
 ## Matrice di conformità
 

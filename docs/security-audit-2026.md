@@ -40,3 +40,7 @@ Session tokens are accepted only while their server-side `created_at`/`expires_a
 window remains within the 14-day maximum. Compatibility attempts cover the two
 known session tables and epoch/timestamp schemas; a table without a usable expiry
 column fails closed instead of accepting an unbounded token.
+Logout and successful password reset revoke tokens from both compatible session
+tables inside savepoints, so an optional missing table cannot undo the password
+change. Session cookies receive the `Secure` attribute whenever the request or
+configured application base URL uses HTTPS.
