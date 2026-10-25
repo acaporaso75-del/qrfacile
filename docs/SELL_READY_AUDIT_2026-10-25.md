@@ -99,6 +99,33 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
 - backup/restore produttivo provato e monitoraggio disponibilità;
 - autorizzazione separata per push, PR, deploy e ogni attivazione Live.
 
+## Checkpoint locale conclusivo
+
+Il lavoro applicativo sicuro eseguibile senza accesso a sistemi remoti è concluso
+sul branch `codex/qrfacile-sell-ready`. L'HEAD applicativo immediatamente precedente
+a questo checkpoint è `4c5127c7df94e0277e9bd1b1ba57cf646d4f5059`.
+
+Verifiche finali locali:
+
+- 355 test superati su PostgreSQL 16.15 nativo isolato;
+- audit statico di sicurezza: 0 rilievi;
+- controllo transazioni SQL: superato;
+- compilazione Python di applicazione e script: superata;
+- PostgreSQL locale arrestato e porta 55432 chiusa al termine.
+
+Restano deliberatamente fuori da questo checkpoint locale:
+
+- MFA amministratori, che richiede una scelta architetturale e gestione sicura dei segreti;
+- validazione legale/privacy e approvazione contabile dei processi reali;
+- applicazione migrazioni e collaudo browser sullo staging autorizzato;
+- prove SMTP e PayPal Sandbox end-to-end;
+- audit WCAG con tecnologie assistive;
+- restore produttivo, monitoraggio e qualsiasi attivazione PayPal Live.
+
+Il singolo passo successivo autorizzabile è il push dell'esatto SHA del commit di
+checkpoint su un branch remoto esplicitamente indicato, seguito da CI remota. Tale
+autorizzazione non comprende staging, deploy, produzione, merge o servizi Live.
+
 ## Fonti normative primarie
 
 - GDPR, Regolamento (UE) 2016/679: https://eur-lex.europa.eu/eli/reg/2016/679/oj
