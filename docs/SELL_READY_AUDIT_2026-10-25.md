@@ -59,6 +59,8 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
     supportati, aggiungendo SVG vettoriale e PDF quadrato e codificando i parametri.
 24. limita a 4.000 caratteri dettagli e risoluzioni delle richieste privacy,
     mostra la risoluzione all'interessato e azzera la data di chiusura alla riapertura.
+25. limita categoria, sintesi ed evidenze JSON degli incidenti, richiede un oggetto
+    strutturato e azzera la vecchia data di chiusura quando un incidente viene riaperto.
 
 ## Matrice di conformità
 

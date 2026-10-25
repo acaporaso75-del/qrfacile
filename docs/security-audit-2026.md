@@ -87,3 +87,7 @@ rolls back every deletion; applying changes still requires the explicit flag.
 Expired password-reset token records have a 24-hour technical tail and expired
 email-verification token records a seven-day tail under the same job. These are
 proposed operational periods and still require the documented privacy review.
+
+Compliance-incident creation bounds category, summary and serialized evidence;
+evidence must be a JSON object rather than an arbitrary scalar or list. Reopened
+incidents clear their previous closure timestamp while preserving the audit trail.

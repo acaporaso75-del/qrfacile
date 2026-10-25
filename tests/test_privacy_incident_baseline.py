@@ -4,6 +4,12 @@ import pytest
 from fastapi import HTTPException
 
 from qrfacile_app.privacy_requests_ui import MAX_PRIVACY_TEXT_LENGTH, _bounded_text
+from qrfacile_app.compliance_incidents_ui import (
+    MAX_INCIDENT_CATEGORY_LENGTH,
+    MAX_INCIDENT_EVIDENCE_BYTES,
+    _incident_evidence,
+    _incident_text,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -46,3 +52,19 @@ def test_users_receive_resolution_and_reopened_requests_clear_completion():
     text = (ROOT / "qrfacile_app" / "privacy_requests_ui.py").read_text(encoding="utf-8")
     assert "completed_at, resolution" in text
     assert "THEN now() ELSE NULL END" in text
+
+
+def test_incident_text_and_evidence_are_bounded():
+    assert _incident_text(" security ", "Categoria", MAX_INCIDENT_CATEGORY_LENGTH) == "security"
+    assert _incident_evidence({"timeline": ["opened"]}) == '{"timeline": ["opened"]}'
+    with pytest.raises(HTTPException):
+        _incident_text("x" * (MAX_INCIDENT_CATEGORY_LENGTH + 1), "Categoria", MAX_INCIDENT_CATEGORY_LENGTH)
+    with pytest.raises(HTTPException):
+        _incident_evidence(["not", "an", "object"])
+    with pytest.raises(HTTPException):
+        _incident_evidence({"blob": "x" * MAX_INCIDENT_EVIDENCE_BYTES})
+
+
+def test_reopened_incident_clears_old_closed_timestamp():
+    text = (ROOT / "qrfacile_app" / "compliance_incidents_ui.py").read_text(encoding="utf-8")
+    assert "closed_at=CASE WHEN %s='closed' THEN now() ELSE NULL END" in text
