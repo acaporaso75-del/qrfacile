@@ -67,4 +67,5 @@ counters and leaves users, credentials and sessions unchanged.
 All new passwords created through Cantina registration, Studio registration or
 password reset use the same server-side policy: 12 to 128 characters. Matching
 HTML bounds give immediate feedback but are not trusted for enforcement.
-Existing password hashes and login compatibility are unchanged.
+Both registration forms also require a matching confirmation before any account
+is created. Existing password hashes and login compatibility are unchanged.

@@ -30,3 +30,11 @@ def test_password_inputs_publish_the_same_length_bounds():
     for markup in (reset, studio, winery):
         assert 'minlength="12"' in markup
         assert 'maxlength="128"' in markup
+
+
+def test_both_registration_flows_require_password_confirmation():
+    for module in (studio_register_routes, winery_register_routes):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert 'password_confirm: str = Form(...)' in source
+        assert '_input("password_confirm", "password"' in source
+        assert 'password != (password_confirm or "")' in source

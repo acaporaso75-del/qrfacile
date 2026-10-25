@@ -79,6 +79,7 @@ def _input(name: str, type_: str, placeholder: str, value: str = "", required: b
     labels = {
         "email": "Email",
         "password": "Password",  # pragma: allowlist secret
+        "password_confirm": "Conferma password",  # pragma: allowlist secret
         "name": "Nome cantina",
         "vat": "Partita IVA",
         "sdi": "Codice SDI",
@@ -94,6 +95,7 @@ def _input(name: str, type_: str, placeholder: str, value: str = "", required: b
     autocompletes = {
         "email": "email",
         "password": "new-password",  # pragma: allowlist secret
+        "password_confirm": "new-password",  # pragma: allowlist secret
         "name": "organization",
         "pec": "email",
         "phone": "tel",
@@ -253,9 +255,16 @@ def register_winery_get(request: Request, invite: str = "", err: str = "", msg: 
                 </div>
               </div>
 
-              <div style="margin-top:14px">
-                <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Nome Cantina</label>
-                {_input("name", "text", "Cantina XYZ", "", True)}
+              <div class="grid2 register-form-grid" style="margin-top:14px">
+                <div>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Conferma password</label>
+                  {_input("password_confirm", "password", "Ripeti la password", "", True)}
+                </div>
+
+                <div>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Nome Cantina</label>
+                  {_input("name", "text", "Cantina XYZ", "", True)}
+                </div>
               </div>
 
               <div class="grid2 register-form-grid" style="margin-top:14px">
@@ -465,6 +474,7 @@ def register_winery_post(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
+    password_confirm: str = Form(...),
     name: str = Form(...),
     vat: str = Form(...),
     sdi: str = Form(...),
@@ -491,6 +501,9 @@ def register_winery_post(
     policy_error = new_password_error(password)
     if policy_error:
         return RedirectResponse(f"/register-winery?err={quote_plus(policy_error)}", status_code=303)
+
+    if password != (password_confirm or ""):
+        return RedirectResponse("/register-winery?err=Le%20password%20non%20coincidono", status_code=303)
 
     if terms_accepted != "yes" or privacy_acknowledged != "yes":
         return RedirectResponse(

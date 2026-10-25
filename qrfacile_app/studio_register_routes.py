@@ -105,6 +105,7 @@ def _input(name: str, type_: str, placeholder: str, value: str = "", required: b
     labels = {
         "email": "Email di accesso",
         "password": "Password",  # pragma: allowlist secret
+        "password_confirm": "Conferma password",  # pragma: allowlist secret
         "company_name": "Ragione sociale",
         "vat": "Partita IVA",
         "sdi": "Codice SDI",
@@ -119,6 +120,7 @@ def _input(name: str, type_: str, placeholder: str, value: str = "", required: b
     autocompletes = {
         "email": "email",
         "password": "new-password",  # pragma: allowlist secret
+        "password_confirm": "new-password",  # pragma: allowlist secret
         "company_name": "organization",
         "pec": "email",
         "contact_name": "name",
@@ -237,6 +239,11 @@ def register_studio_get(err: str = "", msg: str = "", invite: str = "", next: st
                 <div>
                   <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Password (min {MIN_PASSWORD_LENGTH})</label>
                   {_input("password", "password", "••••••••", "", True)}
+                </div>
+
+                <div>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Conferma password</label>
+                  {_input("password_confirm", "password", "Ripeti la password", "", True)}
                 </div>
 
                 <div>
@@ -423,6 +430,7 @@ def register_studio_post(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
+    password_confirm: str = Form(...),
     company_name: str = Form(...),
     vat: str = Form(...),
     sdi: str = Form(...),
@@ -447,6 +455,9 @@ def register_studio_post(
     policy_error = new_password_error(password)
     if policy_error:
         return RedirectResponse(f"/register-studio?err={quote_plus(policy_error)}", status_code=303)
+
+    if password != (password_confirm or ""):
+        return RedirectResponse("/register-studio?err=Le%20password%20non%20coincidono", status_code=303)
 
     if terms_accepted != "yes" or privacy_acknowledged != "yes":
         return RedirectResponse(

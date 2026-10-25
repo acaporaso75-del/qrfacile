@@ -48,6 +48,8 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
     e rende messaggi ed errori annunciabili dalle tecnologie assistive.
 19. applica una sola policy alle nuove password di Cantina, Studio e recupero:
     minimo 12 e massimo 128 caratteri, lasciando invariato l'accesso storico.
+20. richiede la conferma password in entrambe le registrazioni per intercettare
+    errori di digitazione prima della creazione dell'account.
 
 ## Matrice di conformità
 
