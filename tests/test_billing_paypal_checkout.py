@@ -159,7 +159,11 @@ class _Cursor:
 
     def fetchone(self):
         if "AS profile" in self.last_sql:
-            return {"profile": self.state.get("profile", {"vat": "12345678903", "country": "IT"})}
+            return {"profile": self.state.get("profile", {
+                "name": "Cantina Test", "vat": "12345678903", "sdi": "ABC1234", "pec": "",
+                "billing_address": "Via Test 1", "city": "Benevento", "billing_cap": "82100",
+                "province": "BN", "billing_country": "IT",
+            })}
         if "SELECT * FROM orders" in self.last_sql:
             return self.state.get("order")
         if "FROM wineries" in self.last_sql:
@@ -359,11 +363,35 @@ def test_annual_start_uses_gross_price_and_immutable_snapshot(monkeypatch):
 ])
 def test_ineligible_annual_checkout_never_contacts_provider(monkeypatch, pack, confirmation, country):
     state = _install_checkout_mocks(monkeypatch, _ProviderResponse())
-    state["profile"] = {"vat": "12345678903", "country": country}
+    state["profile"] = {
+        "name": "Cantina Test", "vat": "12345678903", "sdi": "ABC1234", "pec": "",
+        "billing_address": "Via Test 1", "city": "Benevento", "billing_cap": "82100",
+        "province": "BN", "billing_country": country,
+    }
     request = _request("/paypal/start", "POST")
-    with pytest.raises(HTTPException):
-        paypal_ui.paypal_start(request, pack, csrf_token=csrf_token_for_request(request),
-                               fiscal_confirmation=confirmation)
+    if country == "FR" and pack == "annual_start" and confirmation == "IT_ORDINARY":
+        response = paypal_ui.paypal_start(request, pack, csrf_token=csrf_token_for_request(request),
+                                          fiscal_confirmation=confirmation)
+        assert response.status_code == 303
+        assert response.headers["location"].startswith("/app/winery/settings?err=")
+    else:
+        with pytest.raises(HTTPException):
+            paypal_ui.paypal_start(request, pack, csrf_token=csrf_token_for_request(request),
+                                   fiscal_confirmation=confirmation)
+    assert not state["posts"]
+    assert not any("INSERT INTO orders" in sql for sql, _ in state["queries"])
+
+
+def test_incomplete_fiscal_profile_never_creates_order_or_contacts_provider(monkeypatch):
+    state = _install_checkout_mocks(monkeypatch, _ProviderResponse())
+    state["profile"] = {"name": "Cantina Test", "vat": "12345678903", "billing_country": "IT"}
+    request = _request("/paypal/start", "POST")
+    response = paypal_ui.paypal_start(request, "annual_start",
+                                      csrf_token=csrf_token_for_request(request),
+                                      fiscal_confirmation="IT_ORDINARY")
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/app/winery/settings?err=")
+    assert response.headers["location"].endswith("#profilo-fiscale")
     assert not state["posts"]
     assert not any("INSERT INTO orders" in sql for sql, _ in state["queries"])
 

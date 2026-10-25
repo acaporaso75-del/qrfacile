@@ -34,7 +34,7 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
 | Accessibilità | Parziale | Aggiunti nomi accessibili e autocomplete ai form di registrazione; manca un audit WCAG completo con tastiera, screen reader, contrasto, zoom e flussi autenticati in staging. |
 | Sicurezza account | Non completo | Password reset e sessioni presenti; MFA admin non risulta implementata. Verifica email non è applicata in modo uniforme e richiede piano di migrazione. |
 | Continuità | Evidenza staging esistente | Esistono runbook e restore staging; occorre prova periodica di restore del perimetro produttivo e owner operativo. |
-| Pagamenti e fatture | Sandbox-ready nel codice, non pronto per Live | Il checkout annuale calcola imponibile, IVA ordinaria italiana e totale, congela le condizioni ordine e distingue Live/Sandbox/manuale/storico. Documento fiscale, riconciliazione, rimborsi e casi fiscali non ordinari richiedono processo contabile e test end-to-end. |
+| Pagamenti e fatture | Sandbox-ready nel codice, non pronto per Live | Il checkout annuale calcola imponibile, IVA ordinaria italiana e totale, congela condizioni e profilo fiscale nell'ordine e blocca prima di PayPal profili italiani incompleti o formalmente incoerenti. Verifica ufficiale P.IVA, documento fiscale, riconciliazione, rimborsi e casi fiscali non ordinari richiedono processo contabile e test end-to-end. |
 
 ## Requisiti prima di poter dire "vendibile"
 

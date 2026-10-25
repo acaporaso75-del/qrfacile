@@ -1,12 +1,14 @@
 import time
+from urllib.parse import quote_plus
 
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 from passlib.hash import pbkdf2_sha256
 
 from qrfacile_app.db import pg
 from qrfacile_app.legal_core import record_registration_acceptances
+from qrfacile_app.fiscal_profile import normalized_italian_fiscal_profile
 from qrfacile_app.ui_shell import page, top_actions, esc
 
 router = APIRouter()
@@ -84,6 +86,8 @@ def _input(name: str, type_: str, placeholder: str, value: str = "", required: b
         "contact_phone": "Telefono del referente",
         "city": "Città",
         "province": "Provincia",
+        "billing_address": "Indirizzo di fatturazione",
+        "billing_cap": "CAP di fatturazione",
     }
     autocompletes = {
         "email": "email",
@@ -95,6 +99,8 @@ def _input(name: str, type_: str, placeholder: str, value: str = "", required: b
         "contact_phone": "tel",
         "city": "address-level2",
         "province": "address-level1",
+        "billing_address": "street-address",
+        "billing_cap": "postal-code",
     }
     autocomplete = autocompletes.get(name, "off")
 
@@ -300,15 +306,28 @@ def register_winery_get(request: Request, invite: str = "", err: str = "", msg: 
 
               <div class="grid2 register-form-grid" style="margin-top:14px">
                 <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Città opzionale</label>
-                  {_input("city", "text", "Benevento")}
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Indirizzo di fatturazione</label>
+                  {_input("billing_address", "text", "Via..., n°", "", True)}
                 </div>
 
                 <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Provincia opzionale</label>
-                  {_input("province", "text", "BN")}
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Città</label>
+                  {_input("city", "text", "Benevento", "", True)}
                 </div>
               </div>
+
+              <div class="grid2 register-form-grid" style="margin-top:14px">
+                <div>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">CAP</label>
+                  {_input("billing_cap", "text", "82100", "", True)}
+                </div>
+
+                <div>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Provincia</label>
+                  {_input("province", "text", "BN", "", True)}
+                </div>
+              </div>
+              <input type="hidden" name="billing_country" value="IT">
 
               <div class="register-actions" style="
                 margin-top:22px;
@@ -451,8 +470,11 @@ def register_winery_post(
     phone: str = Form(""),
     contact_name: str = Form(...),
     contact_phone: str = Form(...),
-    city: str = Form(""),
-    province: str = Form(""),
+    billing_address: str = Form(...),
+    city: str = Form(...),
+    billing_cap: str = Form(...),
+    province: str = Form(...),
+    billing_country: str = Form("IT"),
     terms_accepted: str = Form(""),
     privacy_acknowledged: str = Form(""),
     invite: str = Form(""),
@@ -472,6 +494,22 @@ def register_winery_post(
             "/register-winery?err=Devi%20accettare%20i%20Termini%20e%20confermare%20la%20Privacy",
             status_code=303,
         )
+
+    try:
+        fiscal = normalized_italian_fiscal_profile({
+            "name": name,
+            "vat": vat,
+            "sdi": sdi,
+            "pec": pec,
+            "billing_address": billing_address,
+            "city": city,
+            "billing_cap": billing_cap,
+            "province": province,
+            "billing_country": billing_country,
+        })
+    except HTTPException as exc:
+        message = quote_plus(str(exc.detail))
+        return RedirectResponse(f"/register-winery?err={message}", status_code=303)
 
     invite = (invite or "").strip()
 
@@ -509,19 +547,25 @@ def register_winery_post(
 
             cur.execute(
                 """
-                INSERT INTO wineries (owner_user_id, name, vat, sdi, pec, phone, city, province, created_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                INSERT INTO wineries (
+                  owner_user_id, name, vat, sdi, pec, phone, city, province,
+                  billing_address, billing_cap, billing_country, created_at
+                )
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 RETURNING id
                 """,
                 (
                     user_id,
-                    (name or "").strip(),
-                    (vat or "").strip(),
-                    (sdi or "").strip(),
-                    (pec or "").strip(),
+                    fiscal["name"],
+                    fiscal["vat"],
+                    fiscal["sdi"],
+                    fiscal["pec"],
                     (phone or "").strip(),
-                    (city or "").strip(),
-                    (province or "").strip(),
+                    fiscal["city"],
+                    fiscal["province"],
+                    fiscal["billing_address"],
+                    fiscal["billing_cap"],
+                    fiscal["billing_country"],
                     now(),
                 ),
             )

@@ -22,7 +22,9 @@ Historical start/pro/plus orders retain their original 20/60/200 credits and amo
 
 The server computes net, VAT and total and freezes the purchased terms and saved customer details in orders.commercial_snapshot.
 The checkout requires confirmation of professional use, Italian fiscal location and ordinary VAT treatment.
-Saved foreign-country details or missing/malformed VAT numbers block checkout. The current VAT check validates
+Saved foreign-country details or incomplete address/CAP/province/SDI-or-PEC data and missing/malformed VAT numbers block checkout.
+Existing accounts can complete these fields from the authenticated Cantina settings page; incomplete profiles are
+sent there without creating an order or contacting PayPal. The current VAT check validates
 length, digits and the Italian checksum, but it is **not** an official verification that the VAT registration exists,
 is active or belongs to the purchasing entity.
 Foreign and special tax cases require a reviewed quotation, not an automatic zero-rate decision.
@@ -37,9 +39,9 @@ The same paid order cannot grant twice. Provider calls in local tests are mocks,
 
 1. Review the actual staging schema and take a verified backup.
 2. Apply the previously prepared payment-environment and legal-document migrations as applicable.
-3. Apply sql/2026_annual_wine_packages.sql **before** starting this application version.
-4. Verify view/trigger definitions and compare historical balances and QR records before/after.
-5. Run native PostgreSQL integration, two-session concurrent spending, sandbox checkout/capture/retry,
+3. Apply sql/2026_winery_fiscal_profile.sql and sql/2026_annual_wine_packages.sql **before** starting this application version.
+4. Verify the nullable winery fields, view/trigger definitions and compare historical balances and QR records before/after.
+5. Run native PostgreSQL integration, fiscal-profile completion, two-session concurrent spending, sandbox checkout/capture/retry,
    and browser acceptance for winery and Studio roles.
 6. Obtain separate release authorization. No production migration/deploy/PayPal Live configuration is authorized.
 
@@ -55,7 +57,7 @@ The 2026-10-25 legal version is still unreleased; its public terms hash has been
 
 ## Local verification
 
-Final local result after Studio-access, revenue-reporting and VAT-checksum hardening: **287 passed, 0 skipped** using an isolated native
+Final local result after Studio-access, revenue-reporting and fiscal-profile hardening: **299 passed, 0 skipped** using an isolated native
 PostgreSQL 16.15 database bound to 127.0.0.1. This includes the two-connection overspend test and
 the staging reconciliation migration/rollback test. The separate in-memory PostgreSQL/PGlite run
 also passed all **18** assertions.

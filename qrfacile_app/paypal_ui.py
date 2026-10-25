@@ -15,6 +15,7 @@ from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.csrf_core import require_csrf
 from qrfacile_app.db import pg
 from qrfacile_app.annual_packages import annual_quote, grant_annual_units, load_order_product, validate_capture
+from qrfacile_app.fiscal_profile import normalized_italian_fiscal_profile
 
 from qrfacile_app.pricing_config import (
     get_purchase_pack,
@@ -270,12 +271,15 @@ def paypal_start(
                     raise HTTPException(422, 'Conferma i dati fiscali e il totale IVA inclusa prima di acquistare.')
                 cur.execute("SELECT to_jsonb(w) AS profile FROM wineries w WHERE id=%s", (winery_id,))
                 profile = (cur.fetchone() or {}).get('profile') or {}
-                country = profile.get('billing_country') or profile.get('country') or 'IT'
-                snapshot = annual_quote(pack, country, str(profile.get('vat') or ''))
-                snapshot['customer'] = {
-                    key: profile.get(key) for key in
-                    ('name', 'company_name', 'vat', 'sdi', 'pec', 'city', 'province', 'billing_country', 'country')
-                }
+                try:
+                    customer = normalized_italian_fiscal_profile(profile)
+                except HTTPException as exc:
+                    return RedirectResponse(
+                        f"/app/winery/settings?err={quote_plus(str(exc.detail))}#profilo-fiscale",
+                        status_code=303,
+                    )
+                snapshot = annual_quote(pack, customer['billing_country'], customer['vat'])
+                snapshot['customer'] = customer
                 snapshot['fiscal_confirmation'] = fiscal_confirmation
                 total_cents = snapshot['gross_cents']
 
