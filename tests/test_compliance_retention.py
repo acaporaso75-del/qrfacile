@@ -36,15 +36,24 @@ class _Connection:
 
 
 def test_retention_dry_run_rolls_back_and_covers_login_failures(monkeypatch):
-    connection = _Connection({"login_failures"})
+    connection = _Connection({"login_failures", "password_reset_tokens", "email_verification_tokens"})
     monkeypatch.setenv("DATABASE_URL", "postgresql://local/test")
     monkeypatch.setattr(compliance_retention.psycopg, "connect", lambda _url: connection)
     result = compliance_retention.execute(dry_run=True)
     assert result["login_failures"] == 3
+    assert result["password_reset_tokens"] == 3
+    assert result["email_verification_tokens"] == 3
     assert connection.rollbacks == 1 and connection.commits == 0
-    statement, params = connection.cursor_instance.deletes[0]
-    assert "extract(epoch FROM now()" in statement
-    assert params == (24,)
+    statements = {table: (statement, params) for table, (statement, params) in zip(
+        ("login_failures", "password_reset_tokens", "email_verification_tokens"),
+        connection.cursor_instance.deletes,
+    )}
+    assert "extract(epoch FROM now()" in statements["login_failures"][0]
+    assert statements["login_failures"][1] == (24,)
+    assert "expires_at < extract(epoch FROM now()" in statements["password_reset_tokens"][0]
+    assert statements["password_reset_tokens"][1] == (24,)
+    assert "expires_at < now()" in statements["email_verification_tokens"][0]
+    assert statements["email_verification_tokens"][1] == (7,)
 
 
 def test_retention_apply_commits_and_reports_missing_tables(monkeypatch):

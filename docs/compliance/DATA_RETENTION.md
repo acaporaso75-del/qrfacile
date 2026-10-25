@@ -5,8 +5,10 @@ I dati sono conservati solo per il tempo necessario alla finalità dichiarata, a
 
 ## Durate operative proposte
 - Sessioni applicative: 14 giorni dall'ultima attività, salvo revoca immediata.
-- Token reset password: massimo 60 minuti o fino all'uso.
-- Log autenticazione e sicurezza: 12 mesi.
+- Token reset password: validità massima 60 minuti; record tecnico eliminabile 24 ore dopo la scadenza.
+- Token verifica email: record tecnico eliminabile 7 giorni dopo la scadenza.
+- Contatori antifrode dei login falliti: 24 ore.
+- Eventi di sicurezza soggetti ad audit: 12 mesi.
 - Audit log amministrativo: 24 mesi.
 - Log applicativi ordinari: 90 giorni.
 - Dati account attivo: durata del rapporto.
