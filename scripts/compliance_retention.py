@@ -44,7 +44,7 @@ def execute(dry_run: bool) -> dict[str, int | bool | str]:
         "legal_acceptances": "legal_acceptances_days",
         "compliance_incidents": "closed_incidents_days",
         "login_failures": "login_failures_hours",
-        "password_reset_tokens": "password_reset_tokens_hours",
+        "password_reset_tokens": "password_reset_tokens_hours",  # pragma: allowlist secret
         "email_verification_tokens": "email_verification_tokens_days",
     }
 

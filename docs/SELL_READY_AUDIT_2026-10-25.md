@@ -57,6 +57,8 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
     e caratteri di controllo; il cookie contesto usa Secure sotto HTTPS.
 23. ripristina la compatibilità dei vecchi link export verso preset realmente
     supportati, aggiungendo SVG vettoriale e PDF quadrato e codificando i parametri.
+24. limita a 4.000 caratteri dettagli e risoluzioni delle richieste privacy,
+    mostra la risoluzione all'interessato e azzera la data di chiusura alla riapertura.
 
 ## Matrice di conformità
 
@@ -64,7 +66,7 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
 |---|---|---|
 | E-label vino | Codice corretto, non installato | `/e/` senza cookie, analytics, fingerprint, IP/user-agent o contatore; resta obbligatorio testare staging e produzione dopo un deploy autorizzato. |
 | GDPR informativa e prova contrattuale | Parziale avanzato | Informativa aggiornata e accettazioni versionate; da formalizzare ruoli titolare/responsabile, registro art. 30, DPA sottoscritti e lista sub-responsabili. |
-| Diritti interessati / incidenti | Presente nel codice, processo non provato | Workflow e tabelle esistono; servono responsabili, SLA, prova periodica ed evidenze organizzative. |
+| Diritti interessati / incidenti | Presente nel codice, processo non provato | Workflow con scadenza, risoluzione visibile e limiti input presente; servono responsabili, SLA, prova periodica ed evidenze organizzative. |
 | Retention | Documentata, non certificata | Le durate proposte richiedono approvazione privacy/fiscale e prova del job in produzione. |
 | Cookie/ePrivacy | Coerente con lo stato attuale | Le pagine pubbliche osservate non impostano cookie né caricano script. Nuovi analytics/pixel richiederanno nuova valutazione e, se applicabile, consenso. |
 | AI Act | Framework presente, attivazione da governare | Registro sistemi AI, policy, revisione umana e divieto auto-publish per dati sensibili presenti; prima di attivare un provider servono scheda caso d'uso, DPA, trasferimenti, retention e formazione AI literacy. |
