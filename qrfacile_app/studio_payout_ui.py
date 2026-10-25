@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, esc, pill
 
@@ -34,7 +35,7 @@ def _balances(cur, user_id: int) -> dict:
 def _credits(cur, user_id: int) -> dict:
     cur.execute("""
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
     """, (int(user_id),))
@@ -153,6 +154,7 @@ def request_payout(
     iban: str = Form(...),
     beneficiary: str = Form(...),
 ):
+    require_csrf_or_same_origin(request)
     u = require_any_role(request, ("studio",))
     uid = int(u["id"])
 

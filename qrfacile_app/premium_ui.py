@@ -4,9 +4,11 @@ from typing import Set
 
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
+from psycopg.errors import UniqueViolation
 from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.util import new_slug
 from qrfacile_app.auth_core import (
     require_any_role,
@@ -14,8 +16,11 @@ from qrfacile_app.auth_core import (
     winery_id_for_owner,
 )
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
+from qrfacile_app.guided_flow import render_guided_stepper
 
 router = APIRouter()
+
+QR_WINES_QR_ITEM_UNIQUE_CONSTRAINT = "uq_qr_wines_qr_item_id"
 
 
 def now() -> int:
@@ -42,7 +47,7 @@ def _balances(cur, user_id: int) -> dict:
     cur.execute(
         """
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
         """,
@@ -128,7 +133,7 @@ def _connected_studios(cur, winery_id: int) -> list[dict]:
           sc.can_create,
           u.email,
           COALESCE(s.company_name, '') AS company_name
-        FROM studio_clients sc
+        FROM studio_clients sc /* security-review: selection-only */
         JOIN users u ON u.id = sc.studio_user_id
         LEFT JOIN studios s ON s.user_id = u.id
         WHERE sc.winery_id=%s
@@ -184,16 +189,16 @@ def _studio_assignment_box(
       <label class="newWineWorkOption">
         <input type="radio" name="studio_work_mode" value="self" checked>
         <span>
-          <b>Gestisco io</b>
-          <small>Nessuno studio viene assegnato ora.</small>
+          <b>La cantina gestisce direttamente il lavoro</b>
+          <small>Solo gli utenti autorizzati della cantina potranno modificare e pubblicare.</small>
         </span>
       </label>
 
       <label class="newWineWorkOption">
         <input type="radio" name="studio_work_mode" value="connected" {connected_disabled}>
         <span>
-          <b>Assegna a Studio già collegato</b>
-          <small>Lo studio deve essere collegato alla cantina e poi assegnato a questa etichetta.</small>
+          <b>Affida il lavoro a uno studio grafico collegato</b>
+          <small>Lo studio potrà modificare l’etichetta; la pubblicazione resta sotto il controllo della cantina.</small>
         </span>
       </label>
       <div class="newWineWorkNested">
@@ -202,7 +207,7 @@ def _studio_assignment_box(
           {''.join(opts)}
         </select>
         <div class="note" style="margin-top:10px">
-          Il collegamento generale resta in <b>studio_clients</b>; l'assegnazione operativa usa <b>label_collaborators</b>.
+          Scegli lo studio che preparerà questa etichetta. Potrai cambiare assegnazione dalla dashboard.
         </div>
       </div>
 
@@ -224,35 +229,16 @@ def _create_studio_invite_for_context(
     if not studio_email or "@" not in studio_email or "." not in studio_email:
         return False
 
-    token = secrets.token_urlsafe(24)
-    ts = now()
-    exp = ts + 14 * 86400
-
-    cols = [
-        "token",
-        "winery_id",
-        "inviter_user_id",
-        "studio_email",
-        "can_view",
-        "can_edit",
-        "can_create",
-        "created_at",
-        "expires_at",
-    ]
-    vals = [token, int(winery_id), int(inviter_user_id), studio_email, True, True, False, ts, exp]
-
-    invite_cols = _columns(cur, "studio_invites")
-    if wine_id and "source_wine_id" in invite_cols:
-        cols.append("source_wine_id")
-        vals.append(int(wine_id))
-    if label_id and "source_label_id" in invite_cols:
-        cols.append("source_label_id")
-        vals.append(int(label_id))
-
-    placeholders = ",".join(["%s"] * len(vals))
+    import hashlib, json
+    token = secrets.token_urlsafe(32)
+    invite_type = "label" if label_id else ("wine" if wine_id else "studio")
     cur.execute(
-        f"INSERT INTO studio_invites ({','.join(cols)}) VALUES ({placeholders})",
-        tuple(vals),
+        """INSERT INTO invites(legacy_token,token_hash,invite_type,inviter_user_id,inviter_role,
+             invitee_email,target_role,winery_id,wine_id,label_id,permissions_json,status,expires_at,created_at,send_attempts)
+           VALUES(NULL,%s,%s,%s,'winery',%s,'studio',%s,%s,%s,%s::jsonb,'pending',now()+interval '14 days',now(),0)""",
+        (hashlib.sha256(token.encode()).hexdigest(),invite_type,int(inviter_user_id),studio_email,
+         int(winery_id),int(wine_id) if wine_id else None,int(label_id) if label_id else None,
+         json.dumps({"can_view":True,"can_edit":True,"can_create":False,"can_publish":False})),
     )
     return True
 
@@ -567,6 +553,8 @@ def new_wine_get(
         </div>
       </div>
 
+      {render_guided_stepper(0, "wine")}
+
       <form class="card newWineForm" method="post" action="/app/new-wine">
         <div class="newWineSectionTitle">
           <span>1</span>
@@ -587,7 +575,7 @@ def new_wine_get(
               {''.join(master_opts)}
             </select>
             <div class="note" style="margin-top:10px">
-              Seleziona l’etichetta/prodotto a cui collegare questo lotto.
+              Se scegli un’etichetta esistente, i dati disponibili verranno copiati nel nuovo lotto. Potrai modificarli prima di salvare.
               Se non esiste ancora, creala da
               <a class="dashboardInlineLink" href="/app/new-wine-master">Nuova etichetta</a>.
             </div>
@@ -605,16 +593,16 @@ def new_wine_get(
         <div class="newWineGrid3">
           <div style="grid-column:1 / -1">
             <label>Etichetta selezionata</label>
-            <input class="input" name="wine_name" placeholder="Compilata automaticamente dall’etichetta scelta" readonly>
+            <input class="input" name="wine_name" placeholder="Scegli prima un’etichetta dall’elenco" readonly>
           </div>
 
           <div>
-            <label>Annata opzionale</label>
+            <label>Annata (se dichiarata in etichetta)</label>
             <input class="input" name="vintage" placeholder="2023">
           </div>
 
           <div>
-            <label>Lotto opzionale</label>
+            <label>Codice lotto</label>
             <input class="input" name="lot" placeholder="L001/7">
           </div>
 
@@ -624,7 +612,7 @@ def new_wine_get(
           </div>
 
           <div>
-            <label>Grado alcolico opzionale</label>
+            <label>Grado alcolico (% vol)</label>
             <input class="input" name="alcohol" placeholder="13.5">
           </div>
 
@@ -913,7 +901,7 @@ def _subscription_gate_for_new_wine(cur, user: dict, owner_user_id: int, winery_
     - admin: può creare sempre.
     - se non esiste subscription active: non blocca qui; decide il saldo crediti.
       Questo permette l'uso dei 3 crediti QR vino gratuiti iniziali.
-    - se esiste subscription active ma scaduta: blocca nuovi QR.
+    - subscription legacy scaduta: i crediti ancora disponibili consentono nuovi QR.
     - se subscription active valida: ok.
     """
     role = (user.get("role") or "").lower().strip()
@@ -941,7 +929,10 @@ def _subscription_gate_for_new_wine(cur, user: dict, owner_user_id: int, winery_
     expires_at = int(sub.get("expires_at") or 0)
 
     if expires_at and expires_at < now():
-        return False, "Piano scaduto: rinnova il piano per creare nuovi QR vino."
+        # New annual allowances and perpetual credits survive a legacy subscription.
+        cur.execute("SELECT COALESCE(SUM(delta),0) AS balance FROM available_credit_ledger WHERE user_id=%s AND credit_type='wine'", (int(owner_user_id),))
+        if int((cur.fetchone() or {}).get('balance') or 0) <= 0:
+            return False, "Unità esaurite o scadute: acquista un pacchetto per creare nuovi QR vino."
 
     return True, ""
 
@@ -961,6 +952,7 @@ def new_wine_post(
     studio_work_mode: str = Form("self"),
     invite_studio_email: str = Form(""),
 ):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery", "studio", "admin"))
 
     require_any_role(
@@ -994,7 +986,8 @@ def new_wine_post(
     credit_cost = 2 if duration_years == 25 else 1
 
     ts = now()
-    expires_at = ts + (60 * 60 * 24 * 365 * duration_years)
+    from qrfacile_app.annual_packages import anniversary
+    expires_at = anniversary(ts, duration_years)
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -1047,7 +1040,7 @@ def new_wine_post(
             cur.execute(
                 """
                 SELECT COALESCE(SUM(delta), 0) AS balance
-                FROM credit_ledger
+                FROM available_credit_ledger
                 WHERE user_id=%s AND credit_type='wine'
                 """,
                 (owner_user_id,),
@@ -1142,10 +1135,22 @@ def new_wine_post(
             placeholders = ",".join(["%s"] * len(values))
             cols_sql = ",".join(col_names)
 
-            cur.execute(
-                f"INSERT INTO qr_wines({cols_sql}) VALUES ({placeholders}) RETURNING id",
-                tuple(values),
-            )
+            try:
+                cur.execute(
+                    f"INSERT INTO qr_wines({cols_sql}) VALUES ({placeholders}) RETURNING id",
+                    tuple(values),
+                )
+            except UniqueViolation as exc:
+                conn.rollback()
+                if exc.diag.constraint_name == QR_WINES_QR_ITEM_UNIQUE_CONSTRAINT:
+                    return RedirectResponse(
+                        url=(
+                            f"/app/new-wine?winery_id={int(winery_id)}"
+                            "&err=Esiste%20gi%C3%A0%20un%20vino%20per%20questo%20QR"
+                        ),
+                        status_code=303,
+                    )
+                raise
             wine_id = int(cur.fetchone()["id"])
 
             cur.execute(
@@ -1611,6 +1616,7 @@ def new_label_create(
     assigned_studio_user_id: int = Form(0),
     invite_studio_email: str = Form(""),
 ):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery", "studio", "admin"))
 
     with pg() as conn:

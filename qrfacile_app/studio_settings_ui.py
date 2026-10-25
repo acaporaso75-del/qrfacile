@@ -543,7 +543,7 @@ def studios_settings_redirect(request: Request, msg: str = "", err: str = ""):
     return RedirectResponse(f"/app/winery/settings{suffix}", status_code=303)
 
 
-@router.post("/app/settings/studios/invite")
+# Legacy duplicate deliberately unrouted; invitation_management_ui owns this path.
 def studios_invite_post(
     request: Request,
     studio_email: str = Form(...),
@@ -604,7 +604,7 @@ def studios_invite_post(
 
             placeholders = ",".join(["%s"] * len(vals))
             cur.execute(
-                f"INSERT INTO studio_invites ({','.join(cols)}) VALUES ({placeholders})",
+                f"INSERT INTO studio_invites /* security-review: unrouted-legacy */ ({','.join(cols)}) VALUES ({placeholders})",
                 tuple(vals),
             )
             conn.commit()
@@ -630,8 +630,10 @@ def studios_invite_post(
 
 
 
-@router.get("/app/invite/studio/accept/{token}", response_class=HTMLResponse)
-def studio_accept_invite(request: Request, token: str):
+# Legacy implementation intentionally left unregistered while old installations
+# transition to qrfacile_app.invitation_acceptance_ui.  Acceptance must only be
+# reachable through the POST route below.
+def _legacy_studio_accept_invite_unrouted(request: Request, token: str):
     token = (token or "").strip()
 
     with pg() as conn:
@@ -727,8 +729,7 @@ def studio_accept_invite(request: Request, token: str):
     return RedirectResponse(_invite_redirect_target(inv), status_code=303)
 
 
-@router.post("/app/invite/studio/accept/{token}")
-def studio_accept_invite_post(request: Request, token: str):
+def _legacy_studio_accept_invite_post_unrouted(request: Request, token: str):
     user = require_any_role(request, ("studio", "admin"))
     role = (user.get("role") or "").lower().strip()
 

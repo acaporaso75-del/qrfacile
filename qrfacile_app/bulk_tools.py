@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app.util import now_epoch, new_slug
 
@@ -63,9 +64,14 @@ def _allowed_wineries_macro(cur, user: dict) -> List[int]:
         return [int(r["id"]) for r in (cur.fetchall() or [])]
     if role == "studio":
         cur.execute("""
-          SELECT winery_id
-          FROM studio_clients
-          WHERE studio_user_id=%s AND can_view=TRUE
+          SELECT DISTINCT wl.winery_id
+          FROM label_collaborators lc
+          JOIN wine_labels wl ON wl.id=lc.wine_label_id
+          JOIN studio_clients sc
+            ON sc.studio_user_id=lc.collaborator_user_id
+           AND sc.winery_id=wl.winery_id
+          WHERE lc.collaborator_user_id=%s AND lc.active=TRUE
+            AND lc.can_view=TRUE AND sc.can_view=TRUE
         """, (int(user["id"]),))
         return [int(r["winery_id"]) for r in (cur.fetchall() or [])]
     # winery owner
@@ -75,16 +81,16 @@ def _allowed_wineries_macro(cur, user: dict) -> List[int]:
 
 
 def _studio_acl_where(studio_user_id: int) -> str:
-    # micro ACL: studio can see label if created_by_user_id == studio OR ACL table can_view
-    return f"""(
-      wl.created_by_user_id = {int(studio_user_id)}
-      OR EXISTS (
+    # General connection and explicit per-label assignment are both required.
+    return f"""EXISTS (
         SELECT 1
-        FROM wine_labels_acl a
-        WHERE a.wine_label_id = wl.id
-          AND a.studio_user_id = {int(studio_user_id)}
-          AND a.can_view = TRUE
-      )
+        FROM label_collaborators lc
+        JOIN studio_clients sc
+          ON sc.studio_user_id=lc.collaborator_user_id
+         AND sc.winery_id=wl.winery_id
+        WHERE lc.wine_label_id=wl.id
+          AND lc.collaborator_user_id={int(studio_user_id)}
+          AND lc.active=TRUE AND lc.can_view=TRUE AND sc.can_view=TRUE
     )"""
 
 
@@ -106,14 +112,16 @@ def _label_visible_to_studio(cur, label_id: int, studio_user_id: int) -> dict:
     if not lb:
         raise HTTPException(404, "Etichetta non trovata")
 
-    if lb.get("created_by_user_id") and int(lb["created_by_user_id"]) == int(studio_user_id):
-        return lb
-
     cur.execute("""
-      SELECT 1 FROM wine_labels_acl a
-      WHERE a.wine_label_id=%s AND a.studio_user_id=%s AND a.can_view=TRUE
+      SELECT 1
+      FROM label_collaborators lc
+      JOIN studio_clients sc
+        ON sc.studio_user_id=lc.collaborator_user_id
+       AND sc.winery_id=%s
+      WHERE lc.wine_label_id=%s AND lc.collaborator_user_id=%s
+        AND lc.active=TRUE AND lc.can_view=TRUE AND sc.can_view=TRUE
       LIMIT 1
-    """, (int(label_id), int(studio_user_id)))
+    """, (int(lb["winery_id"]), int(label_id), int(studio_user_id)))
     if cur.fetchone():
         return lb
 
@@ -212,6 +220,7 @@ def bulk_clone_form(request: Request, label_id: int = 0):
 
 @router.post("/app/bulk/clone")
 def bulk_clone_post(request: Request, label_id: int = Form(...), lots: str = Form("")):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ["winery", "studio", "admin"])
     ts = now_epoch()
     lot_list = _parse_lots(lots)

@@ -10,6 +10,7 @@ from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, esc
 from qrfacile_app.ui_layout import pill
+from qrfacile_app.services.storage import versioned_upload_url
 
 router = APIRouter()
 
@@ -18,9 +19,9 @@ def _h(s: str) -> str:
     return html.escape(s or "")
 
 
-def _thumb(asset_path: str | None) -> str:
+def _thumb(asset_path: str | None, updated_at: object = "") -> str:
     if asset_path:
-        return f"/uploads/{asset_path}"
+        return versioned_upload_url(asset_path, updated_at)
     return "/static/img/placeholder_label.svg"
 
 
@@ -28,7 +29,7 @@ def _balances(cur, user_id: int) -> dict:
     cur.execute(
         """
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
         """,
@@ -113,7 +114,7 @@ def _load_inline_management(cur, wine_ids: list[int], winery_ids: list[int]) -> 
               u.id AS studio_user_id,
               u.email,
               COALESCE(s.company_name, '') AS company_name
-            FROM studio_clients sc
+            FROM studio_clients sc /* security-review: selection-only */
             JOIN users u ON u.id = sc.studio_user_id
             LEFT JOIN studios s ON s.user_id = u.id
             WHERE sc.winery_id = ANY(%s)
@@ -535,8 +536,8 @@ def _wine_card(r: dict, role: str = "", labels_by_wine: dict[int, list[dict]] | 
     slug = r.get("slug") or ""
     wine_id = int(r["wine_id"])
 
-    front = _thumb(r.get("front_thumb"))
-    back = _thumb(r.get("back_thumb"))
+    front = _thumb(r.get("front_thumb"), r.get("front_updated_at"))
+    back = _thumb(r.get("back_thumb"), r.get("back_updated_at"))
 
     wine_name = _h(r.get("wine_name") or "Senza nome")
     winery_name = _h(r.get("winery_name") or "")
@@ -730,10 +731,14 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
             elif role == "studio":
                 cur.execute(
                     """
-                    SELECT winery_id
-                    FROM studio_clients
-                    WHERE studio_user_id=%s
-                      AND can_view=TRUE
+                    SELECT DISTINCT wl.winery_id
+                    FROM label_collaborators lc
+                    JOIN wine_labels wl ON wl.id=lc.wine_label_id
+                    JOIN studio_clients sc
+                      ON sc.studio_user_id=lc.collaborator_user_id
+                     AND sc.winery_id=wl.winery_id
+                    WHERE lc.collaborator_user_id=%s
+                      AND lc.active=TRUE AND lc.can_view=TRUE AND sc.can_view=TRUE
                     """,
                     (uid,),
                 )
@@ -845,19 +850,37 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
 
             where = "qw.winery_id = ANY(%s)"
             params = [allowed_winery_ids]
+            if role == "studio":
+                where += """
+                AND EXISTS (
+                  SELECT 1 FROM wine_labels wl_scope
+                  JOIN label_collaborators lc_scope ON lc_scope.wine_label_id=wl_scope.id
+                  JOIN studio_clients sc_scope
+                    ON sc_scope.studio_user_id=lc_scope.collaborator_user_id
+                   AND sc_scope.winery_id=wl_scope.winery_id
+                  WHERE wl_scope.wine_id=qw.id
+                    AND lc_scope.collaborator_user_id=%s
+                    AND lc_scope.active=TRUE AND lc_scope.can_view=TRUE
+                    AND sc_scope.can_view=TRUE
+                )
+                """
+                params.append(uid)
             work = (work or "all").strip().lower()
             if work not in ("all", "self", "assigned", "pending"):
                 work = "all"
 
-            cur.execute(
-                """
-                SELECT COUNT(*)::int AS n
-                FROM wines_master
-                WHERE winery_id = ANY(%s)
-                """,
-                (allowed_winery_ids,),
-            )
-            master_count = int((cur.fetchone() or {}).get("n") or 0)
+            if role == "studio":
+                master_count = 0
+            else:
+                cur.execute(
+                    """
+                    SELECT COUNT(*)::int AS n
+                    FROM wines_master
+                    WHERE winery_id = ANY(%s)
+                    """,
+                    (allowed_winery_ids,),
+                )
+                master_count = int((cur.fetchone() or {}).get("n") or 0)
 
             if q:
                 where += """
@@ -940,6 +963,8 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
                   w.name AS winery_name,
                   wa_front.img_thumb AS front_thumb,
                   wa_back.img_thumb AS back_thumb,
+                  wa_front.updated_at AS front_updated_at,
+                  wa_back.updated_at AS back_updated_at,
                   COALESCE(ing.ingredient_count, 0) AS ingredient_count,
                   COALESCE(allg.allergen_count, 0) AS allergen_count,
                   COALESCE(rec.recycle_count, 0) AS recycle_count,
@@ -981,7 +1006,10 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
                 LEFT JOIN (
                   SELECT wine_id, COUNT(*)::int AS recycle_count
                   FROM wine_recycle_items
-                  WHERE COALESCE(code, '') <> ''
+                  WHERE COALESCE(BTRIM(product), '') <> ''
+                     OR COALESCE(BTRIM(code), '') NOT IN ('', '-')
+                     OR COALESCE(BTRIM(extra_code), '') <> ''
+                     OR COALESCE(BTRIM(note), '') <> ''
                   GROUP BY wine_id
                 ) rec ON rec.wine_id = qw.id
 

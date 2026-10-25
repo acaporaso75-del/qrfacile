@@ -9,7 +9,8 @@ Regola commerciale definitiva:
 - Upgrade da 10 a 25 anni = 1 credito wine aggiuntivo.
 - I crediti servono per creare nuovi QR o fare upgrade.
 - I QR già creati restano online e modificabili per la durata scelta.
-- Nessun abbonamento obbligatorio.
+- Pacchetti annuali a rinnovo manuale; unità non usate in scadenza a 12 mesi.
+- Nessuna scadenza retroattiva per i crediti storici.
 
 Importante:
 - I pacchetti QR self-service caricano crediti.
@@ -34,7 +35,7 @@ QR_UPGRADE_10_TO_25_CREDIT_COST = 1
 # PACCHETTI QR VINO
 # =========================================================
 
-QR_PACKS = {
+HISTORICAL_QR_PACKS = {
     "start": {
         "label": "Start",
         "subtitle": "Per piccole cantine o prime prove operative",
@@ -77,6 +78,26 @@ QR_PACKS = {
             "Adatto a molte referenze e lotti",
         ],
     },
+}
+
+
+QR_PACKS = {
+    key: {
+        "label": label, "subtitle": "Nuove etichette per la tua cantina",
+        "credit_type": "wine", "qty": qty, "amount_cents": cents,
+        "annual": True, "highlight": key == "annual_winery",
+        "features": [
+            f"{qty} unità utilizzabili entro 12 mesi",
+            "Rinnovo manuale, nessun addebito automatico",
+            "QR già creati conservati per 10 o 25 anni",
+            "Prezzi IVA esclusa",
+        ],
+    }
+    for key, label, qty, cents in (
+        ("annual_start", "Start", 15, 9900),
+        ("annual_winery", "Cantina", 50, 17900),
+        ("annual_business", "Business", 100, 29900),
+    )
 }
 
 
@@ -242,7 +263,7 @@ def _qr_pack_payload(key: str, pack: dict) -> dict:
 
     return {
         "name": pack.get("label") or key,
-        "price": euro(pack.get("amount_cents")),
+        "price": euro(pack.get("amount_cents")) + (" / anno · IVA esclusa" if pack.get("annual") else ""),
         "amount_cents": int(pack.get("amount_cents") or 0),
 
         "wine_credits":
@@ -256,7 +277,9 @@ def _qr_pack_payload(key: str, pack: dict) -> dict:
             or (pack.get("subtitle") or ""),
 
         "subscription": False,
-        "kind": "qr_pack",
+        "kind": "annual_wine" if pack.get("annual") else "qr_pack",
+        "annual": bool(pack.get("annual")),
+        "prices_exclude_vat": bool(pack.get("annual")),
         "highlight": bool(pack.get("highlight")),
     }
 
@@ -305,6 +328,12 @@ def get_purchase_pack(pack_key: str) -> dict | None:
     # QR canonici
     if key in QR_PACKS:
         return _qr_pack_payload(key, QR_PACKS[key])
+
+    # Preserve historical entitlements. Never reinterpret an old order at new prices.
+    if key in HISTORICAL_QR_PACKS:
+        payload = _qr_pack_payload(key, HISTORICAL_QR_PACKS[key])
+        payload.update(disabled=True, hidden_in_billing=True)
+        return payload
 
     # servizi assistiti + alias legacy
     if key in ASSISTED_SERVICE_ALIASES:

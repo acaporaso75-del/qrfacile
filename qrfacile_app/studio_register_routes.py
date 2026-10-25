@@ -1,11 +1,15 @@
 import time
+from urllib.parse import quote_plus
 
-from fastapi import APIRouter, Form
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 from passlib.hash import pbkdf2_sha256
 
 from qrfacile_app.db import pg
+from qrfacile_app.legal_core import record_registration_acceptances
+from qrfacile_app.password_policy import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, new_password_error
+from qrfacile_app.services.email_verification import create_verification
 from qrfacile_app.ui_shell import page, top_actions, esc
 
 router = APIRouter()
@@ -98,16 +102,46 @@ def _invite_next_after_login(inv: dict | None) -> str:
 
 def _input(name: str, type_: str, placeholder: str, value: str = "", required: bool = False) -> str:
     req = "required" if required else ""
+    labels = {
+        "email": "Email di accesso",
+        "password": "Password",  # pragma: allowlist secret
+        "password_confirm": "Conferma password",  # pragma: allowlist secret
+        "company_name": "Ragione sociale",
+        "vat": "Partita IVA",
+        "sdi": "Codice SDI",
+        "pec": "PEC",
+        "contact_name": "Nome del referente",
+        "contact_phone": "Telefono del referente",
+        "billing_address": "Indirizzo di fatturazione",
+        "billing_city": "Città di fatturazione",
+        "billing_cap": "CAP di fatturazione",
+        "billing_province": "Provincia di fatturazione",
+    }
+    autocompletes = {
+        "email": "email",
+        "password": "new-password",  # pragma: allowlist secret
+        "password_confirm": "new-password",  # pragma: allowlist secret
+        "company_name": "organization",
+        "pec": "email",
+        "contact_name": "name",
+        "contact_phone": "tel",
+        "billing_address": "street-address",
+        "billing_city": "address-level2",
+        "billing_cap": "postal-code",
+        "billing_province": "address-level1",
+    }
+    autocomplete = autocompletes.get(name, "off")
 
     return f"""
-<input class="input" name="{esc(name)}" type="{esc(type_)}" value="{esc(value)}"
-  placeholder="{esc(placeholder)}" {req}
+<input class="input" id="{esc(name)}" name="{esc(name)}" type="{esc(type_)}" value="{esc(value)}"
+  aria-label="{esc(labels.get(name, name.replace('_', ' ').title()))}"
+  autocomplete="{esc(autocomplete)}" placeholder="{esc(placeholder)}" {req}{f' minlength="{MIN_PASSWORD_LENGTH}" maxlength="{MAX_PASSWORD_LENGTH}"' if type_ == 'password' else ''}
   style="width:100%;font-size:15px;padding:14px 15px;border-radius:14px">
 """.strip()
 
 
 @router.get("/register-studio", response_class=HTMLResponse)
-def register_studio_get(err: str = "", msg: str = "", invite: str = ""):
+def register_studio_get(err: str = "", msg: str = "", invite: str = "", next: str = ""):
     actions = top_actions(
         ("/", "Home"),
         ("/login", "Login"),
@@ -169,6 +203,18 @@ def register_studio_get(err: str = "", msg: str = "", invite: str = ""):
                 Account Studio Grafico
               </div>
 
+              <fieldset style="margin-top:20px;padding:16px;border:1px solid rgba(15,23,42,.14);border-radius:14px">
+                <legend style="font-weight:800;padding:0 6px">Condizioni e privacy</legend>
+                <label style="display:flex;gap:10px;align-items:flex-start;line-height:1.45">
+                  <input type="checkbox" name="terms_accepted" value="yes" required style="margin-top:4px">
+                  <span>Ho letto e accetto i <a href="/terms" target="_blank" rel="noopener">Termini di servizio</a> (versione 25/10/2026).</span>
+                </label>
+                <label style="display:flex;gap:10px;align-items:flex-start;line-height:1.45;margin-top:10px">
+                  <input type="checkbox" name="privacy_acknowledged" value="yes" required style="margin-top:4px">
+                  <span>Dichiaro di aver letto l’<a href="/privacy" target="_blank" rel="noopener">informativa privacy</a> (versione 25/10/2026). Non è un consenso marketing.</span>
+                </label>
+              </fieldset>
+
               <div class="h1" style="margin-top:14px;font-size:36px;letter-spacing:-.8px">
                 Registrazione Studio
               </div>
@@ -183,6 +229,7 @@ def register_studio_get(err: str = "", msg: str = "", invite: str = ""):
 
             <form method="post" action="/register-studio" style="margin-top:26px">
               <input type="hidden" name="invite" value="{esc(invite)}">
+              <input type="hidden" name="next" value="{esc(next if next.startswith('/') and not next.startswith('//') else '')}">
               <div class="grid2 register-form-grid">
                 <div>
                   <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Email login</label>
@@ -190,8 +237,13 @@ def register_studio_get(err: str = "", msg: str = "", invite: str = ""):
                 </div>
 
                 <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Password (min 8)</label>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Password (min {MIN_PASSWORD_LENGTH})</label>
                   {_input("password", "password", "••••••••", "", True)}
+                </div>
+
+                <div>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Conferma password</label>
+                  {_input("password_confirm", "password", "Ripeti la password", "", True)}
                 </div>
 
                 <div>
@@ -375,8 +427,10 @@ def register_studio_get(err: str = "", msg: str = "", invite: str = ""):
 
 @router.post("/register-studio")
 def register_studio_post(
+    request: Request,
     email: str = Form(...),
     password: str = Form(...),
+    password_confirm: str = Form(...),
     company_name: str = Form(...),
     vat: str = Form(...),
     sdi: str = Form(...),
@@ -387,7 +441,10 @@ def register_studio_post(
     billing_city: str = Form(""),
     billing_cap: str = Form(""),
     billing_province: str = Form(""),
+    terms_accepted: str = Form(""),
+    privacy_acknowledged: str = Form(""),
     invite: str = Form(""),
+    next: str = Form(""),
 ):
     email = (email or "").strip().lower()
     password = password or ""
@@ -395,8 +452,18 @@ def register_studio_post(
     if "@" not in email:
         return RedirectResponse("/register-studio?err=Email%20non%20valida", status_code=303)
 
-    if len(password) < 8:
-        return RedirectResponse("/register-studio?err=Password%20minimo%208%20caratteri", status_code=303)
+    policy_error = new_password_error(password)
+    if policy_error:
+        return RedirectResponse(f"/register-studio?err={quote_plus(policy_error)}", status_code=303)
+
+    if password != (password_confirm or ""):
+        return RedirectResponse("/register-studio?err=Le%20password%20non%20coincidono", status_code=303)
+
+    if terms_accepted != "yes" or privacy_acknowledged != "yes":
+        return RedirectResponse(
+            "/register-studio?err=Devi%20accettare%20i%20Termini%20e%20confermare%20la%20Privacy",
+            status_code=303,
+        )
 
     company_name = (company_name or "").strip()
     vat = (vat or "").strip()
@@ -446,8 +513,11 @@ def register_studio_post(
 
             cur.execute(
                 """
-                INSERT INTO users(email, pass_hash, role, created_at, email_verified, last_qr_type, pref_lock_qr_type)
-                VALUES (%s,%s,'studio',%s,1,'modulare',0)
+                INSERT INTO users(
+                  email, pass_hash, role, created_at, email_verified,
+                  email_verification_required, last_qr_type, pref_lock_qr_type
+                )
+                VALUES (%s,%s,'studio',%s,0,TRUE,'modulare',0)
                 RETURNING id
                 """,
                 (email, pass_hash, ts),
@@ -481,9 +551,23 @@ def register_studio_post(
             if inv:
                 _accept_studio_invite(cur, inv, user_id, ts)
 
+            record_registration_acceptances(cur, user_id=user_id, request=request)
+
         conn.commit()
+
+    try:
+        base_url = str(getattr(request.app.state, "app_base_url", "") or "").rstrip("/")
+        if not base_url:
+            base_url = f"{request.url.scheme}://{request.headers.get('host', '')}".rstrip("/")
+        create_verification(user_id=user_id, base_url=base_url)
+    except Exception:
+        # Account remains restricted and can retry from /verify-email-required.
+        pass
 
     if invite:
         return RedirectResponse(f"/login?created=1&next={_invite_next_after_login(inv)}", status_code=303)
+
+    if next.startswith("/") and not next.startswith("//"):
+        return RedirectResponse(f"/login?created=1&next={next}", status_code=303)
 
     return RedirectResponse("/login?created=1", status_code=303)

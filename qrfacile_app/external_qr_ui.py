@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page
 from qrfacile_app.util import new_slug
@@ -19,7 +20,7 @@ def _balances(cur, user_id: int) -> dict:
     cur.execute(
         """
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
         """,
@@ -94,6 +95,7 @@ def new_external_get(request: Request, msg: str = "", err: str = ""):
 
 @router.post("/app/new-external/create")
 def new_external_create(request: Request, target_url: str = Form(...)):
+    require_csrf_or_same_origin(request)
     u = require_any_role(request, ("winery", "studio", "admin"))
     uid = int(u["id"])
 
@@ -115,7 +117,7 @@ def new_external_create(request: Request, target_url: str = Form(...)):
                 cur.execute(
                     """
                     SELECT COALESCE(SUM(delta),0) AS balance
-                    FROM credit_ledger
+                    FROM available_credit_ledger
                     WHERE user_id=%s AND credit_type='generic'
                     """,
                     (uid,),

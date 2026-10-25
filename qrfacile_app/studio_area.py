@@ -12,6 +12,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
+from qrfacile_app.checkout_ui import paypal_checkout_form, paypal_checkout_script
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 
@@ -157,16 +159,16 @@ def _pack_label(value: str, compact: bool = False) -> str:
     value = (value or "").strip().lower()
     if compact:
         labels = {
-            "start": "Start",
-            "pro": "Cantina",
-            "plus": "Business",
+            "annual_start": "Start",
+            "annual_winery": "Cantina",
+            "annual_business": "Business",
             "unlimited": "Legacy",
         }
     else:
         labels = {
-            "start": "Start · 20 crediti · €29",
-            "pro": "Cantina · 60 crediti · €79",
-            "plus": "Business · 200 crediti · €199",
+            "annual_start": "Start · 15 unità/anno · €99 + IVA",
+            "annual_winery": "Cantina · 50 unità/anno · €179 + IVA",
+            "annual_business": "Business · 100 unità/anno · €299 + IVA",
             "unlimited": "Non disponibile online",
         }
     return labels.get(value, "Da valutare" if compact else "-")
@@ -468,9 +470,9 @@ def studio_dashboard(request: Request, msg: str = "", err: str = ""):
 
             <select name="recommended_pack">
               <option value="" selected>Da valutare dopo registrazione</option>
-              <option value="start">Suggerisci Start · 20 crediti · €29</option>
-              <option value="pro">Suggerisci Cantina · 60 crediti · €79</option>
-              <option value="plus">Suggerisci Business · 200 crediti · €199</option>
+              <option value="annual_start">Suggerisci Start · 15 unità/anno · €99 + IVA</option>
+              <option value="annual_winery">Suggerisci Cantina · 50 unità/anno · €179 + IVA</option>
+              <option value="annual_business">Suggerisci Business · 100 unità/anno · €299 + IVA</option>
               <option value="unlimited">Suggerisci Non disponibile online</option>
             </select>
 
@@ -593,6 +595,8 @@ def studio_invite(
     mode: str = Form("both"),
     recommended_pack: str = Form(""),
 ):
+    from qrfacile_app.csrf_core import require_csrf_or_same_origin
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("studio", "admin"))
     uid = int(user["id"])
     studio_email = (user.get("email") or "").strip().lower()
@@ -601,7 +605,7 @@ def studio_invite(
     mode = (mode or "both").strip().lower()
     recommended_pack = (recommended_pack or "").strip().lower()
 
-    if recommended_pack not in ("", "start", "pro", "plus", "unlimited"):
+    if recommended_pack not in ("", "annual_start", "annual_winery", "annual_business", "unlimited"):
         recommended_pack = ""
 
     if "@" not in winery_email or "." not in winery_email:
@@ -610,10 +614,6 @@ def studio_invite(
     can_view = True
     can_edit = (mode == "both")
     can_create = (mode == "both")
-
-    token = secrets.token_urlsafe(24)
-    ts = now()
-    exp = ts + 60 * 60 * 24 * 14
 
     base_url = ""
     try:
@@ -627,47 +627,21 @@ def studio_invite(
         if host:
             base_url = f"{scheme}://{host}".rstrip("/")
 
-    invite_path = f"/register-winery?invite={token}"
+    from qrfacile_app.services.invitations import create_invitation
+    invitation = create_invitation(invite_type="winery", inviter=user,
+        recipient_email=winery_email, winery_id=None,
+        permissions={"can_view":can_view,"can_edit":can_edit,"can_create":can_create})
+    token = invitation.pop("raw_token")
+    invite_path = f"/app/invite/winery/accept/{token}"
     invite_url = f"{base_url}{invite_path}" if base_url else invite_path
 
     pack_labels = {
-        "start": "Start · 20 crediti · €29",
-        "pro": "Cantina · 60 crediti · €79",
-        "plus": "Business · 200 crediti · €199",
+        "annual_start": "Start · 15 unità/anno · €99 + IVA",
+        "annual_winery": "Cantina · 50 unità/anno · €179 + IVA",
+        "annual_business": "Business · 100 unità/anno · €299 + IVA",
         "unlimited": "Non disponibile online",
     }
     recommended_label = pack_labels.get(recommended_pack, "-")
-
-    with pg() as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            winery_id = None
-            try:
-                cur.execute(
-                    """
-                    SELECT w.id
-                    FROM wineries w
-                    JOIN users u ON u.id = w.owner_user_id
-                    WHERE lower(u.email)=lower(%s)
-                    LIMIT 1
-                    """,
-                    (winery_email,),
-                )
-                w = cur.fetchone()
-                if w:
-                    winery_id = int(w["id"])
-            except Exception:
-                winery_id = None
-
-            cur.execute(
-                """
-                INSERT INTO studio_invites
-                  (token, winery_id, inviter_user_id, studio_email, recommended_pack, can_view, can_edit, can_create, created_at, expires_at)
-                VALUES
-                  (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """,
-                (token, winery_id, uid, winery_email, recommended_pack or None, can_view, can_edit, can_create, ts, exp),
-            )
-            conn.commit()
 
     sent, smtp_error = _send_winery_invite_email(
         to_email=winery_email,
@@ -694,13 +668,14 @@ def studio_winery_recommended_pack(
     winery_id: int,
     recommended_pack: str = Form(""),
 ):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("studio", "admin"))
     uid = int(user["id"])
     role = (user.get("role") or "").lower().strip()
 
     recommended_pack = (recommended_pack or "").strip().lower()
 
-    if recommended_pack not in ("", "start", "pro", "plus", "unlimited"):
+    if recommended_pack not in ("", "annual_start", "annual_winery", "annual_business", "unlimited"):
         recommended_pack = ""
 
     with pg() as conn:
@@ -844,9 +819,9 @@ def studio_winery(request: Request, winery_id: int, msg: str = "", err: str = ""
 
     pack_labels = {
         "": "Da valutare",
-        "start": "Start · 20 crediti · €29",
-        "pro": "Cantina · 60 crediti · €79",
-        "plus": "Business · 200 crediti · €199",
+        "annual_start": "Start · 15 unità/anno · €99 + IVA",
+        "annual_winery": "Cantina · 50 unità/anno · €179 + IVA",
+        "annual_business": "Business · 100 unità/anno · €299 + IVA",
         "unlimited": "Non disponibile online",
     }
     current_pack = (perm.get("recommended_pack") or "").strip().lower()
@@ -892,9 +867,9 @@ def studio_winery(request: Request, winery_id: int, msg: str = "", err: str = ""
           <div class="studioPlanForm">
             <select name="recommended_pack">
               <option value="" {_sel_pack("")}>Da valutare</option>
-              <option value="start" {_sel_pack("start")}>Start · 20 crediti · €29</option>
-              <option value="pro" {_sel_pack("pro")}>Cantina · 60 crediti · €79</option>
-              <option value="plus" {_sel_pack("plus")}>Business · 200 crediti · €199</option>
+              <option value="annual_start" {_sel_pack("annual_start")}>Start · 15 unità/anno · €99 + IVA</option>
+              <option value="annual_winery" {_sel_pack("annual_winery")}>Cantina · 50 unità/anno · €179 + IVA</option>
+              <option value="annual_business" {_sel_pack("annual_business")}>Business · 100 unità/anno · €299 + IVA</option>
               <option value="unlimited" {_sel_pack("unlimited")}>Non disponibile online</option>
             </select>
             <button class="btn btn-primary" type="submit">Salva suggerimento</button>
@@ -908,13 +883,16 @@ def studio_winery(request: Request, winery_id: int, msg: str = "", err: str = ""
           </div>
         </details>
 
-        <form method="post" action="/paypal/start" style="margin-top:12px">
-          <input type="hidden" name="pack" value="unlimited">
-          <input type="hidden" name="billing_winery_id" value="{int(winery_id)}">
-          <button class="btn" type="submit">
-            Pacchetto legacy non acquistabile online
-          </button>
-        </form>
+        {paypal_checkout_form(
+            request,
+            pack="unlimited",
+            billing_winery_id=int(winery_id),
+            button_class="btn",
+            disabled=True,
+            disabled_label="Pacchetto legacy non acquistabile online",
+            style="margin-top:12px",
+        )}
+        {paypal_checkout_script()}
       </div>
 
       <div class="studioSectionHead studioSectionTop" id="studio-labels">

@@ -1,8 +1,8 @@
-import os
 import io
+import os
 from PIL import Image, ImageOps
 
-UPLOADS_DIR = "/opt/qrfacile/uploads"
+from qrfacile_app.services.storage import get_uploads_dir
 
 MAX_ORIGINAL_MB = 20
 MAX_ORIGINAL_BYTES = MAX_ORIGINAL_MB * 1024 * 1024
@@ -51,26 +51,27 @@ def process_label_image(upload_file, winery_id: int, label_id: int) -> dict:
     except Exception:
         raise ValueError("Formato immagine non valido (usa JPG/PNG/WebP)")
 
+    uploads_dir = get_uploads_dir()
     base_rel = f"labels/{int(winery_id)}/{int(label_id)}"
-    base_abs = os.path.join(UPLOADS_DIR, base_rel)
+    base_abs = uploads_dir / base_rel
     _safe_mkdir(base_abs)
 
     # ORIGINAL
     img_rgb = _to_rgb(img)
     original_rel = f"{base_rel}/original.jpg"
-    original_abs = os.path.join(UPLOADS_DIR, original_rel)
+    original_abs = uploads_dir / original_rel
     img_rgb.save(original_abs, format="JPEG", quality=92, optimize=True, progressive=True)
 
     # OPTIMIZED
     opt = _resize_to_width(img_rgb, OPT_MAX_W)
     optimized_rel = f"{base_rel}/optimized.jpg"
-    optimized_abs = os.path.join(UPLOADS_DIR, optimized_rel)
+    optimized_abs = uploads_dir / optimized_rel
     opt.save(optimized_abs, format="JPEG", quality=88, optimize=True, progressive=True)
 
     # THUMB (WEBP)
     thumb = _resize_to_width(img_rgb, THUMB_W)
     thumb_rel = f"{base_rel}/thumb.webp"
-    thumb_abs = os.path.join(UPLOADS_DIR, thumb_rel)
+    thumb_abs = uploads_dir / thumb_rel
     thumb.save(thumb_abs, format="WEBP", quality=82, method=6)
 
     return {
