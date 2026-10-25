@@ -5,6 +5,7 @@ import os
 import smtplib
 import hashlib
 import logging
+from urllib.parse import quote
 from email.message import EmailMessage
 
 from fastapi import APIRouter, Request, Form
@@ -664,7 +665,8 @@ def login_post(
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
-                "SELECT id, email, pass_hash, role FROM users WHERE lower(email)=lower(%s) LIMIT 1",
+                """SELECT id, email, pass_hash, role, email_verified, email_verification_required
+                   FROM users WHERE lower(email)=lower(%s) LIMIT 1""",
                 (email,),
             )
             u = cur.fetchone()
@@ -687,6 +689,13 @@ def login_post(
     # Sicurezza: accetta solo percorsi interni, niente redirect esterni.
     if not next_url.startswith("/") or next_url.startswith("//"):
         next_url = "/app/start"
+
+    if (
+        (u.get("role") or "").lower().strip() != "admin"
+        and bool(u.get("email_verification_required"))
+        and not bool(u.get("email_verified"))
+    ):
+        next_url = f"/verify-email-required?next={quote(next_url, safe='/')}"
 
     resp = RedirectResponse(next_url, status_code=303)
     resp.set_cookie(

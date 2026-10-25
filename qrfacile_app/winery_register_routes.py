@@ -9,6 +9,7 @@ from passlib.hash import pbkdf2_sha256
 from qrfacile_app.db import pg
 from qrfacile_app.legal_core import record_registration_acceptances
 from qrfacile_app.fiscal_profile import normalized_italian_fiscal_profile
+from qrfacile_app.services.email_verification import create_verification
 from qrfacile_app.ui_shell import page, top_actions, esc
 
 router = APIRouter()
@@ -530,8 +531,10 @@ def register_winery_post(
             try:
                 cur.execute(
                     """
-                    INSERT INTO users (email, pass_hash, role, created_at, email_verified)
-                    VALUES (%s,%s,'winery',%s,1)
+                    INSERT INTO users (
+                      email, pass_hash, role, created_at, email_verified, email_verification_required
+                    )
+                    VALUES (%s,%s,'winery',%s,0,TRUE)
                     RETURNING id
                     """,
                     (email, _hash_pw(password), now()),
@@ -616,6 +619,15 @@ def register_winery_post(
             record_registration_acceptances(cur, user_id=user_id, request=request)
 
             conn.commit()
+
+    try:
+        base_url = str(getattr(request.app.state, "app_base_url", "") or "").rstrip("/")
+        if not base_url:
+            base_url = f"{request.url.scheme}://{request.headers.get('host', '')}".rstrip("/")
+        create_verification(user_id=user_id, base_url=base_url)
+    except Exception:
+        # Account remains restricted and can retry from /verify-email-required.
+        pass
 
     target = next if next.startswith("/") and not next.startswith("//") else ""
     return RedirectResponse(f"/login?created=1&next={target}" if target else "/login?created=1", status_code=303)

@@ -69,7 +69,8 @@ def test_manual_post_without_csrf_or_origin_is_rejected():
 
 def test_studio_registration_requires_email_verification():
     source = (ROOT / "qrfacile_app" / "studio_register_routes.py").read_text(encoding="utf-8")
-    assert "VALUES (%s,%s,'studio',%s,0,'modulare',0)" in source
+    assert "email_verification_required" in source
+    assert "VALUES (%s,%s,'studio',%s,0,TRUE,'modulare',0)" in source
 
 
 def test_studio_publish_permission_is_not_offered_by_acl_ui():

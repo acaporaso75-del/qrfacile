@@ -29,3 +29,9 @@ existing evidence.
 An account becomes verified only after a transaction locks a token row selected
 by its SHA-256 hash, rejects used/revoked/expired tokens, updates the user, and
 marks the token used in the same transaction.
+
+After `2026_email_verification_enforcement.sql`, new Cantina and Studio accounts
+receive an initial verification attempt and cannot enter role-protected routes
+until verified. Existing accounts retain their prior access state and are not
+silently reclassified as verified. SMTP delivery remains a staging acceptance
+requirement; a failed attempt leaves the account restricted with a protected resend path.

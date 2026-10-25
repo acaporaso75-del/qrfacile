@@ -89,7 +89,7 @@ def _load_user(user_id: int) -> Optional[Dict[str, Any]]:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
-                SELECT id, email, role
+                SELECT id, email, role, email_verified, email_verification_required
                 FROM users
                 WHERE id=%s
                 LIMIT 1
@@ -162,6 +162,13 @@ def require_any_role(
     role = (u.get("role") or "").lower().strip()
     authorization_role = "studio" if role == "collaborator" else role
     roles_set = {r.lower().strip() for r in roles}
+
+    if role != "admin" and bool(u.get("email_verification_required")) and not bool(u.get("email_verified")):
+        raise HTTPException(
+            status_code=303,
+            detail="Verifica email richiesta",
+            headers={"Location": "/verify-email-required"},
+        )
 
     if authorization_role not in roles_set:
         _forbidden()

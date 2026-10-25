@@ -38,7 +38,8 @@ The same paid order cannot grant twice. Provider calls in local tests are mocks,
 ## Database and release order
 
 1. Review the actual staging schema and take a verified backup.
-2. Apply the previously prepared payment-environment and legal-document migrations as applicable.
+2. Apply the previously prepared payment-environment, legal-document, email-verification and
+   sql/2026_email_verification_enforcement.sql migrations as applicable.
 3. Apply sql/2026_winery_fiscal_profile.sql and sql/2026_annual_wine_packages.sql **before** starting this application version.
 4. Verify the nullable winery fields, view/trigger definitions and compare historical balances and QR records before/after.
 5. Run native PostgreSQL integration, fiscal-profile completion, two-session concurrent spending, sandbox checkout/capture/retry,
@@ -57,7 +58,7 @@ The 2026-10-25 legal version is still unreleased; its public terms hash has been
 
 ## Local verification
 
-Final local result after Studio-access, revenue-reporting, fiscal-profile and mutation-route hardening: **304 passed, 0 skipped** using an isolated native
+Final local result after Studio-access, revenue-reporting, fiscal-profile, email and mutation-route hardening: **307 passed, 0 skipped** using an isolated native
 PostgreSQL 16.15 database bound to 127.0.0.1. This includes the two-connection overspend test and
 the staging reconciliation migration/rollback test. The separate in-memory PostgreSQL/PGlite run
 also passed all **18** assertions.
