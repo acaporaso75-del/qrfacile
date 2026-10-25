@@ -6,6 +6,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.services.compliance_service import (
     AI_POLICY_VERSION,
     get_compliance_status,
@@ -60,6 +61,7 @@ def compliance_status(request: Request):
 
 @router.post("/api/admin/compliance/ai-usage")
 async def register_ai_usage(request: Request):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("admin", "winery", "studio"))
     payload: dict[str, Any] = await request.json()
     record = register_ai_usage_record(user_id=int(user["id"]), payload=payload)

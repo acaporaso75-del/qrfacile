@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, esc
 
@@ -261,6 +262,7 @@ def admin_credits_load(
     delta: str = Form(...),
     note: str = Form(""),
 ):
+    require_csrf_or_same_origin(request)
     u = require_any_role(request, ("admin",))
     admin_id = int(u["id"])
 

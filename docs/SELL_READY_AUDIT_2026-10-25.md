@@ -26,6 +26,8 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
    CSRF i salvataggi, l'aggiunta di ingredienti/allergeni e la richiesta di override.
 9. rimuove le route mutative legacy duplicate per assegnazione Studio e pubblicazione:
    i form inviano token CSRF e raggiungono soltanto i servizi canonici auditati.
+10. applica il controllo CSRF/origine alle mutazioni amministrative ad alto impatto:
+    crediti, payout, override, registro/revisione AI, incidenti e richieste privacy.
 
 ## Matrice di conformità
 

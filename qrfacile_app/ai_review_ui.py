@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.services.ai_review_service import (
     VALID_REVIEW_DECISIONS,
     list_pending_ai_reviews,
@@ -51,6 +52,7 @@ def ai_review_queue(request: Request):
 
 @router.post("/ai-review/{record_id}")
 def review_ai_output(request: Request, record_id: int, decision: str = Form(...)):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("admin",))
     if decision not in VALID_REVIEW_DECISIONS:
         raise HTTPException(status_code=422, detail="Decisione non valida")

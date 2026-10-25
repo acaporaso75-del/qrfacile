@@ -8,6 +8,7 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 
 router = APIRouter(tags=["compliance-incidents"])
@@ -51,6 +52,7 @@ def list_incidents(request: Request, status: str | None = None):
 
 @router.post("/api/admin/compliance/incidents")
 async def create_incident(request: Request):
+    require_csrf_or_same_origin(request)
     admin = require_any_role(request, ("admin",))
     payload = await request.json()
     severity = str(payload.get("severity") or "").strip().lower()
@@ -96,6 +98,7 @@ async def create_incident(request: Request):
 
 @router.post("/api/admin/compliance/incidents/{incident_id}/status")
 async def update_incident(incident_id: int, request: Request):
+    require_csrf_or_same_origin(request)
     admin = require_any_role(request, ("admin",))
     payload = await request.json()
     status = str(payload.get("status") or "").strip().lower()

@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, esc
 from qrfacile_app.ui_layout import pill
@@ -194,6 +195,7 @@ def admin_payouts(request: Request, status: str = "requested", msg: str = "", er
 
 @router.post("/admin/payouts/{payout_id}/mark-paid")
 def admin_mark_paid(request: Request, payout_id: int, note: str = Form("")):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("admin", "studio", "winery"))
     if not _is_admin(user):
         raise HTTPException(403, "Forbidden")
@@ -231,6 +233,7 @@ def admin_mark_paid(request: Request, payout_id: int, note: str = Form("")):
 
 @router.post("/admin/payouts/{payout_id}/reject")
 def admin_reject(request: Request, payout_id: int, note: str = Form("")):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("admin", "studio", "winery"))
     if not _is_admin(user):
         raise HTTPException(403, "Forbidden")

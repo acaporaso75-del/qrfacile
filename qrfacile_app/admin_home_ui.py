@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, esc
 
@@ -319,6 +320,7 @@ def admin_home(request: Request, q: str = "", msg: str = "", err: str = ""):
 
 @router.post("/admin/set-winery")
 def admin_set_winery(request: Request, winery_id: str = Form("")):
+    require_csrf_or_same_origin(request)
     """
     Compat legacy: manteniamo questa route, ma reindirizziamo alla logica nuova.
     """

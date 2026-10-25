@@ -9,6 +9,7 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 
 router = APIRouter(tags=["privacy-requests"])
@@ -106,6 +107,7 @@ def admin_privacy_requests(request: Request, status: str | None = None):
 
 @router.post("/api/admin/privacy-requests/{request_id}/status")
 async def update_privacy_request(request_id: int, request: Request):
+    require_csrf_or_same_origin(request)
     admin = require_any_role(request, ("admin",))
     payload = await request.json()
     status = str(payload.get("status") or "").strip()
