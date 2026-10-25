@@ -1,5 +1,10 @@
 from pathlib import Path
 
+import pytest
+from fastapi import HTTPException
+
+from qrfacile_app.services.ai_registry_service import _validate_registry_payload
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -40,3 +45,54 @@ def test_compliance_status_requires_ai_system_registry():
         ROOT / "qrfacile_app" / "services" / "compliance_service.py"
     ).read_text(encoding="utf-8")
     assert '"ai_system_registry"' in text
+
+
+def _valid_payload(**overrides):
+    payload = {
+        "system_key": "ingredient_assistant",
+        "name": "Assistente ingredienti",
+        "description": "Supporto redazionale",
+        "provider": "internal",
+        "model": "review-only",
+        "intended_purpose": "Bozza ingredienti con revisione umana",
+        "human_oversight_procedure": "Revisione obbligatoria prima dell'uso",
+        "risk_classification": "limited",
+        "status": "assessment",
+    }
+    payload.update(overrides)
+    return payload
+
+
+def test_ai_registry_fails_closed_on_unreviewed_approval_and_auto_publish():
+    for payload in (
+        _valid_payload(status="approved"),
+        _valid_payload(auto_publish_allowed=True),
+    ):
+        with pytest.raises(HTTPException) as exc:
+            _validate_registry_payload(payload)
+        assert exc.value.status_code == 422
+
+
+def test_personal_and_special_category_data_require_retention_and_dpa():
+    with pytest.raises(HTTPException):
+        _validate_registry_payload(_valid_payload(contains_personal_data=True))
+    with pytest.raises(HTTPException):
+        _validate_registry_payload(_valid_payload(
+            contains_personal_data=True,
+            special_category_data_allowed=True,
+            retention_days=30,
+            dpa_verified=False,
+        ))
+    _validate_registry_payload(_valid_payload(
+        contains_personal_data=True,
+        special_category_data_allowed=True,
+        retention_days=30,
+        dpa_verified=True,
+    ))
+
+
+def test_ai_registry_bounds_identifier_and_retention():
+    with pytest.raises(HTTPException):
+        _validate_registry_payload(_valid_payload(system_key="Bad key with spaces"))
+    with pytest.raises(HTTPException):
+        _validate_registry_payload(_valid_payload(retention_days=3651))

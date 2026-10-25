@@ -91,3 +91,9 @@ proposed operational periods and still require the documented privacy review.
 Compliance-incident creation bounds category, summary and serialized evidence;
 evidence must be a JSON object rather than an arbitrary scalar or list. Reopened
 incidents clear their previous closure timestamp while preserving the audit trail.
+
+The AI-system registry cannot mark a system approved or enable automatic
+publication through the current administration form. Personal-data use requires
+a numeric retention period; special-category data additionally requires human
+oversight and a verified DPA. A separate evidenced legal/security approval
+workflow remains intentionally required before these gates can be opened.

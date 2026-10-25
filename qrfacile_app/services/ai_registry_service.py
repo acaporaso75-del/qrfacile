@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Mapping
 
 from fastapi import HTTPException
@@ -18,6 +19,9 @@ SENSITIVE_USE_CASE_MARKERS = {
     "label_compliance",
     "legal_compliance",
 }
+MAX_AI_REGISTRY_TEXT_LENGTH = 4000
+MAX_AI_RETENTION_DAYS = 3650
+SYSTEM_KEY_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_.-]{2,79}$")
 
 
 def _table_exists(cur, table_name: str) -> bool:
@@ -40,6 +44,13 @@ def _validate_registry_payload(payload: Mapping[str, Any]) -> None:
     if missing:
         raise HTTPException(status_code=422, detail=f"Campi mancanti: {', '.join(missing)}")
 
+    system_key = str(payload.get("system_key") or "").strip()
+    if not SYSTEM_KEY_PATTERN.fullmatch(system_key):
+        raise HTTPException(status_code=422, detail="Chiave sistema AI non valida")
+    for field_name in required:
+        if len(str(payload.get(field_name) or "")) > MAX_AI_REGISTRY_TEXT_LENGTH:
+            raise HTTPException(status_code=422, detail=f"{field_name}: massimo {MAX_AI_REGISTRY_TEXT_LENGTH} caratteri")
+
     risk = str(payload.get("risk_classification") or "limited")
     status = str(payload.get("status") or "draft")
     if risk not in VALID_RISK_CLASSIFICATIONS:
@@ -48,6 +59,29 @@ def _validate_registry_payload(payload: Mapping[str, Any]) -> None:
         raise HTTPException(status_code=422, detail="Stato sistema AI non valido")
     if risk == "prohibited" and status == "approved":
         raise HTTPException(status_code=422, detail="Un caso d'uso proibito non può essere approvato")
+    if status == "approved":
+        raise HTTPException(status_code=422, detail="L'approvazione richiede il workflow di revisione legale e sicurezza")
+
+    retention_days = payload.get("retention_days")
+    if retention_days is not None:
+        try:
+            retention_days = int(retention_days)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail="Retention AI non valida") from exc
+        if retention_days < 0 or retention_days > MAX_AI_RETENTION_DAYS:
+            raise HTTPException(status_code=422, detail=f"Retention AI: massimo {MAX_AI_RETENTION_DAYS} giorni")
+    if bool(payload.get("contains_personal_data", False)) and retention_days is None:
+        raise HTTPException(status_code=422, detail="La retention è obbligatoria quando sono trattati dati personali")
+
+    if bool(payload.get("auto_publish_allowed", False)):
+        raise HTTPException(status_code=422, detail="La pubblicazione automatica richiede un sistema formalmente approvato")
+    if bool(payload.get("special_category_data_allowed", False)):
+        if not bool(payload.get("contains_personal_data", False)):
+            raise HTTPException(status_code=422, detail="Le categorie particolari richiedono dati personali dichiarati")
+        if not bool(payload.get("human_oversight_required", True)):
+            raise HTTPException(status_code=422, detail="Le categorie particolari richiedono supervisione umana")
+        if not bool(payload.get("dpa_verified", False)):
+            raise HTTPException(status_code=422, detail="Le categorie particolari richiedono un DPA verificato")
 
     purpose = str(payload.get("intended_purpose") or "").lower()
     sensitive = any(marker in purpose for marker in SENSITIVE_USE_CASE_MARKERS)
@@ -162,7 +196,7 @@ def upsert_ai_system(*, payload: Mapping[str, Any], actor_user_id: int | None) -
                     "human_oversight_procedure": str(payload["human_oversight_procedure"]).strip(),
                     "auto_publish_allowed": bool(payload.get("auto_publish_allowed", False)),
                     "training_data_reuse_allowed": bool(payload.get("training_data_reuse_allowed", False)),
-                    "retention_days": payload.get("retention_days"),
+                    "retention_days": int(payload["retention_days"]) if payload.get("retention_days") is not None else None,
                     "dpa_verified": bool(payload.get("dpa_verified", False)),
                     "transfer_mechanism": payload.get("transfer_mechanism"),
                     "status": str(payload.get("status") or "draft"),

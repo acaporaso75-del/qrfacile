@@ -64,8 +64,8 @@ input,textarea,select{{padding:10px;border:1px solid #bbb;border-radius:8px}} te
 <label>Modello<input name="model" required></label>
 <label>Versione modello<input name="model_version"></label>
 <label>Classificazione rischio<select name="risk_classification"><option>minimal</option><option selected>limited</option><option>high</option><option>prohibited</option></select></label>
-<label>Stato<select name="status"><option selected>draft</option><option>assessment</option><option>approved</option><option>suspended</option><option>retired</option></select></label>
-<label>Retention giorni<input name="retention_days" type="number" min="0"></label>
+<label>Stato<select name="status"><option selected>draft</option><option>assessment</option><option>suspended</option><option>retired</option></select></label>
+<label>Retention giorni<input name="retention_days" type="number" min="0" max="3650"></label>
 <label class="full">Descrizione<textarea name="description" required></textarea></label>
 <label class="full">Finalità prevista<textarea name="intended_purpose" required></textarea></label>
 <label class="full">Procedura supervisione umana<textarea name="human_oversight_procedure" required></textarea></label>
@@ -135,7 +135,7 @@ def save_ai_system(
         "output_categories": _split_values(output_categories),
         "risk_classification": risk_classification,
         "status": status,
-        "retention_days": int(retention_days) if retention_days.strip() else None,
+        "retention_days": retention_days.strip() or None,
         "transfer_mechanism": transfer_mechanism or None,
         "contains_personal_data": contains_personal_data is not None,
         "special_category_data_allowed": special_category_data_allowed is not None,

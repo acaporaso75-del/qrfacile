@@ -61,6 +61,9 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
     mostra la risoluzione all'interessato e azzera la data di chiusura alla riapertura.
 25. limita categoria, sintesi ed evidenze JSON degli incidenti, richiede un oggetto
     strutturato e azzera la vecchia data di chiusura quando un incidente viene riaperto.
+26. rende fail-closed il registro AI: l'interfaccia non può auto-approvare sistemi
+    o attivare auto-publish; dati personali richiedono retention e le categorie
+    particolari anche supervisione umana e DPA verificato.
 
 ## Matrice di conformità
 
@@ -71,7 +74,7 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
 | Diritti interessati / incidenti | Presente nel codice, processo non provato | Workflow con scadenza, risoluzione visibile e limiti input presente; servono responsabili, SLA, prova periodica ed evidenze organizzative. |
 | Retention | Documentata, non certificata | Le durate proposte richiedono approvazione privacy/fiscale e prova del job in produzione. |
 | Cookie/ePrivacy | Coerente con lo stato attuale | Le pagine pubbliche osservate non impostano cookie né caricano script. Nuovi analytics/pixel richiederanno nuova valutazione e, se applicabile, consenso. |
-| AI Act | Framework presente, attivazione da governare | Registro sistemi AI, policy, revisione umana e divieto auto-publish per dati sensibili presenti; prima di attivare un provider servono scheda caso d'uso, DPA, trasferimenti, retention e formazione AI literacy. |
+| AI Act | Framework fail-closed, attivazione da governare | Registro sistemi AI, policy e revisione umana presenti; auto-approvazione e auto-publish sono bloccati finché non esiste un workflow separato di revisione legale/sicurezza. Prima di attivare un provider servono scheda caso d'uso, DPA, trasferimenti, retention e formazione AI literacy. |
 | Accessibilità | Parziale avanzato | Aggiunti nomi accessibili e autocomplete ai form di registrazione e autenticazione; feedback globali con ruoli status/alert. Manca un audit WCAG completo con tastiera, screen reader, contrasto, zoom e flussi autenticati in staging. |
 | Sicurezza account | Parziale avanzato | Policy centralizzata per nuove password, password reset, limite login falliti, scadenza sessione server-side a 14 giorni e verifica dei nuovi account presenti; gli account storici sono preservati. La migrazione `2026_login_rate_limit.sql`, invio SMTP e recupero vanno provati in staging; MFA admin non risulta implementata. |
 | Continuità | Evidenza staging esistente | Esistono runbook e restore staging; occorre prova periodica di restore del perimetro produttivo e owner operativo. |
