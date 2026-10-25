@@ -36,6 +36,21 @@ def review_ai_output_record(*, record_id: int, reviewer_user_id: int, decision: 
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
+                SELECT id, risk_classification, human_review_status
+                  FROM ai_usage_log
+                 WHERE id = %s
+                 FOR UPDATE
+                """,
+                (int(record_id),),
+            )
+            current = cur.fetchone()
+            if not current or current.get("human_review_status") != "pending":
+                return None
+            if decision == "approved" and current.get("risk_classification") == "prohibited":
+                raise ValueError("prohibited_risk_cannot_be_approved")
+
+            cur.execute(
+                """
                 UPDATE ai_usage_log
                    SET human_review_status = %s,
                        reviewer_user_id = %s,

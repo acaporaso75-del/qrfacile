@@ -106,3 +106,7 @@ AI-usage logging accepts only bounded labels, hashes bounded JSON input/output,
 requires object-shaped bounded metadata and validates the risk classification.
 The compliance-status endpoint reports a generic unavailable state without
 serializing database exception details to the client.
+
+AI-output decisions lock the pending record before updating it. Already-reviewed
+records cannot be overwritten, and an output carrying the `prohibited` risk
+classification cannot receive an approved human-review state.

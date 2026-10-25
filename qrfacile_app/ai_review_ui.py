@@ -71,7 +71,9 @@ def review_ai_output(request: Request, record_id: int, decision: str = Form(...)
             reviewer_user_id=int(user["id"]),
             decision=decision,
         )
-    except ValueError:
+    except ValueError as exc:
+        if str(exc) == "prohibited_risk_cannot_be_approved":
+            raise HTTPException(status_code=422, detail="Un output classificato come proibito non può essere approvato")
         raise HTTPException(status_code=422, detail="Decisione non valida")
 
     if not row:
