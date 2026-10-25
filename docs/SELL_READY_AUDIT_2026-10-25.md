@@ -39,6 +39,8 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
     reset password riuscito; il cookie di sessione è marcato Secure su HTTPS.
 15. limita a cinque per ora gli invii di verifica email usando un lock sul record
     utente, così richieste concorrenti non possono aggirare il limite.
+16. limita anche le richieste di reset password a cinque per account ogni ora,
+    mantiene la risposta anti-enumerazione e invalida i link precedenti prima del nuovo.
 
 ## Matrice di conformità
 

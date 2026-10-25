@@ -22,6 +22,8 @@ router = APIRouter()
 logger = logging.getLogger("qrfacile.auth_routes")
 
 PASSWORD_RESET_TTL_SECONDS = 60 * 60
+PASSWORD_RESET_WINDOW_SECONDS = 60 * 60
+PASSWORD_RESET_MAX_REQUESTS = 5
 PASSWORD_RESET_NEUTRAL_MSG = "Se l’email è registrata, riceverai un link per reimpostare la password."  # pragma: allowlist secret
 
 
@@ -281,16 +283,32 @@ def forgot_password_post(request: Request, email: str = Form(...)):
             with pg() as conn:
                 with conn.cursor(row_factory=dict_row) as cur:
                     cur.execute(
-                        "SELECT id, email FROM users WHERE lower(email)=lower(%s) LIMIT 1",
+                        "SELECT id, email FROM users WHERE lower(email)=lower(%s) LIMIT 1 FOR UPDATE",
                         (email,),
                     )
                     u = cur.fetchone()
 
                     if u:
-                        raw_token = secrets.token_urlsafe(32)
                         ts = now()
+                        cur.execute(
+                            """SELECT COUNT(*) AS request_count
+                               FROM password_reset_tokens
+                               WHERE user_id=%s AND created_at>=%s""",
+                            (int(u["id"]), ts - PASSWORD_RESET_WINDOW_SECONDS),
+                        )
+                        request_count = int((cur.fetchone() or {}).get("request_count") or 0)
+                        if request_count >= PASSWORD_RESET_MAX_REQUESTS:
+                            conn.commit()
+                            return forgot_password_get(request, msg=PASSWORD_RESET_NEUTRAL_MSG)
+
+                        raw_token = secrets.token_urlsafe(32)
                         exp = ts + PASSWORD_RESET_TTL_SECONDS
                         request_ip = _reset_request_ip(request)
+                        cur.execute(
+                            """UPDATE password_reset_tokens SET used_at=%s
+                               WHERE user_id=%s AND used_at IS NULL""",
+                            (ts, int(u["id"])),
+                        )
                         cur.execute(
                             """
                             INSERT INTO password_reset_tokens

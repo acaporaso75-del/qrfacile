@@ -49,3 +49,7 @@ Verification-email creation locks the user row and reserves one of at most five
 send attempts in a rolling 60-minute window before releasing the transaction.
 Concurrent resend requests therefore cannot bypass the limit; provider delivery
 success or failure is recorded on the hashed token without exposing it.
+
+Password-reset requests lock the matched user, allow at most five requests per
+60 minutes, keep the same public response for existing, missing and limited
+accounts, and invalidate older unused links before creating a replacement.
