@@ -61,7 +61,7 @@ def _request(path: str = "/app/billing", method: str = "GET") -> Request:
 
 def test_online_billing_card_is_valid_post_form_with_csrf():
     request = _request()
-    html = paypal_checkout_form(request, pack="start")
+    html = paypal_checkout_form(request, pack="generic_10")
     parser = _FormParser()
     parser.feed(html)
 
@@ -73,12 +73,12 @@ def test_online_billing_card_is_valid_post_form_with_csrf():
     }]
     assert parser.buttons[0]["type"] == "submit"
     assert "disabled" not in parser.buttons[0]
-    assert 'name="pack" value="start"' in html
+    assert 'name="pack" value="generic_10"' in html
     assert 'name="csrf_token"' in html
 
 
 def test_rendered_billing_pack_uses_checkout_contract():
-    html = _pack_card(_request(), "start", get_purchase_pack("start"))
+    html = _pack_card(_request(), "generic_10", get_purchase_pack("generic_10"))
     parser = _FormParser()
     parser.feed(html)
     assert parser.max_depth == 1
@@ -158,6 +158,10 @@ class _Cursor:
             raise RuntimeError("database unavailable")
 
     def fetchone(self):
+        if "AS profile" in self.last_sql:
+            return {"profile": self.state.get("profile", {"vat": "00000000000", "country": "IT"})}
+        if "SELECT * FROM orders" in self.last_sql:
+            return self.state.get("order")
         if "FROM wineries" in self.last_sql:
             return {"id": 9}
         if "RETURNING id" in self.last_sql:
@@ -212,7 +216,7 @@ def test_paypal_start_rejects_missing_csrf_before_db_or_http(monkeypatch):
     monkeypatch.setattr(paypal_ui, "pg", lambda: touched.append("db"))
     monkeypatch.setattr(paypal_ui.requests, "post", lambda *_args, **_kwargs: touched.append("http"))
     with pytest.raises(HTTPException) as exc:
-        paypal_ui.paypal_start(_request("/paypal/start", "POST"), "start", csrf_token="")
+        paypal_ui.paypal_start(_request("/paypal/start", "POST"), "generic_10", csrf_token="")
     assert exc.value.status_code == 403
     assert touched == []
 
@@ -226,7 +230,7 @@ def test_paypal_start_posts_sandbox_order_and_redirects_to_approve(monkeypatch):
     request = _request("/paypal/start", "POST")
     response = paypal_ui.paypal_start(
         request,
-        "start",
+        "generic_10",
         csrf_token=csrf_token_for_request(request),
     )
     assert response.status_code == 303
@@ -245,7 +249,7 @@ def test_provider_error_redirects_to_readable_billing_error(monkeypatch, status_
     request = _request("/paypal/start", "POST")
     response = paypal_ui.paypal_start(
         request,
-        "start",
+        "generic_10",
         csrf_token=csrf_token_for_request(request),
     )
     location = unquote(response.headers["location"])
@@ -271,7 +275,7 @@ def test_network_error_redirects_without_raw_exception(monkeypatch):
     request = _request("/paypal/start", "POST")
     response = paypal_ui.paypal_start(
         request,
-        "start",
+        "generic_10",
         csrf_token=csrf_token_for_request(request),
     )
     location = unquote(response.headers["location"])
@@ -292,7 +296,7 @@ def test_rejects_non_sandbox_approve_host(monkeypatch):
     request = _request("/paypal/start", "POST")
     response = paypal_ui.paypal_start(
         request,
-        "start",
+        "generic_10",
         csrf_token=csrf_token_for_request(request),
     )
     assert response.status_code == 303
@@ -306,7 +310,7 @@ def test_malformed_provider_json_redirects_without_500(monkeypatch, payload):
     request = _request("/paypal/start", "POST")
     response = paypal_ui.paypal_start(
         request,
-        "start",
+        "generic_10",
         csrf_token=csrf_token_for_request(request),
     )
     assert response.status_code == 303
@@ -324,9 +328,98 @@ def test_local_order_update_failure_has_readable_redirect(monkeypatch):
     request = _request("/paypal/start", "POST")
     response = paypal_ui.paypal_start(
         request,
-        "start",
+        "generic_10",
         csrf_token=csrf_token_for_request(request),
     )
     assert response.status_code == 303
     assert response.headers["location"].startswith("/app/billing?err=")
     assert any("status='cancelled'" in sql for sql, _params in state["queries"])
+
+
+def test_annual_start_uses_gross_price_and_immutable_snapshot(monkeypatch):
+    import json
+    state = _install_checkout_mocks(monkeypatch, _ProviderResponse(payload={
+        "id": "PP-77", "links": [{"rel": "approve", "href": "https://www.sandbox.paypal.com/checkoutnow?token=TEST"}],
+    }))
+    request = _request("/paypal/start", "POST")
+    response = paypal_ui.paypal_start(request, "annual_start",
+        csrf_token=csrf_token_for_request(request), fiscal_confirmation="IT_ORDINARY")
+    assert response.status_code == 303
+    assert state["posts"][0][1]["json"]["purchase_units"][0]["amount"]["value"] == "120.78"
+    params = next(params for sql, params in state["queries"] if "INSERT INTO orders" in sql)
+    snapshot = json.loads(params[-2])
+    assert (snapshot["net_cents"], snapshot["vat_cents"], snapshot["gross_cents"]) == (9900, 2178, 12078)
+    assert snapshot["wine_credits"] == 15
+    assert snapshot["fiscal_confirmation"] == "IT_ORDINARY"
+
+
+@pytest.mark.parametrize("pack,confirmation,country", [
+    ("start", "IT_ORDINARY", "IT"), ("annual_start", "", "IT"),
+    ("annual_start", "IT_ORDINARY", "FR"),
+])
+def test_ineligible_annual_checkout_never_contacts_provider(monkeypatch, pack, confirmation, country):
+    state = _install_checkout_mocks(monkeypatch, _ProviderResponse())
+    state["profile"] = {"vat": "00000000000", "country": country}
+    request = _request("/paypal/start", "POST")
+    with pytest.raises(HTTPException):
+        paypal_ui.paypal_start(request, pack, csrf_token=csrf_token_for_request(request),
+                               fiscal_confirmation=confirmation)
+    assert not state["posts"]
+    assert not any("INSERT INTO orders" in sql for sql, _ in state["queries"])
+
+
+def test_annual_capture_grants_once_and_paid_replay_has_no_http(monkeypatch):
+    from qrfacile_app.annual_packages import annual_quote
+    state = _install_checkout_mocks(monkeypatch, _ProviderResponse(payload={
+        "id": "PP-77", "status": "COMPLETED", "purchase_units": [{
+            "payments": {"captures": [{"id": "CAPTURE-TEST", "status": "COMPLETED",
+                                      "amount": {"currency_code": "EUR", "value": "120.78"}}]},
+        }],
+    }))
+    state["order"] = {
+        "id": 77, "user_id": 42, "pack": "annual_start", "status": "pending",
+        "amount_cents": 12078, "currency": "EUR", "paypal_order_id": "PP-77",
+        "payment_environment": paypal_ui.PAYPAL_MODE,
+        "commercial_snapshot": annual_quote("annual_start", "IT", "00000000000"),
+    }
+    request = _request("/paypal/return")
+    response = paypal_ui.paypal_return(request, token="PP-77", order_id=77)
+    assert response.status_code == 303
+    grants = [(sql, params) for sql, params in state["queries"] if "annual_purchase" in sql]
+    assert len(grants) == 1
+    assert grants[0][1][:3] == (42, 15, 77)
+    assert grants[0][1][4] > grants[0][1][3]
+    state["order"]["status"] = "paid"
+    paypal_ui.paypal_return(request, token="PP-77", order_id=77)
+    assert len(state["posts"]) == 1
+    assert len([sql for sql, _ in state["queries"] if "annual_purchase" in sql]) == 1
+
+
+def test_studio_annual_purchase_requires_quote_before_db_or_provider(monkeypatch):
+    state = _install_checkout_mocks(monkeypatch, _ProviderResponse())
+    monkeypatch.setattr(paypal_ui, "require_any_role", lambda *_: {"id":42, "role":"studio"})
+    request = _request("/paypal/start", "POST")
+    response = paypal_ui.paypal_start(request, "annual_start",
+        csrf_token=csrf_token_for_request(request), fiscal_confirmation="IT_ORDINARY")
+    assert response.status_code == 303 and response.headers["location"].startswith("/support")
+    assert not state["queries"] and not state["posts"]
+
+
+def test_capture_wrong_gross_amount_never_marks_paid_or_grants(monkeypatch):
+    from qrfacile_app.annual_packages import annual_quote
+    state = _install_checkout_mocks(monkeypatch, _ProviderResponse(payload={
+        "id":"PP-77", "status":"COMPLETED", "purchase_units":[{
+            "payments":{"captures":[{"id":"CAP-TEST","status":"COMPLETED",
+                                     "amount":{"currency_code":"EUR","value":"99.00"}}]}
+        }],
+    }))
+    state["order"] = {
+        "id":77, "user_id":42, "pack":"annual_start", "status":"pending",
+        "amount_cents":12078, "currency":"EUR", "paypal_order_id":"PP-77",
+        "payment_environment":paypal_ui.PAYPAL_MODE,
+        "commercial_snapshot":annual_quote("annual_start","IT","00000000000"),
+    }
+    response = paypal_ui.paypal_return(_request("/paypal/return"), token="PP-77", order_id=77)
+    assert response.status_code == 303
+    assert "err=" in response.headers["location"]
+    assert not any("status='paid'" in sql or "INSERT INTO credit_ledger" in sql for sql, _ in state["queries"])

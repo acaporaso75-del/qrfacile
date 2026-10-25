@@ -36,7 +36,7 @@ def _balances(cur, user_id: int) -> dict:
     cur.execute(
         """
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
         """,
@@ -62,6 +62,26 @@ def _ledger(cur, user_id: int) -> list[dict]:
         (int(user_id),),
     )
     return cur.fetchall() or []
+
+
+def _annual_allowances(cur, user_id: int) -> str:
+    cur.execute("""
+        SELECT delta, annual_used, expires_at FROM credit_ledger
+        WHERE user_id=%s AND reason='annual_purchase'
+        ORDER BY expires_at DESC
+    """, (int(user_id),))
+    rows = []
+    for grant in cur.fetchall() or []:
+        expired = int(grant['expires_at']) <= now()
+        remaining = 0 if expired else max(0, int(grant['delta']) - int(grant['annual_used']))
+        rows.append(f"<li>{remaining} unità residue su {int(grant['delta'])} · "
+                    f"{'Scadute il' if expired else 'Utilizzabili fino al'} "
+                    f"{esc(_fmt_ts(int(grant['expires_at'])))}</li>")
+    if not rows:
+        return ""
+    return '<section class="card"><h2>Unità annuali</h2><ul>' + ''.join(rows) + (
+        '</ul><p>Le unità non usate scadono senza riporto. I crediti storici restano separati '
+        'e i QR creati rimangono attivi per la durata scelta.</p></section>')
 
 
 def _recommended_pack_from_invite(cur, user: dict) -> str:
@@ -235,6 +255,7 @@ def _reason_label(reason: str) -> str:
     labels = {
         "seed": "Crediti iniziali",
         "purchase": "Acquisto crediti",
+        "annual_purchase": "Acquisto unità annuali (vedi scadenza)",
         "admin_adjust": "Caricamento admin",
         "new_wine": "Creazione lotto vino",
         "wine_lot_create": "Creazione QR vino",
@@ -246,7 +267,7 @@ def _reason_label(reason: str) -> str:
 def _pack_card(request: Request, pack_key: str, pack: dict, recommended_pack: str = "") -> str:
     recommended_pack = (recommended_pack or "").strip().lower()
     is_recommended = bool(recommended_pack and pack_key == recommended_pack)
-    is_default_featured = (not recommended_pack and pack_key == "pro")
+    is_default_featured = (not recommended_pack and pack_key == "annual_winery")
     featured = " featured" if (is_recommended or is_default_featured or pack.get("highlight")) else ""
 
     if is_recommended:
@@ -304,6 +325,7 @@ def billing(request: Request, msg: str = "", err: str = ""):
             orders = _orders(cur, uid)
             subscription = _active_subscription(cur, uid)
             recommended_pack = _recommended_pack_from_invite(cur, user)
+            annual_allowances_html = _annual_allowances(cur, uid)
 
     actions = (
         pill(f"wine: {balances.get('wine', 0)}", "green") + " " +
@@ -337,6 +359,7 @@ def billing(request: Request, msg: str = "", err: str = ""):
         (k, v)
         for k, v in list_billing_packs()
         if not v.get("hidden_in_billing") and k not in hidden_packs
+        and (not v.get("annual") or user.get("role") == "winery")
     ]
 
     pack_cards = "".join(_pack_card(request, k, v, recommended_pack) for k, v in visible_packs)
@@ -402,7 +425,7 @@ def billing(request: Request, msg: str = "", err: str = ""):
           <div class="billingEyebrow">Crediti QR</div>
           <div class="h1">Billing</div>
           <div class="p">
-            Controlla il saldo disponibile e acquista crediti QR o servizi opzionali di Assistenza QRFACILE. Nessun abbonamento obbligatorio.
+            Pacchetti Wine annuali a rinnovo manuale, IVA esclusa. Nessun addebito automatico. QR già creati conservati per la durata scelta.
           </div>
         </div>
         <div class="billingHeroCards">
@@ -424,7 +447,9 @@ def billing(request: Request, msg: str = "", err: str = ""):
       </div>
 
       {subscription_html}
+      {annual_allowances_html}
       {recommended_box}
+      <p>Studi e gestione multi-cantina: <a href="/support">richiedi un preventivo</a>.</p>
 
       <div class="billingPackGrid">
         {pack_cards}
@@ -570,6 +595,9 @@ def request_plan(request: Request, pack: str = Form(...)):
 
     if data.get("disabled") or int(data.get("amount_cents") or 0) <= 0:
         raise HTTPException(400, "Piano non acquistabile online")
+
+    if data.get('annual'):
+        raise HTTPException(400, 'Usa il checkout annuale con riepilogo IVA o richiedi un preventivo al supporto.')
 
     uid = int(user["id"])
 

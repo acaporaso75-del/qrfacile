@@ -46,7 +46,7 @@ def _balances(cur, user_id: int) -> dict:
     cur.execute(
         """
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
         """,
@@ -900,7 +900,7 @@ def _subscription_gate_for_new_wine(cur, user: dict, owner_user_id: int, winery_
     - admin: può creare sempre.
     - se non esiste subscription active: non blocca qui; decide il saldo crediti.
       Questo permette l'uso dei 3 crediti QR vino gratuiti iniziali.
-    - se esiste subscription active ma scaduta: blocca nuovi QR.
+    - subscription legacy scaduta: i crediti ancora disponibili consentono nuovi QR.
     - se subscription active valida: ok.
     """
     role = (user.get("role") or "").lower().strip()
@@ -928,7 +928,10 @@ def _subscription_gate_for_new_wine(cur, user: dict, owner_user_id: int, winery_
     expires_at = int(sub.get("expires_at") or 0)
 
     if expires_at and expires_at < now():
-        return False, "Piano scaduto: rinnova il piano per creare nuovi QR vino."
+        # New annual allowances and perpetual credits survive a legacy subscription.
+        cur.execute("SELECT COALESCE(SUM(delta),0) AS balance FROM available_credit_ledger WHERE user_id=%s AND credit_type='wine'", (int(owner_user_id),))
+        if int((cur.fetchone() or {}).get('balance') or 0) <= 0:
+            return False, "Unità esaurite o scadute: acquista un pacchetto per creare nuovi QR vino."
 
     return True, ""
 
@@ -981,7 +984,8 @@ def new_wine_post(
     credit_cost = 2 if duration_years == 25 else 1
 
     ts = now()
-    expires_at = ts + (60 * 60 * 24 * 365 * duration_years)
+    from qrfacile_app.annual_packages import anniversary
+    expires_at = anniversary(ts, duration_years)
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -1034,7 +1038,7 @@ def new_wine_post(
             cur.execute(
                 """
                 SELECT COALESCE(SUM(delta), 0) AS balance
-                FROM credit_ledger
+                FROM available_credit_ledger
                 WHERE user_id=%s AND credit_type='wine'
                 """,
                 (owner_user_id,),

@@ -34,7 +34,7 @@ def _balances(cur, user_id: int) -> dict:
 def _credits(cur, user_id: int) -> dict:
     cur.execute("""
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
     """, (int(user_id),))

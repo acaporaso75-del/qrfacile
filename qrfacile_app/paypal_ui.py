@@ -1,6 +1,7 @@
 # /opt/qrfacile/qrfacile_app/paypal_ui.py
 
 import logging
+import json
 import os
 import time
 import requests
@@ -13,6 +14,7 @@ from psycopg.rows import dict_row
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.csrf_core import require_csrf
 from qrfacile_app.db import pg
+from qrfacile_app.annual_packages import annual_quote, grant_annual_units, load_order_product, validate_capture
 
 from qrfacile_app.pricing_config import (
     get_purchase_pack,
@@ -212,6 +214,7 @@ def paypal_start(
     pack: str = Form(...),
     billing_winery_id: int = Form(0),
     csrf_token: str = Form(""),
+    fiscal_confirmation: str = Form(""),
 ):
     user = require_any_role(request, ("winery", "studio", "admin"))
     require_csrf(request, csrf_token)
@@ -230,6 +233,8 @@ def paypal_start(
 
     uid = int(user["id"])
     base = _base_url(request)
+    if data.get('annual') and role != 'winery':
+        return RedirectResponse("/support?subject=Pacchetto%20Studio%20multi-cantina", status_code=303)
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -258,6 +263,22 @@ def paypal_start(
 
                 winery_id = int(billing_winery_id)
 
+            snapshot = None
+            total_cents = int(data['amount_cents'])
+            if data.get('annual'):
+                if fiscal_confirmation != 'IT_ORDINARY':
+                    raise HTTPException(422, 'Conferma i dati fiscali e il totale IVA inclusa prima di acquistare.')
+                cur.execute("SELECT to_jsonb(w) AS profile FROM wineries w WHERE id=%s", (winery_id,))
+                profile = (cur.fetchone() or {}).get('profile') or {}
+                country = profile.get('billing_country') or profile.get('country') or 'IT'
+                snapshot = annual_quote(pack, country, str(profile.get('vat') or ''))
+                snapshot['customer'] = {
+                    key: profile.get(key) for key in
+                    ('name', 'company_name', 'vat', 'sdi', 'pec', 'city', 'province', 'billing_country', 'country')
+                }
+                snapshot['fiscal_confirmation'] = fiscal_confirmation
+                total_cents = snapshot['gross_cents']
+
             cur.execute(
                 """
                 INSERT INTO orders (
@@ -268,18 +289,20 @@ def paypal_start(
                   amount_cents,
                   currency,
                   payment_environment,
+                  commercial_snapshot,
                   status,
                   created_at
                 )
-                VALUES (%s,%s,%s,1,%s,'EUR',%s,'pending',%s)
+                VALUES (%s,%s,%s,1,%s,'EUR',%s,%s::jsonb,'pending',%s)
                 RETURNING id
                 """,
                 (
                     uid,
                     winery_id,
                     pack,
-                    int(data["amount_cents"]),
+                    total_cents,
                     PAYPAL_MODE,
+                    json.dumps(snapshot) if snapshot else None,
                     now(),
                 ),
             )
@@ -307,7 +330,7 @@ def paypal_start(
                     "description": f"QRFACILE crediti/servizio {data['name']}",
                     "amount": {
                         "currency_code": "EUR",
-                        "value": f"{int(data['amount_cents']) / 100:.2f}",
+                        "value": f"{total_cents / 100:.2f}",
                     },
                 }],
                 "application_context": {
@@ -427,6 +450,10 @@ def paypal_return(
                     status_code=303,
                 )
 
+            if order.get('payment_environment') not in (None, 'unknown', PAYPAL_MODE):
+                raise HTTPException(409, 'Ambiente del pagamento diverso da quello corrente')
+            load_order_product(order)
+
     try:
         token_api = _paypal_token()
         r = requests.post(
@@ -446,19 +473,9 @@ def paypal_return(
         status = str(capture_data.get("status") or "").upper()
         if status != "COMPLETED":
             raise RuntimeError("Pagamento PayPal non completato")
+        capture_id = validate_capture(capture_data, order)
     except (HTTPException, RuntimeError, requests.RequestException, ValueError) as exc:
         return _capture_error(int(order["id"]), exc)
-
-    capture_id = ""
-
-    try:
-        captures = capture_data["purchase_units"][0]["payments"]["captures"]
-
-        if captures:
-            capture_id = captures[0].get("id") or ""
-
-    except Exception:
-        capture_id = ""
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -496,7 +513,7 @@ def paypal_return(
 
             pack = (locked_order.get("pack") or "").strip().lower()
 
-            data = get_purchase_pack(pack)
+            data = load_order_product(locked_order)
 
             if not data:
                 raise HTTPException(
@@ -505,6 +522,8 @@ def paypal_return(
                 )
 
             order_id_int = int(locked_order["id"])
+            validate_capture(capture_data, locked_order)
+            paid_timestamp = now()
 
             cur.execute(
                 """
@@ -518,13 +537,16 @@ def paypal_return(
                 (
                     paypal_order_id,
                     capture_id,
-                    now(),
+                    paid_timestamp,
                     order_id_int,
                 ),
             )
 
             # wine credits
-            if int(data.get("wine_credits") or 0):
+            if data.get('annual'):
+                grant_annual_units(cur, user_id=uid, order_id=order_id_int,
+                                   units=int(data['wine_credits']), paid_at=paid_timestamp)
+            elif int(data.get("wine_credits") or 0):
 
                 _add_credit(
                     cur,

@@ -2062,7 +2062,7 @@ body {
     <div class="heroText">
       <div class="eyebrow">QRFACILE · Etichetta digitale vino</div>
 
-      <h1>Il QR del vino,<br>fatto semplice.<br><span>Senza abbonamento obbligatorio.</span></h1>
+      <h1>Il QR del vino,<br>fatto semplice.<br><span>Pacchetti annuali, rinnovo manuale.</span></h1>
 
       <p>
         Crea QR vino per l’etichetta digitale, gestisci lotti, ingredienti,
@@ -2080,7 +2080,7 @@ body {
         </div>
         <div style="border:1px solid rgba(2,8,23,.10);background:rgba(255,255,255,.82);border-radius:18px;padding:12px">
           <b style="display:block;font-size:18px">+1 credito</b>
-          <span style="display:block;margin-top:4px;color:#64748b;font-size:12px;font-weight:850">upgrade 10 → 25 anni</span>
+          <span style="display:block;margin-top:4px;color:#64748b;font-size:12px;font-weight:850">upgrade 10 → 25 anni su richiesta al supporto</span>
         </div>
       </div>
 

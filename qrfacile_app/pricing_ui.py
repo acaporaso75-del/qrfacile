@@ -40,7 +40,7 @@ def _main_feature(pack: dict) -> str:
     return f"""
     <div class="priceFeature main">
       <span>✓</span>
-      <b>{qty} crediti QR vino</b>
+      <b>{qty} unità per nuove etichette ogni anno</b>
     </div>
 
     <div class="priceFeature">
@@ -48,6 +48,7 @@ def _main_feature(pack: dict) -> str:
       <div>
         <b>{standard_qr} QR vino da {QR_STANDARD_YEARS} anni</b><br>
         oppure {extended_qr} QR vino da {QR_EXTENDED_YEARS} anni
+        {'+ 1 unità residua' if qty % QR_EXTENDED_CREDIT_COST else ''}
       </div>
     </div>
     """
@@ -109,7 +110,8 @@ def _qr_pack_card(request: Request, key: str, pack: dict) -> str:
         </div>
       </div>
 
-      <div class="priceValue">{price}</div>
+      <div class="priceValue">{price}<small> / anno</small></div>
+      <p>IVA esclusa · solo clienti professionali</p>
 
       <div class="priceFeatures">
         {_main_feature(pack)}
@@ -162,10 +164,10 @@ def pricing_page(request: Request):
 
       <section class="pricingHero">
         <div class="pricingEyebrow">Prezzi QRFACILE</div>
-        <h1>Scegli il pacchetto di crediti QR vino più adatto alla tua cantina</h1>
+        <h1>Pacchetti annuali Wine per la tua cantina</h1>
         <p>
-          Paghi solo i crediti che usi. Nessun abbonamento obbligatorio.
-          QR pronti per la stampa in pochi minuti.
+          Acquisti nuove etichette per 12 mesi, con rinnovo manuale e senza addebiti automatici.
+          I QR già creati restano consultabili per la durata scelta, anche senza rinnovo.
         </p>
       </section>
 
@@ -189,13 +191,19 @@ def pricing_page(request: Request):
         </div>
         <div>
           <b>+{QR_UPGRADE_10_TO_25_CREDIT_COST} credito</b>
-          <span>upgrade da {QR_STANDARD_YEARS} a {QR_EXTENDED_YEARS} anni</span>
+          <span>upgrade da {QR_STANDARD_YEARS} a {QR_EXTENDED_YEARS} anni su richiesta al supporto</span>
         </div>
       </section>
 
       <section class="priceGrid">
         {qr_cards}
       </section>
+      <p>10 anni: 1 unità. Conservazione estesa 25 anni: 2 unità.
+      Le unità annuali non utilizzate scadono dopo 12 mesi dall'acquisto, senza proroga al rinnovo.
+      Restano possibili le correzioni dei dati obbligatori delle etichette esistenti.
+      I crediti acquistati con le precedenti offerte conservano le condizioni originarie.</p>
+      <p>Studi grafici, gestione multi-cantina e grandi volumi:
+      <a href="/support">richiedi un preventivo</a>.</p>
       {paypal_checkout_script()}
 
       <section class="assistSection">
@@ -669,7 +677,7 @@ def pricing_page(request: Request):
         title="Prezzi QRFACILE | QR code per etichetta digitale vino",
         subtitle="Prezzi",
         body_html=body,
-        description="Prezzi QRFACILE Wine: 3 crediti gratuiti, pacchetti senza abbonamento obbligatorio e QR vino attivi per 10 o 25 anni.",
+        description="QRFACILE Wine B2B: Start 99€, Cantina 179€, Business 299€ all'anno, IVA esclusa. Etichette conservate per 10 o 25 anni, rinnovo manuale.",
         canonical_path="/pricing",
         structured_data={
             "@context": "https://schema.org",
@@ -682,6 +690,7 @@ def pricing_page(request: Request):
                     "name": pack["label"],
                     "price": f"{int(pack['amount_cents']) / 100:.2f}",
                     "priceCurrency": "EUR",
+                    "priceSpecification": {"@type": "UnitPriceSpecification", "price": f"{int(pack['amount_cents']) / 100:.2f}", "priceCurrency": "EUR", "valueAddedTaxIncluded": False, "billingDuration": "P1Y"},
                     "url": "https://www.qrfacile.it/pricing",
                 }
                 for _, pack in list_qr_packs()

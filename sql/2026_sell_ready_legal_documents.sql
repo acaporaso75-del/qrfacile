@@ -8,14 +8,14 @@ INSERT INTO legal_documents (
         'terms',
         '2026-10-25',
         'Termini di servizio QRFACILE',
-        '4e3e30e0ceb17cf81e2ca184088dcbbd9537e77391f1c20c499633f115f57945',
+        '0fda722549411ad56d958685923f0ee66b12d59ceeb9305e0a4de2bc85f41d00', -- pragma: allowlist secret (public HTML SHA-256)
         TIMESTAMPTZ '2026-10-25 00:00:00+02'
     ),
     (
         'privacy',
         '2026-10-25',
         'Informativa privacy QRFACILE',
-        'ceaa60c1cd64671486ab158f84a32a6ea2aa648d671d4a1bc6ab03947e8a2307',
+        'ceaa60c1cd64671486ab158f84a32a6ea2aa648d671d4a1bc6ab03947e8a2307', -- pragma: allowlist secret (public HTML SHA-256)
         TIMESTAMPTZ '2026-10-25 00:00:00+02'
     )
 ON CONFLICT (document_key, version) DO UPDATE SET

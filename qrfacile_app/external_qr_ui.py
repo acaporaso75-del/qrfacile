@@ -19,7 +19,7 @@ def _balances(cur, user_id: int) -> dict:
     cur.execute(
         """
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
         """,
@@ -115,7 +115,7 @@ def new_external_create(request: Request, target_url: str = Form(...)):
                 cur.execute(
                     """
                     SELECT COALESCE(SUM(delta),0) AS balance
-                    FROM credit_ledger
+                    FROM available_credit_ledger
                     WHERE user_id=%s AND credit_type='generic'
                     """,
                     (uid,),

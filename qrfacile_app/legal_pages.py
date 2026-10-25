@@ -613,8 +613,20 @@ def terms(request: Request):
       <div class="legalCard">
         <h2>4. QR gratuiti, piani e crediti</h2>
         <p>
-          QRFACILE può prevedere un numero iniziale di QR gratuiti, pacchetti, piani annuali o crediti utilizzabili
-          secondo le condizioni commerciali vigenti al momento dell’attivazione.
+          I pacchetti Wine B2B Start (15 unità, 99 €/anno), Cantina (50 unità, 179 €/anno)
+          e Business (100 unità, 299 €/anno) sono riservati a clienti professionali.
+          I prezzi sono IVA esclusa; il checkout espone imponibile, IVA e totale prima del pagamento.
+          Per studi, multi-cantina, clienti esteri e regimi fiscali speciali è disponibile un preventivo.
+        </p>
+        <p>
+          Ogni acquisto attiva le proprie unità per 12 mesi dalla conferma del pagamento.
+          Il rinnovo è manuale, senza addebiti automatici. Le unità non utilizzate scadono senza riporto;
+          un nuovo acquisto non proroga quelle precedenti. Un QR da 10 anni utilizza 1 unità,
+          un QR da 25 anni ne utilizza 2. La durata decorre dalla creazione del QR.
+          Il mancato rinnovo non disattiva i QR già creati: restano disponibili e correggibili
+          per la durata scelta. I crediti acquistati prima del nuovo listino mantengono le condizioni originarie.
+          La durata commerciale non sostituisce la valutazione degli obblighi applicabili alla singola etichetta;
+          eventuali esigenze di conservazione più lunga devono essere concordate.
         </p>
         <p>
           Le condizioni economiche, i limiti dei piani, il numero di QR inclusi, eventuali funzionalità premium

@@ -60,7 +60,7 @@ def _balances(cur, user_id: int) -> list[dict]:
     cur.execute(
         """
         SELECT credit_type, COALESCE(SUM(delta),0) AS saldo
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
         ORDER BY credit_type

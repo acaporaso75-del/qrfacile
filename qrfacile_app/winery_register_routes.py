@@ -149,9 +149,9 @@ def register_winery_get(request: Request, invite: str = "", err: str = "", msg: 
                         perms_txt = ", ".join(perms) if perms else "-"
 
                         pack_labels = {
-                            "start": "Start · 20 crediti · €29",
-                            "pro": "Cantina · 60 crediti · €79",
-                            "plus": "Business · 200 crediti · €199",
+                            "annual_start": "Start · 15 unità/anno · €99 + IVA",
+                            "annual_winery": "Cantina · 50 unità/anno · €179 + IVA",
+                            "annual_business": "Business · 100 unità/anno · €299 + IVA",
                             "unlimited": "Non disponibile online",
                         }
                         recommended_pack = (inv.get("recommended_pack") or "").strip().lower()
