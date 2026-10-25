@@ -15,7 +15,7 @@ I dati sono conservati solo per il tempo necessario alla finalità dichiarata, a
 - Backup giornalieri: 30 giorni.
 - Backup mensili: 12 mesi.
 - Contenuti e-label pubblicati: durata necessaria alla commercializzazione e agli obblighi applicabili al prodotto.
-- Scansioni QR tecniche: preferibilmente aggregate o anonimizzate; dati grezzi massimo 30 giorni salvo necessità documentata.
+- Pagine pubbliche e-label `/e/`: nessuna registrazione applicativa della scansione, nessun identificatore, IP, user-agent o fingerprint del visitatore.
 - Prompt/output AI: 12 mesi quando necessari per audit, contestazioni e sicurezza; riduzione o anonimizzazione ove possibile.
 - Consensi e accettazioni legali: durata del rapporto più 10 anni per prova contrattuale, salvo diversa valutazione legale.
 

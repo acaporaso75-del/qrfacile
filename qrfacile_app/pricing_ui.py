@@ -668,5 +668,23 @@ def pricing_page(request: Request):
     return HTMLResponse(page_public(
         title="Prezzi QRFACILE | QR code per etichetta digitale vino",
         subtitle="Prezzi",
-        body_html=body
+        body_html=body,
+        description="Prezzi QRFACILE Wine: 3 crediti gratuiti, pacchetti senza abbonamento obbligatorio e QR vino attivi per 10 o 25 anni.",
+        canonical_path="/pricing",
+        structured_data={
+            "@context": "https://schema.org",
+            "@type": "OfferCatalog",
+            "name": "Pacchetti QRFACILE Wine",
+            "url": "https://www.qrfacile.it/pricing",
+            "itemListElement": [
+                {
+                    "@type": "Offer",
+                    "name": pack["label"],
+                    "price": f"{int(pack['amount_cents']) / 100:.2f}",
+                    "priceCurrency": "EUR",
+                    "url": "https://www.qrfacile.it/pricing",
+                }
+                for _, pack in list_qr_packs()
+            ],
+        },
     ))

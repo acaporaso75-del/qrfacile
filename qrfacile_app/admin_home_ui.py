@@ -47,10 +47,35 @@ def _kpi(cur) -> dict:
     out["external_qr"] = int((cur.fetchone() or {}).get("n") or 0)
 
     try:
-        cur.execute("SELECT COALESCE(SUM(amount_cents),0) AS s FROM credit_orders WHERE status='paid'")
-        out["revenue_eur"] = float((cur.fetchone() or {}).get("s") or 0) / 100.0
+        cur.execute(
+            """
+            SELECT
+              COALESCE(SUM(amount_cents) FILTER (
+                WHERE status='paid' AND payment_environment='live'
+              ), 0) AS live_cents,
+              COALESCE(SUM(amount_cents) FILTER (
+                WHERE status='paid' AND payment_environment='sandbox'
+              ), 0) AS sandbox_cents,
+              COALESCE(SUM(amount_cents) FILTER (
+                WHERE status='paid' AND payment_environment='unknown'
+              ), 0) AS unknown_cents
+            FROM orders
+            """
+        )
+        payment_totals = cur.fetchone() or {}
+        out["revenue_live_eur"] = float(payment_totals.get("live_cents") or 0) / 100.0
+        out["revenue_sandbox_eur"] = float(payment_totals.get("sandbox_cents") or 0) / 100.0
+        out["revenue_unknown_eur"] = float(payment_totals.get("unknown_cents") or 0) / 100.0
+
+        cur.execute(
+            "SELECT COALESCE(SUM(amount_cents),0) AS s FROM credit_orders WHERE status='paid'"
+        )
+        out["revenue_legacy_eur"] = float((cur.fetchone() or {}).get("s") or 0) / 100.0
     except Exception:
-        out["revenue_eur"] = 0.0
+        out["revenue_live_eur"] = 0.0
+        out["revenue_sandbox_eur"] = 0.0
+        out["revenue_unknown_eur"] = 0.0
+        out["revenue_legacy_eur"] = 0.0
 
     since = _now_epoch() - (30 * 24 * 3600)
 
@@ -169,8 +194,13 @@ def admin_home(request: Request, q: str = "", msg: str = "", err: str = ""):
           <div class="p"><b>{kpi['external_qr']}</b> creati</div>
         </div>
         <div class="card">
-          <div class="h2">Ricavi (paid)</div>
-          <div class="p"><b>{kpi['revenue_eur']:.2f}€</b></div>
+          <div class="h2">Incassi Live verificati</div>
+          <div class="p"><b>{kpi['revenue_live_eur']:.2f}€</b></div>
+          <div class="muted" style="font-size:12px;margin-top:6px">
+            Sandbox: {kpi['revenue_sandbox_eur']:.2f}€ ·
+            Storico non classificato: {kpi['revenue_unknown_eur']:.2f}€ ·
+            Legacy/manuale: {kpi['revenue_legacy_eur']:.2f}€
+          </div>
         </div>
       </div>
     </div>

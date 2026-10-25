@@ -41,6 +41,8 @@ def ai_policy(request: Request):
         subtitle="AI Policy",
         body_html=body,
         actions_html='<a class="btn" href="/legal">Note legali</a><a class="btn" href="/privacy">Privacy</a>',
+        description="Policy QRFACILE per trasparenza, supervisione umana, dati e responsabilità nell’uso di funzioni AI.",
+        canonical_path="/ai-policy",
     ))
 
 

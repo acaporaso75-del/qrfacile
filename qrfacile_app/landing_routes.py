@@ -421,6 +421,17 @@ def home(request: Request):
         subtitle="Home",
         body_html=body,
         actions_html=actions,
+        description="QRFACILE è la piattaforma Enolab per QR dinamici. Il modulo Wine gestisce etichette digitali vino, dati obbligatori e file QR per la stampa.",
+        canonical_path="/",
+        structured_data={
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "Enolab S.r.l.",
+            "brand": {"@type": "Brand", "name": "QRFACILE"},
+            "url": "https://www.qrfacile.it/",
+            "email": "info@enolab.it",
+            "vatID": "IT01413300623",
+        },
     ))
 
 
@@ -846,6 +857,18 @@ def wine_home(request: Request):
         subtitle="Wine",
         body_html=body,
         actions_html=actions,
+        description="Etichetta digitale vino per cantine e studi grafici: ingredienti, allergeni, valori nutrizionali, riciclo, QR dinamico ed export per tipografia.",
+        canonical_path="/wine",
+        structured_data={
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            "name": "QRFACILE Wine",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "url": "https://www.qrfacile.it/wine",
+            "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR", "description": "3 crediti iniziali gratuiti"},
+            "provider": {"@type": "Organization", "name": "Enolab S.r.l."},
+        },
     ))
 
 

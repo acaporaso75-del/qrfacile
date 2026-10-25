@@ -141,7 +141,7 @@ def admin_customer(request: Request, winery_id: int, msg: str = "", err: str = "
 
             cur.execute(
                 """
-                SELECT id, pack, amount_cents, currency, status, billing_winery_id,
+                SELECT id, pack, amount_cents, currency, status, payment_environment, billing_winery_id,
                        created_at, paid_at, paypal_order_id, paypal_capture_id
                 FROM orders
                 WHERE user_id=%s
@@ -159,6 +159,7 @@ def admin_customer(request: Request, winery_id: int, msg: str = "", err: str = "
                     "Pack": o.get("pack"),
                     "Importo": _money(o.get("amount_cents"), o.get("currency") or "EUR"),
                     "Stato": o.get("status"),
+                    "Ambiente": o.get("payment_environment") or "unknown",
                     "Cantina": o.get("billing_winery_id") or "-",
                     "Creato": _fmt_ts(o.get("created_at")),
                     "Pagato": _fmt_ts(o.get("paid_at")),

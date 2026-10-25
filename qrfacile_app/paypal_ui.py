@@ -267,10 +267,11 @@ def paypal_start(
                   qty,
                   amount_cents,
                   currency,
+                  payment_environment,
                   status,
                   created_at
                 )
-                VALUES (%s,%s,%s,1,%s,'EUR','pending',%s)
+                VALUES (%s,%s,%s,1,%s,'EUR',%s,'pending',%s)
                 RETURNING id
                 """,
                 (
@@ -278,6 +279,7 @@ def paypal_start(
                     winery_id,
                     pack,
                     int(data["amount_cents"]),
+                    PAYPAL_MODE,
                     now(),
                 ),
             )

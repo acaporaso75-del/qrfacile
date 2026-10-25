@@ -585,10 +585,11 @@ def request_plan(request: Request, pack: str = Form(...)):
                   qty,
                   amount_cents,
                   currency,
+                  payment_environment,
                   status,
                   created_at
                 )
-                VALUES (%s,%s,%s,%s,%s,'EUR','pending',%s)
+                VALUES (%s,%s,%s,%s,%s,'EUR','manual','pending',%s)
                 RETURNING id
                 """,
                 (

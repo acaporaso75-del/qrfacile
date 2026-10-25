@@ -1,11 +1,12 @@
 import time
 
-from fastapi import APIRouter, Form
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 from passlib.hash import pbkdf2_sha256
 
 from qrfacile_app.db import pg
+from qrfacile_app.legal_core import record_registration_acceptances
 from qrfacile_app.ui_shell import page, top_actions, esc
 
 router = APIRouter()
@@ -98,10 +99,38 @@ def _invite_next_after_login(inv: dict | None) -> str:
 
 def _input(name: str, type_: str, placeholder: str, value: str = "", required: bool = False) -> str:
     req = "required" if required else ""
+    labels = {
+        "email": "Email di accesso",
+        "password": "Password",  # pragma: allowlist secret
+        "company_name": "Ragione sociale",
+        "vat": "Partita IVA",
+        "sdi": "Codice SDI",
+        "pec": "PEC",
+        "contact_name": "Nome del referente",
+        "contact_phone": "Telefono del referente",
+        "billing_address": "Indirizzo di fatturazione",
+        "billing_city": "Città di fatturazione",
+        "billing_cap": "CAP di fatturazione",
+        "billing_province": "Provincia di fatturazione",
+    }
+    autocompletes = {
+        "email": "email",
+        "password": "new-password",  # pragma: allowlist secret
+        "company_name": "organization",
+        "pec": "email",
+        "contact_name": "name",
+        "contact_phone": "tel",
+        "billing_address": "street-address",
+        "billing_city": "address-level2",
+        "billing_cap": "postal-code",
+        "billing_province": "address-level1",
+    }
+    autocomplete = autocompletes.get(name, "off")
 
     return f"""
-<input class="input" name="{esc(name)}" type="{esc(type_)}" value="{esc(value)}"
-  placeholder="{esc(placeholder)}" {req}
+<input class="input" id="{esc(name)}" name="{esc(name)}" type="{esc(type_)}" value="{esc(value)}"
+  aria-label="{esc(labels.get(name, name.replace('_', ' ').title()))}"
+  autocomplete="{esc(autocomplete)}" placeholder="{esc(placeholder)}" {req}
   style="width:100%;font-size:15px;padding:14px 15px;border-radius:14px">
 """.strip()
 
@@ -168,6 +197,18 @@ def register_studio_get(err: str = "", msg: str = "", invite: str = "", next: st
               ">
                 Account Studio Grafico
               </div>
+
+              <fieldset style="margin-top:20px;padding:16px;border:1px solid rgba(15,23,42,.14);border-radius:14px">
+                <legend style="font-weight:800;padding:0 6px">Condizioni e privacy</legend>
+                <label style="display:flex;gap:10px;align-items:flex-start;line-height:1.45">
+                  <input type="checkbox" name="terms_accepted" value="yes" required style="margin-top:4px">
+                  <span>Ho letto e accetto i <a href="/terms" target="_blank" rel="noopener">Termini di servizio</a> (versione 25/10/2026).</span>
+                </label>
+                <label style="display:flex;gap:10px;align-items:flex-start;line-height:1.45;margin-top:10px">
+                  <input type="checkbox" name="privacy_acknowledged" value="yes" required style="margin-top:4px">
+                  <span>Dichiaro di aver letto l’<a href="/privacy" target="_blank" rel="noopener">informativa privacy</a> (versione 25/10/2026). Non è un consenso marketing.</span>
+                </label>
+              </fieldset>
 
               <div class="h1" style="margin-top:14px;font-size:36px;letter-spacing:-.8px">
                 Registrazione Studio
@@ -376,6 +417,7 @@ def register_studio_get(err: str = "", msg: str = "", invite: str = "", next: st
 
 @router.post("/register-studio")
 def register_studio_post(
+    request: Request,
     email: str = Form(...),
     password: str = Form(...),
     company_name: str = Form(...),
@@ -388,6 +430,8 @@ def register_studio_post(
     billing_city: str = Form(""),
     billing_cap: str = Form(""),
     billing_province: str = Form(""),
+    terms_accepted: str = Form(""),
+    privacy_acknowledged: str = Form(""),
     invite: str = Form(""),
     next: str = Form(""),
 ):
@@ -399,6 +443,12 @@ def register_studio_post(
 
     if len(password) < 8:
         return RedirectResponse("/register-studio?err=Password%20minimo%208%20caratteri", status_code=303)
+
+    if terms_accepted != "yes" or privacy_acknowledged != "yes":
+        return RedirectResponse(
+            "/register-studio?err=Devi%20accettare%20i%20Termini%20e%20confermare%20la%20Privacy",
+            status_code=303,
+        )
 
     company_name = (company_name or "").strip()
     vat = (vat or "").strip()
@@ -482,6 +532,8 @@ def register_studio_post(
 
             if inv:
                 _accept_studio_invite(cur, inv, user_id, ts)
+
+            record_registration_acceptances(cur, user_id=user_id, request=request)
 
         conn.commit()
 
