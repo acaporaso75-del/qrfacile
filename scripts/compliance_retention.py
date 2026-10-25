@@ -14,6 +14,7 @@ DEFAULTS = {
     "ai_usage_log_days": 730,
     "legal_acceptances_days": 3650,
     "closed_incidents_days": 3650,
+    "login_failures_hours": 24,
 }
 
 
@@ -31,12 +32,14 @@ def execute(dry_run: bool) -> dict[str, int | bool | str]:
         "ai_usage_log": "DELETE FROM ai_usage_log WHERE created_at < now() - (%s * interval '1 day')",
         "legal_acceptances": "DELETE FROM legal_acceptances WHERE accepted_at < now() - (%s * interval '1 day')",
         "compliance_incidents": "DELETE FROM compliance_incidents WHERE status='closed' AND closed_at < now() - (%s * interval '1 day')",
+        "login_failures": "DELETE FROM login_failures WHERE created_at < extract(epoch FROM now() - (%s * interval '1 hour'))::bigint",
     }
     keys = {
         "audit_log": "audit_log_days",
         "ai_usage_log": "ai_usage_log_days",
         "legal_acceptances": "legal_acceptances_days",
         "compliance_incidents": "closed_incidents_days",
+        "login_failures": "login_failures_hours",
     }
 
     with psycopg.connect(database_url) as conn:

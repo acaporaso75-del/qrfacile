@@ -80,3 +80,7 @@ User-controlled return destinations in winery-context selection, label
 collaboration and print sending pass through one same-origin path validator.
 Protocol-relative, encoded-slash, backslash and control-character variants fall
 back to the dashboard. The active-winery context cookie is Secure under HTTPS.
+
+The compliance retention job includes failed-login counters with a 24-hour
+limit, in addition to request-time cleanup. Dry-run remains the default and
+rolls back every deletion; applying changes still requires the explicit flag.
