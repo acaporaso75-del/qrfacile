@@ -66,6 +66,8 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
     particolari anche supervisione umana e DPA verificato.
 27. codifica i valori del database nella coda di revisione AI, aggiunge il token
     CSRF ai form e non espone dettagli infrastrutturali in caso di schema assente.
+28. limita dimensioni e struttura di input, output e metadati del registro utilizzi
+    AI, valida la classe di rischio e non espone eccezioni database nello stato compliance.
 
 ## Matrice di conformità
 

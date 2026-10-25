@@ -101,3 +101,8 @@ workflow remains intentionally required before these gates can be opened.
 The AI-output review queue escapes every database-derived value before rendering,
 includes a CSRF token in each approval/rejection form, and returns a generic 503
 instead of disclosing database exception details when its schema is unavailable.
+
+AI-usage logging accepts only bounded labels, hashes bounded JSON input/output,
+requires object-shaped bounded metadata and validates the risk classification.
+The compliance-status endpoint reports a generic unavailable state without
+serializing database exception details to the client.

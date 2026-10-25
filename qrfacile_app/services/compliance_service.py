@@ -11,6 +11,10 @@ from psycopg.rows import dict_row
 from qrfacile_app.db import pg
 
 AI_POLICY_VERSION = "2026-07-27"
+VALID_AI_RISK_CLASSIFICATIONS = {"minimal", "limited", "high", "prohibited"}
+MAX_AI_USAGE_LABEL_LENGTH = 200
+MAX_AI_USAGE_VALUE_BYTES = 65_536
+MAX_AI_USAGE_METADATA_BYTES = 20_000
 REQUIRED_COMPLIANCE_TABLES = (
     "legal_documents",
     "legal_acceptances",
@@ -45,9 +49,28 @@ def get_compliance_status() -> dict[str, Any]:
     }
 
 
-def _stable_sha256(value: Any) -> str:
-    serialized = json.dumps(value, ensure_ascii=False, sort_keys=True)
+def _serialized_json(value: Any, field_name: str, max_bytes: int) -> str:
+    try:
+        serialized = json.dumps(value, ensure_ascii=False, sort_keys=True)
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise HTTPException(status_code=422, detail=f"{field_name}: JSON non valido") from exc
+    if len(serialized.encode("utf-8")) > max_bytes:
+        raise HTTPException(status_code=422, detail=f"{field_name}: dimensione massima {max_bytes} byte")
+    return serialized
+
+
+def _stable_sha256(value: Any, field_name: str) -> str:
+    serialized = _serialized_json(value, field_name, MAX_AI_USAGE_VALUE_BYTES)
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _usage_label(payload: Mapping[str, Any], field_name: str) -> str:
+    value = str(payload.get(field_name) or "").strip()
+    if not value:
+        raise HTTPException(status_code=422, detail=f"Campo mancante: {field_name}")
+    if len(value) > MAX_AI_USAGE_LABEL_LENGTH:
+        raise HTTPException(status_code=422, detail=f"{field_name}: massimo {MAX_AI_USAGE_LABEL_LENGTH} caratteri")
+    return value
 
 
 def register_ai_usage_record(*, user_id: int, payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -55,6 +78,19 @@ def register_ai_usage_record(*, user_id: int, payload: Mapping[str, Any]) -> dic
     missing = [key for key in required if not payload.get(key)]
     if missing:
         raise HTTPException(status_code=422, detail=f"Campi mancanti: {', '.join(missing)}")
+
+    use_case = _usage_label(payload, "use_case")
+    provider = _usage_label(payload, "provider")
+    model = _usage_label(payload, "model")
+    risk = str(payload.get("risk_classification") or "limited").strip().lower()
+    if risk not in VALID_AI_RISK_CLASSIFICATIONS:
+        raise HTTPException(status_code=422, detail="Classificazione rischio AI non valida")
+    metadata = payload.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        raise HTTPException(status_code=422, detail="I metadati AI devono essere un oggetto JSON")
+    metadata_json = _serialized_json(metadata, "Metadati AI", MAX_AI_USAGE_METADATA_BYTES)
+    input_hash = _stable_sha256(payload["input"], "Input AI")
+    output_hash = _stable_sha256(payload["output"], "Output AI")
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -78,16 +114,16 @@ def register_ai_usage_record(*, user_id: int, payload: Mapping[str, Any]) -> dic
                 """,
                 (
                     user_id,
-                    str(payload["use_case"]),
-                    str(payload["provider"]),
-                    str(payload["model"]),
+                    use_case,
+                    provider,
+                    model,
                     payload.get("model_version"),
-                    _stable_sha256(payload["input"]),
-                    _stable_sha256(payload["output"]),
+                    input_hash,
+                    output_hash,
                     payload.get("prompt_template_version"),
-                    str(payload.get("risk_classification") or "limited"),
+                    risk,
                     bool(payload.get("contains_personal_data", False)),
-                    json.dumps(payload.get("metadata") or {}, ensure_ascii=False),
+                    metadata_json,
                 ),
             )
             row = cur.fetchone()

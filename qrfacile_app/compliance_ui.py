@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -15,6 +16,7 @@ from qrfacile_app.services.compliance_service import (
 from qrfacile_app.ui_shell import page_public
 
 router = APIRouter(tags=["compliance"])
+logger = logging.getLogger("qrfacile.compliance")
 
 
 @router.get("/ai-policy", response_class=HTMLResponse)
@@ -52,10 +54,11 @@ def compliance_status(request: Request):
     require_any_role(request, ("admin",))
     try:
         return get_compliance_status()
-    except Exception as exc:
+    except Exception:
+        logger.exception("Impossibile leggere lo stato compliance")
         return JSONResponse(
             status_code=503,
-            content={"ok": False, "error": "database_unavailable", "detail": str(exc)},
+            content={"ok": False, "error": "database_unavailable"},
         )
 
 
