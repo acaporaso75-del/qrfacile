@@ -47,6 +47,7 @@ def test_login_limit_allows_attempt_below_both_thresholds():
 def test_login_failure_storage_and_migration_are_privacy_minimised():
     source = Path(auth_routes.__file__).read_text(encoding="utf-8")
     migration = (Path(__file__).resolve().parents[1] / "sql" / "2026_login_rate_limit.sql").read_text(encoding="utf-8")
+    rollback = (Path(__file__).resolve().parents[1] / "sql" / "2026_login_rate_limit_rollback.sql").read_text(encoding="utf-8")
     assert "identity_hash = _login_identity_hash(email)" in source
     assert "password_hash = u[\"pass_hash\"] if u else INVALID_LOGIN_HASH" in source
     assert "INSERT INTO login_failures" in source
@@ -54,6 +55,8 @@ def test_login_failure_storage_and_migration_are_privacy_minimised():
     assert "CREATE TABLE IF NOT EXISTS login_failures" in migration
     assert "email" not in migration.lower()
     assert migration.startswith("BEGIN;") and migration.rstrip().endswith("COMMIT;")
+    assert "DROP TABLE IF EXISTS login_failures" in rollback
+    assert rollback.startswith("BEGIN;") and rollback.rstrip().endswith("COMMIT;")
 
 
 @pytest.mark.integration
@@ -67,6 +70,7 @@ def test_login_failure_migration_is_idempotent_on_local_postgres():
 
     schema = "login_limit_" + uuid4().hex
     migration = (Path(__file__).resolve().parents[1] / "sql" / "2026_login_rate_limit.sql").read_text(encoding="utf-8")
+    rollback = (Path(__file__).resolve().parents[1] / "sql" / "2026_login_rate_limit_rollback.sql").read_text(encoding="utf-8")
     with psycopg.connect(url, autocommit=True) as conn:
         conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
         conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(schema)))
@@ -78,6 +82,10 @@ def test_login_failure_migration_is_idempotent_on_local_postgres():
             assert "idx_login_failures_identity_time" in indexes
             assert "idx_login_failures_ip_time" in indexes
             assert "idx_login_failures_created_at" in indexes
+            conn.execute(rollback)
+            assert conn.execute("SELECT to_regclass('login_failures') IS NULL").fetchone() == (True,)
+            conn.execute(migration)
+            assert conn.execute("SELECT to_regclass('login_failures') IS NOT NULL").fetchone() == (True,)
         finally:
             conn.execute("ROLLBACK")
             conn.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(schema)))

@@ -60,4 +60,6 @@ limits within 15 minutes safe against concurrent attempts. Unknown identities
 still run a real password-hash verification, and every rejected login uses the
 same public error. Apply `sql/2026_login_rate_limit.sql` before this application
 revision is enabled; records older than 24 hours are removed during subsequent
-login attempts, and the migration is transaction-wrapped and idempotent.
+login attempts, and the migration is transaction-wrapped and idempotent. The
+dedicated `2026_login_rate_limit_rollback.sql` removes only these transient
+counters and leaves users, credentials and sessions unchanged.
