@@ -22,6 +22,8 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
    esplicita della singola etichetta sui percorsi operativi.
 7. elimina le route duplicate di modifica/revoca dei collegamenti Studio: resta
    un solo percorso auditato, con verifica CSRF o origine e sincronizzazione delle etichette.
+8. rende unico il salvataggio Compliance validato lato server e protegge con token
+   CSRF i salvataggi, l'aggiunta di ingredienti/allergeni e la richiesta di override.
 
 ## Matrice di conformità
 

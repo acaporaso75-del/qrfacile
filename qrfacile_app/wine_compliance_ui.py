@@ -7,6 +7,7 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import csrf_input, require_csrf_or_same_origin
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 from qrfacile_app.guided_flow import render_guided_stepper
 
@@ -288,7 +289,7 @@ def _status_chip(label: str, ok: bool) -> str:
     """
 
 
-def _summary_html(ingredients: list[str], allergens: list[str], nut: dict, recycle: dict, meta: dict, role: str = '', wine_id: int = 0) -> str:
+def _summary_html(ingredients: list[str], allergens: list[str], nut: dict, recycle: dict, meta: dict, role: str = '', wine_id: int = 0, csrf_html: str = '') -> str:
     extra_ingredients = (meta.get("extra_ingredients") or "").strip()
 
     ingredient_ok = bool(ingredients) or bool(extra_ingredients)
@@ -342,6 +343,7 @@ def _summary_html(ingredients: list[str], allergens: list[str], nut: dict, recyc
         <form method="post"
               action="/app/wine/{int(wine_id)}/request-publish-override"
               class="complianceOverrideRequest">
+          {csrf_html}
           <div>
             <label>Richiesta sblocco admin</label>
             <input class="input" name="reason"
@@ -479,7 +481,11 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
     rec_html = _recycle_rows(recycle)
 
     theme = (meta.get("public_theme") or "minimal").strip() or "minimal"
-    summary_html = _summary_html(ingredients, allergens, nut, recycle, meta, role=role, wine_id=int(wine_id))
+    csrf_html = csrf_input(request)
+    summary_html = _summary_html(
+        ingredients, allergens, nut, recycle, meta,
+        role=role, wine_id=int(wine_id), csrf_html=csrf_html,
+    )
 
     body = f"""
     <section class="complianceWrap">
@@ -550,6 +556,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
           <form method="post"
                 action="/app/wine/{int(wine_id)}/compliance/add-ingredient"
                 class="complianceInlineForm">
+            {csrf_html}
             <div>
               <label>Aggiungi ingrediente</label>
               <input class="input" name="name"
@@ -581,6 +588,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
           <form method="post"
                 action="/app/wine/{int(wine_id)}/compliance/add-allergen"
                 class="complianceInlineForm">
+            {csrf_html}
             <div>
               <label>Aggiungi allergene</label>
               <input class="input" name="name"
@@ -598,6 +606,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
       </div>
 
       <form id="saveForm" method="post" action="/app/wine/{int(wine_id)}/compliance/save">
+        {csrf_html}
         <div class="card compliancePanel" style="margin-top:18px">
           <div class="compliancePanelHead">
             <div>
@@ -1280,7 +1289,8 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
 
 
 @router.post("/app/wine/{wine_id}/compliance/add-ingredient")
-def add_ingredient(request: Request, wine_id: int, name: str = Form(...)):
+def add_ingredient(request: Request, wine_id: int, name: str = Form(...), csrf_token: str = Form("")):
+    require_csrf_or_same_origin(request, csrf_token)
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             w = _wine(cur, int(wine_id))
@@ -1341,7 +1351,8 @@ def add_ingredient(request: Request, wine_id: int, name: str = Form(...)):
 
 
 @router.post("/app/wine/{wine_id}/compliance/add-allergen")
-def add_allergen(request: Request, wine_id: int, name: str = Form(...)):
+def add_allergen(request: Request, wine_id: int, name: str = Form(...), csrf_token: str = Form("")):
+    require_csrf_or_same_origin(request, csrf_token)
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             w = _wine(cur, int(wine_id))
@@ -1388,7 +1399,6 @@ def add_allergen(request: Request, wine_id: int, name: str = Form(...)):
     return _redirect(wine_id, "Allergene aggiunto")
 
 
-@router.post("/app/wine/{wine_id}/compliance/save")
 def compliance_save(
     request: Request,
     wine_id: int,
