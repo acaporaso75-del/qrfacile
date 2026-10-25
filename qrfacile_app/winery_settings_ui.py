@@ -231,7 +231,7 @@ def _load_rows(cur, winery_id: int | None, role: str) -> list[dict]:
     return cur.fetchall() or []
 
 
-def _row_card(r: dict) -> str:
+def _row_card(r: dict, csrf_html: str) -> str:
     preset = _preset_name(bool(r["can_view"]), bool(r["can_edit"]), bool(r["can_create"]))
     access_mode = _access_mode(bool(r["can_view"]), bool(r["can_edit"]), bool(r["can_create"]))
     created = _fmt_ts(int(r.get("created_at") or 0))
@@ -307,6 +307,7 @@ def _row_card(r: dict) -> str:
 
       <div class="wineryStudioActions">
         <form method="post" action="/app/settings/studios/set" class="wineryPresetForm">
+          {csrf_html}
           <input type="hidden" name="sc_id" value="{sc_id}">
           <label>Gestisci permessi</label>
           <select name="preset">
@@ -318,6 +319,7 @@ def _row_card(r: dict) -> str:
         </form>
 
         <form method="post" action="/app/settings/studios/revoke" onsubmit="return confirm('Revocare il collegamento operativo a questo studio?');">
+          {csrf_html}
           <input type="hidden" name="sc_id" value="{sc_id}">
           <button class="btn wineryRevokeBtn" type="submit">Revoca accesso</button>
         </form>
@@ -390,7 +392,7 @@ def _page_impl(request: Request, msg: str = "", err: str = "") -> HTMLResponse:
         """
 
     if rows:
-        cards = "".join(_row_card(r) for r in rows)
+        cards = "".join(_row_card(r, csrf_input(request)) for r in rows)
     else:
         cards = """
         <div class="card wineryEmptyCard">
@@ -672,63 +674,3 @@ def winery_fiscal_settings_save(
             )
             conn.commit()
     return RedirectResponse("/app/winery/settings?msg=Profilo%20fiscale%20aggiornato", status_code=303)
-
-
-@router.post("/app/settings/studios/set")
-def studios_set_preset(request: Request, sc_id: int = Form(...), preset: str = Form(...)):
-    user = require_any_role(request, ("winery", "admin"))
-    uid = int(user.get("id") or user.get("user_id"))
-    role = (user.get("role") or "").lower().strip()
-
-    preset = (preset or "").strip().lower()
-    if preset == "full":
-        can_view, can_edit, can_create = True, True, True
-    elif preset == "graphic":
-        can_view, can_edit, can_create = True, True, False
-    elif preset == "view":
-        can_view, can_edit, can_create = True, False, False
-    else:
-        raise HTTPException(400, "Preset non valido")
-
-    with pg() as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            if role != "admin":
-                winery_id = _get_winery_id_for_user(cur, uid)
-                cur.execute("SELECT winery_id FROM studio_clients WHERE id=%s LIMIT 1", (int(sc_id),))
-                r = cur.fetchone()
-                if not r or int(r["winery_id"]) != int(winery_id):
-                    raise HTTPException(403, "Non autorizzato")
-
-            cur.execute(
-                """
-                UPDATE studio_clients
-                SET can_view=%s, can_edit=%s, can_create=%s
-                WHERE id=%s
-                """,
-                (can_view, can_edit, can_create, int(sc_id)),
-            )
-            conn.commit()
-
-    return RedirectResponse("/app/winery/settings?msg=Permessi%20aggiornati", status_code=303)
-
-
-@router.post("/app/settings/studios/revoke")
-def studios_revoke(request: Request, sc_id: int = Form(...)):
-    user = require_any_role(request, ("winery", "admin"))
-    uid = int(user.get("id") or user.get("user_id"))
-    role = (user.get("role") or "").lower().strip()
-
-    with pg() as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            if role != "admin":
-                winery_id = _get_winery_id_for_user(cur, uid)
-                cur.execute("SELECT winery_id FROM studio_clients WHERE id=%s LIMIT 1", (int(sc_id),))
-                r = cur.fetchone()
-                if not r or int(r["winery_id"]) != int(winery_id):
-                    raise HTTPException(403, "Non autorizzato")
-
-            cur.execute("DELETE FROM studio_clients WHERE id=%s", (int(sc_id),))
-            conn.commit()
-
-    return RedirectResponse("/app/winery/settings?msg=Collegamento%20revocato", status_code=303)
-
