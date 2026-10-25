@@ -69,3 +69,7 @@ password reset use the same server-side policy: 12 to 128 characters. Matching
 HTML bounds give immediate feedback but are not trusted for enforcement.
 Both registration forms also require a matching confirmation before any account
 is created. Existing password hashes and login compatibility are unchanged.
+
+The central HTTP exception handler HTML-escapes exception details for both the
+branded 403/404/405 pages and all other HTML error responses. Request-derived
+error text can therefore no longer become executable markup through this path.

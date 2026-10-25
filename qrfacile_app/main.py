@@ -12,6 +12,7 @@ from qrfacile_app.compliance_score_middleware import ComplianceScoreMiddleware
 from qrfacile_app.public_recycling_catalog_middleware import PublicRecyclingCatalogMiddleware
 from qrfacile_app.runtime_config import get_runtime_config
 from qrfacile_app.security_middleware import SecurityHeadersMiddleware
+from qrfacile_app.ui_shell import esc
 from qrfacile_app.uploads_routes import VersionedUploadStaticFiles
 
 logger = logging.getLogger("qrfacile.main")
@@ -105,23 +106,23 @@ def include_router_safe(module_path: str, router_attr: str = "router") -> None:
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     code = exc.status_code
-    msg = (exc.detail or "").strip()
+    msg = str(exc.detail or "").strip()
     if 300 <= code < 400:
         return Response(status_code=code, headers=dict(exc.headers or {}))
     if code in (404, 405, 403):
         title = "Pagina non trovata" if code == 404 else ("Metodo non consentito" if code == 405 else "Accesso negato")
         body = f"""
         <div class="card" style="margin-top:14px;max-width:860px">
-          <div class="h2">{title}</div><div class="p">{msg or ""}</div>
+          <div class="h2">{esc(title)}</div><div class="p">{esc(msg)}</div>
           <div class="row" style="margin-top:14px">
             <a class="btn btn-primary" href="/app/start">Menu</a>
             <a class="btn" href="/app/dashboard">Dashboard</a>
             <a class="btn" href="/login">Login</a>
           </div>
         </div>"""
-        html = f"""<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>QRFACILE · {title}</title><link rel="stylesheet" href="/static/app.css"></head><body><div class="shell" style="grid-template-columns:1fr;max-width:980px"><main class="content">{body}</main></div></body></html>"""
+        html = f"""<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>QRFACILE · {esc(title)}</title><link rel="stylesheet" href="/static/app.css"></head><body><div class="shell" style="grid-template-columns:1fr;max-width:980px"><main class="content">{body}</main></div></body></html>"""
         return HTMLResponse(html, status_code=code)
-    return HTMLResponse(str(exc.detail), status_code=code, headers=dict(exc.headers or {}))
+    return HTMLResponse(esc(str(exc.detail)), status_code=code, headers=dict(exc.headers or {}))
 
 
 include_router_safe("qrfacile_app.auth_routes")

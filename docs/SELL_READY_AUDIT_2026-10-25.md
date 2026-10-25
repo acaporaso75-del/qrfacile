@@ -50,6 +50,8 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
     minimo 12 e massimo 128 caratteri, lasciando invariato l'accesso storico.
 20. richiede la conferma password in entrambe le registrazioni per intercettare
     errori di digitazione prima della creazione dell'account.
+21. codifica sempre i dettagli delle eccezioni HTTP prima di inserirli nelle
+    pagine HTML, eliminando un percorso di cross-site scripting riflesso.
 
 ## Matrice di conformità
 
