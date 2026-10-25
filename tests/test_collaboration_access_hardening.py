@@ -47,3 +47,35 @@ def test_simplified_access_center_is_registered():
     assert "/app/wine/{wine_id}/access-center" in ui_text
     assert "Nessuno studio può pubblicare" in ui_text
     assert "La pubblicazione resta sempre riservata" in ui_text
+
+
+def test_studio_facing_surfaces_require_explicit_label_assignment():
+    for relative in (
+        "bulk_tools.py", "dashboard_ui.py", "label_acl_ui.py",
+        "label_hub_ui.py", "public.py", "wine_hub_ui.py",
+    ):
+        text = (ROOT / "qrfacile_app" / relative).read_text(encoding="utf-8")
+        assert "label_collaborators" in text, relative
+        assert "studio_clients" in text, relative
+
+    bulk = (ROOT / "qrfacile_app" / "bulk_tools.py").read_text(encoding="utf-8")
+    assert "wine_labels_acl" not in bulk
+    assert "wl.created_by_user_id =" not in bulk
+
+    dashboard = (ROOT / "qrfacile_app" / "dashboard_ui.py").read_text(encoding="utf-8")
+    assert "lc_scope.collaborator_user_id=%s" in dashboard
+    assert "lc_scope.active=TRUE AND lc_scope.can_view=TRUE" in dashboard
+
+    preview = (ROOT / "qrfacile_app" / "public.py").read_text(encoding="utf-8")
+    assert "WHERE wl.wine_id=%s" in preview
+    assert "lc.active=TRUE AND lc.can_view=TRUE AND sc.can_view=TRUE" in preview
+
+
+def test_only_secure_invitation_routes_are_registered():
+    legacy = (ROOT / "qrfacile_app" / "studio_settings_ui.py").read_text(encoding="utf-8")
+    management = (ROOT / "qrfacile_app" / "invitation_management_ui.py").read_text(encoding="utf-8")
+    acceptance = (ROOT / "qrfacile_app" / "invitation_acceptance_ui.py").read_text(encoding="utf-8")
+    assert '@router.post("/app/settings/studios/invite")' not in legacy
+    assert '@router.post("/app/invite/studio/accept/{token}")' not in legacy
+    assert '@router.post("/app/settings/studios/invite")' in management
+    assert '@router.post("/app/invite/studio/accept/{token}")' in acceptance

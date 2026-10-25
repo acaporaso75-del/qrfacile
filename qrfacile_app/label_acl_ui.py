@@ -71,7 +71,7 @@ def _load_connected_studios(cur, winery_id: int) -> list[dict]:
           sc.can_view,
           sc.can_edit,
           sc.can_create
-        FROM studio_clients sc
+        FROM studio_clients sc /* security-review: selection-only */
         JOIN users u ON u.id = sc.studio_user_id
         JOIN studios s ON s.user_id = u.id
         WHERE sc.winery_id=%s AND sc.can_view=TRUE
@@ -134,7 +134,7 @@ def _assign_label_management(cur, label: dict, studio_user_id: int) -> str | Non
     cur.execute(
         """
         SELECT can_view, can_edit, can_create
-        FROM studio_clients
+        FROM studio_clients /* security-review: selection-only */
         WHERE winery_id=%s
           AND studio_user_id=%s
           AND can_view=TRUE
@@ -209,11 +209,15 @@ def label_acl(request: Request, label_id: int, msg: str = "", err: str = ""):
                 cur.execute(
                     """
                     SELECT 1
-                    FROM studio_clients
-                    WHERE studio_user_id=%s AND winery_id=%s AND can_view=TRUE
+                    FROM label_collaborators lc
+                    JOIN studio_clients sc
+                      ON sc.studio_user_id=lc.collaborator_user_id
+                     AND sc.winery_id=%s
+                    WHERE lc.wine_label_id=%s AND lc.collaborator_user_id=%s
+                      AND lc.active=TRUE AND lc.can_view=TRUE AND sc.can_view=TRUE
                     LIMIT 1
                     """,
-                    (int(u["id"]), int(label["winery_id"])),
+                    (int(label["winery_id"]), int(label_id), int(u["id"])),
                 )
                 if not cur.fetchone():
                     raise HTTPException(403, "Forbidden")
@@ -436,7 +440,7 @@ def label_acl_assign(
             cur.execute(
                 """
                 SELECT 1
-                FROM studio_clients
+                FROM studio_clients /* security-review: selection-only */
                 WHERE winery_id=%s AND studio_user_id=%s AND can_view=TRUE
                 LIMIT 1
                 """,

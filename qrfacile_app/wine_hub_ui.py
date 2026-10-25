@@ -91,17 +91,21 @@ def _load_wine(cur, wine_id: int) -> dict:
     return r
 
 
-def _studio_can_access_wine(cur, studio_user_id: int, winery_id: int) -> bool:
+def _studio_can_access_wine(cur, studio_user_id: int, wine_id: int) -> bool:
     cur.execute(
         """
         SELECT 1
-        FROM studio_clients
-        WHERE studio_user_id=%s
-          AND winery_id=%s
-          AND can_view=TRUE
+        FROM wine_labels wl
+        JOIN label_collaborators lc ON lc.wine_label_id=wl.id
+        JOIN studio_clients sc
+          ON sc.studio_user_id=lc.collaborator_user_id
+         AND sc.winery_id=wl.winery_id
+        WHERE wl.wine_id=%s
+          AND lc.collaborator_user_id=%s
+          AND lc.active=TRUE AND lc.can_view=TRUE AND sc.can_view=TRUE
         LIMIT 1
         """,
-        (int(studio_user_id), int(winery_id)),
+        (int(wine_id), int(studio_user_id)),
     )
     return bool(cur.fetchone())
 
@@ -259,7 +263,7 @@ def _connected_studio_count(cur, winery_id: int) -> int:
     cur.execute(
         """
         SELECT COUNT(*)::int AS cnt
-        FROM studio_clients sc
+        FROM studio_clients sc /* security-review: selection-only */
         JOIN users u ON u.id = sc.studio_user_id
         WHERE sc.winery_id=%s
           AND lower(u.role)='studio'
@@ -277,7 +281,7 @@ def _connected_studios(cur, winery_id: int) -> list[dict]:
           u.id AS studio_user_id,
           u.email,
           COALESCE(s.company_name, '') AS company_name
-        FROM studio_clients sc
+        FROM studio_clients sc /* security-review: selection-only */
         JOIN users u ON u.id = sc.studio_user_id
         LEFT JOIN studios s ON s.user_id = u.id
         WHERE sc.winery_id=%s
@@ -493,7 +497,7 @@ def _assign_wine_management(cur, wine: dict, label_ids: list[int], studio_user_i
     cur.execute(
         """
         SELECT can_view, can_edit, can_create
-        FROM studio_clients
+        FROM studio_clients /* security-review: selection-only */
         WHERE winery_id=%s
           AND studio_user_id=%s
           AND can_view=TRUE
@@ -725,7 +729,7 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
                     raise HTTPException(403, "Forbidden")
 
             elif role == "studio":
-                if not _studio_can_access_wine(cur, uid, int(wine["winery_id"])):
+                if not _studio_can_access_wine(cur, uid, int(wine_id)):
                     raise HTTPException(403, "Forbidden")
 
             assets = _wine_assets(cur, int(wine_id))

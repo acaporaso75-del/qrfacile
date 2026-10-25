@@ -132,7 +132,7 @@ def _connected_studios(cur, winery_id: int) -> list[dict]:
           sc.can_create,
           u.email,
           COALESCE(s.company_name, '') AS company_name
-        FROM studio_clients sc
+        FROM studio_clients sc /* security-review: selection-only */
         JOIN users u ON u.id = sc.studio_user_id
         LEFT JOIN studios s ON s.user_id = u.id
         WHERE sc.winery_id=%s

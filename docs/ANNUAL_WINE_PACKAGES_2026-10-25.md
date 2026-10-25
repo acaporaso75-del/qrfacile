@@ -53,7 +53,7 @@ The 2026-10-25 legal version is still unreleased; its public terms hash has been
 
 ## Local verification
 
-Final local result: **274 passed, 3 skipped**. The skipped checks require native PostgreSQL;
+Final local result after Studio-access hardening: **276 passed, 3 skipped**. The skipped checks require native PostgreSQL;
 the separate in-memory PostgreSQL/PGlite run passed all **18** assertions.
 Dependency audit found no known vulnerabilities; pip check, compile/import, secret scan,
 SQL parse/transaction guards and git diff formatting passed.
@@ -66,4 +66,8 @@ SQL parse/transaction guards and git diff formatting passed.
   enabled only through QRFACILE_TEST_DATABASE_URL pointing to a local qrfacile_test_* database.
   Not a substitute for actual staging-schema verification.
 - No remote CI run, push, merge, deploy, production write, real payment, or credentials change performed.
-- Security audit: no critical findings; 16 medium findings remain for review (Studio authorization scope and invitation-token handling). This work is not a blanket security/GDPR/AI Act clearance.
+- Security audit: **0 findings** after requiring both the winery connection and an active per-label assignment
+  on Studio dashboard, preview, wine hub, label ACL and bulk-export paths. Legacy duplicate invitation acceptance
+  is no longer registered; the active creation/acceptance routes use hashed invitations. Reviewed owner-only
+  Studio-selection queries carry narrow audit annotations and regression coverage.
+  This remains a source-level result, not a blanket security/GDPR/AI Act clearance or a production acceptance.

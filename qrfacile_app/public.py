@@ -449,13 +449,17 @@ def _require_preview_access(request: Request, cur, qr_row: dict):
         cur.execute(
             """
             SELECT 1
-            FROM studio_clients
-            WHERE studio_user_id=%s
-              AND winery_id=%s
-              AND can_view=TRUE
+            FROM wine_labels wl
+            JOIN label_collaborators lc ON lc.wine_label_id=wl.id
+            JOIN studio_clients sc
+              ON sc.studio_user_id=lc.collaborator_user_id
+             AND sc.winery_id=wl.winery_id
+            WHERE wl.wine_id=%s
+              AND lc.collaborator_user_id=%s
+              AND lc.active=TRUE AND lc.can_view=TRUE AND sc.can_view=TRUE
             LIMIT 1
             """,
-            (uid, winery_id),
+            (int(qr_row.get("wine_id") or 0), uid),
         )
         if cur.fetchone():
             return user
