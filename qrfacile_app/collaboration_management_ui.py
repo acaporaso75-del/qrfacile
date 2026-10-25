@@ -33,8 +33,9 @@ def safe_label_assign(
     label_id: int,
     studio_user_id: int = Form(...),
     profile: str = Form("graphic"),
+    csrf_token: str = Form(""),
 ):
-    require_csrf_or_same_origin(request)
+    require_csrf_or_same_origin(request, csrf_token)
     actor = require_any_role(request, ("winery", "admin"))
     result = assign_studio_to_label(
         actor=actor,
@@ -60,8 +61,8 @@ def safe_label_assign(
 
 
 @router.post("/app/label/{label_id}/acl/clear")
-def safe_label_clear(request: Request, label_id: int):
-    require_csrf_or_same_origin(request)
+def safe_label_clear(request: Request, label_id: int, csrf_token: str = Form("")):
+    require_csrf_or_same_origin(request, csrf_token)
     actor = require_any_role(request, ("winery", "admin"))
     result = clear_label_collaboration(actor=actor, label_id=label_id)
     write_audit_event(
@@ -85,8 +86,9 @@ def safe_label_management_set(
     label_id: int,
     management_value: str = Form(...),
     return_to: str = Form(""),
+    csrf_token: str = Form(""),
 ):
-    require_csrf_or_same_origin(request)
+    require_csrf_or_same_origin(request, csrf_token)
     actor = require_any_role(request, ("winery", "admin"))
     value = str(management_value or "").strip().lower()
     if value == "invite":

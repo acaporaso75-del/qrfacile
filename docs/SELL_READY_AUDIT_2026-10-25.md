@@ -24,6 +24,8 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
    un solo percorso auditato, con verifica CSRF o origine e sincronizzazione delle etichette.
 8. rende unico il salvataggio Compliance validato lato server e protegge con token
    CSRF i salvataggi, l'aggiunta di ingredienti/allergeni e la richiesta di override.
+9. rimuove le route mutative legacy duplicate per assegnazione Studio e pubblicazione:
+   i form inviano token CSRF e raggiungono soltanto i servizi canonici auditati.
 
 ## Matrice di conformità
 

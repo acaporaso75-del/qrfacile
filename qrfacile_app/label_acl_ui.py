@@ -6,6 +6,7 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import csrf_input
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 
 router = APIRouter()
@@ -301,6 +302,7 @@ def label_acl(request: Request, label_id: int, msg: str = "", err: str = ""):
             con gli studi resta gestito da <b>studio_clients</b>; qui decidi chi lavora su questo QR.
           </div>
           <form method="post" action="/app/label/{int(label_id)}/acl/clear" style="margin-top:12px">
+            {csrf_input(request)}
             <button class="btn" type="submit">Gestisco io</button>
           </form>
         </div>
@@ -322,6 +324,8 @@ def label_acl(request: Request, label_id: int, msg: str = "", err: str = ""):
               </div>
 
               <form method="post" action="/app/label/{int(label_id)}/acl/assign" style="margin-top:12px">
+                {csrf_input(request)}
+                <input type="hidden" name="profile" value="graphic">
                 <label>Studio</label>
                 <select name="studio_user_id" required>
                   {''.join(opts)}
@@ -331,18 +335,6 @@ def label_acl(request: Request, label_id: int, msg: str = "", err: str = ""):
                   <label>Permessi consigliati</label>
                   <div class="note" style="margin-top:0">
                     Vista, modifica, media ed export attivi. Pubblicazione disattivata: il controllo resta alla cantina.
-                  </div>
-                </div>
-
-                <div class="grid2" style="margin-top:10px">
-                  <div>
-                    <label><input type="checkbox" name="can_view" checked> view</label>
-                    <label><input type="checkbox" name="can_edit" checked> edit</label>
-                    <label><input type="checkbox" name="can_media" checked> media</label>
-                  </div>
-                  <div>
-                    <label><input type="checkbox" name="can_export" checked> export</label>
-                    <span class="note">Pubblicazione non assegnabile agli studi.</span>
                   </div>
                 </div>
 
@@ -398,7 +390,6 @@ def label_acl(request: Request, label_id: int, msg: str = "", err: str = ""):
     ))
 
 
-@router.post("/app/label/{label_id}/acl/assign")
 def label_acl_assign(
     request: Request,
     label_id: int,
@@ -479,7 +470,6 @@ def label_acl_assign(
     return RedirectResponse(f"/app/label/{int(label_id)}/acl?msg=Studio%20assegnato", status_code=303)
 
 
-@router.post("/app/label/{label_id}/acl/clear")
 def label_acl_clear(request: Request, label_id: int):
     u = require_any_role(request, ("winery", "admin"))
 
@@ -503,7 +493,6 @@ def label_acl_clear(request: Request, label_id: int):
     return RedirectResponse(f"/app/label/{int(label_id)}/acl?msg=Gestione%20interna%20attivata", status_code=303)
 
 
-@router.post("/app/label/{label_id}/management/set")
 def label_management_set(
     request: Request,
     label_id: int,

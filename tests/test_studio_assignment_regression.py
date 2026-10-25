@@ -30,7 +30,7 @@ def test_mutations_are_post_only_and_audited_with_old_and_new_studio():
     assert '@router.get("/app/label/{label_id}/acl/assign")' not in ui
     assert '"old_studio": result["old_studio"]' in ui
     assert '"new_studio": result["new_studio"]' in ui
-    assert "_same_origin(request)" in ui
+    assert "require_csrf_or_same_origin(request" in ui
 
 
 def test_ui_always_shows_current_state_and_clear_actions_without_bomb_icon():

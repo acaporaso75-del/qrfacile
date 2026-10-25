@@ -11,11 +11,15 @@ def test_management_service_forces_studio_publish_false():
     assert "revoke_studio_connection" in text
 
 
-def test_safe_routes_are_registered_before_legacy_acl():
-    text = (ROOT / "qrfacile_app" / "main.py").read_text(encoding="utf-8")
-    safe = text.index('include_router_safe("qrfacile_app.collaboration_management_ui")')
-    legacy = text.index('include_router_safe("qrfacile_app.label_acl_ui")')
-    assert safe < legacy
+def test_only_safe_label_mutation_routes_are_registered():
+    safe = (ROOT / "qrfacile_app" / "collaboration_management_ui.py").read_text(encoding="utf-8")
+    legacy = (ROOT / "qrfacile_app" / "label_acl_ui.py").read_text(encoding="utf-8")
+    for route in ("acl/assign", "acl/clear", "management/set"):
+        decorator = f'@router.post("/app/label/{{label_id}}/{route}")'
+        assert safe.count(decorator) == 1
+        assert decorator not in legacy
+    assert "csrf_input(request)" in legacy
+    assert 'name="profile" value="graphic"' in legacy
 
 
 def test_sensitive_collaboration_posts_have_origin_check_and_audit():

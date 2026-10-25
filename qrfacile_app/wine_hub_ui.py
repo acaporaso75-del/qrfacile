@@ -8,7 +8,7 @@ from psycopg.rows import dict_row
 from qrfacile_app.db import pg
 from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.auth_core import require_any_role
-from qrfacile_app.csrf_core import require_csrf_or_same_origin
+from qrfacile_app.csrf_core import csrf_input, require_csrf_or_same_origin
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 from qrfacile_app.guided_flow import render_guided_stepper
 from qrfacile_app.services.storage import versioned_upload_url
@@ -800,12 +800,14 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
         if is_published:
             publish_action = f"""
             <form method="post" action="/app/wine/{int(wine_id)}/unpublish" style="display:inline">
+              {csrf_input(request)}
               <button class="btn" type="submit">Rendi bozza</button>
             </form>
             """
         elif workflow["publishable"]:
             publish_action = f"""
             <form method="post" action="/app/wine/{int(wine_id)}/publish" style="display:inline">
+              {csrf_input(request)}
               <button class="btn btn-primary" type="submit">Pubblica</button>
             </form>
             """
