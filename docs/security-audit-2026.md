@@ -97,3 +97,7 @@ publication through the current administration form. Personal-data use requires
 a numeric retention period; special-category data additionally requires human
 oversight and a verified DPA. A separate evidenced legal/security approval
 workflow remains intentionally required before these gates can be opened.
+
+The AI-output review queue escapes every database-derived value before rendering,
+includes a CSRF token in each approval/rejection form, and returns a generic 503
+instead of disclosing database exception details when its schema is unavailable.

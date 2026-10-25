@@ -64,6 +64,8 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
 26. rende fail-closed il registro AI: l'interfaccia non può auto-approvare sistemi
     o attivare auto-publish; dati personali richiedono retention e le categorie
     particolari anche supervisione umana e DPA verificato.
+27. codifica i valori del database nella coda di revisione AI, aggiunge il token
+    CSRF ai form e non espone dettagli infrastrutturali in caso di schema assente.
 
 ## Matrice di conformità
 
