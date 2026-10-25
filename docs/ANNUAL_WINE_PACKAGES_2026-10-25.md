@@ -22,7 +22,9 @@ Historical start/pro/plus orders retain their original 20/60/200 credits and amo
 
 The server computes net, VAT and total and freezes the purchased terms and saved customer details in orders.commercial_snapshot.
 The checkout requires confirmation of professional use, Italian fiscal location and ordinary VAT treatment.
-Saved foreign-country details or missing/malformed VAT numbers block checkout. The current VAT check is **format only**, not an official verification of tax registration.
+Saved foreign-country details or missing/malformed VAT numbers block checkout. The current VAT check validates
+length, digits and the Italian checksum, but it is **not** an official verification that the VAT registration exists,
+is active or belongs to the purchasing entity.
 Foreign and special tax cases require a reviewed quotation, not an automatic zero-rate decision.
 The new tax treatment applies to the new annual Wine products; existing generic/assisted products were not repriced.
 Invoice issuance/reconciliation and fiscal master-data completeness still require staging acceptance and accounting validation before release.
@@ -53,7 +55,7 @@ The 2026-10-25 legal version is still unreleased; its public terms hash has been
 
 ## Local verification
 
-Final local result after Studio-access and revenue-reporting hardening: **281 passed, 0 skipped** using an isolated native
+Final local result after Studio-access, revenue-reporting and VAT-checksum hardening: **287 passed, 0 skipped** using an isolated native
 PostgreSQL 16.15 database bound to 127.0.0.1. This includes the two-connection overspend test and
 the staging reconciliation migration/rollback test. The separate in-memory PostgreSQL/PGlite run
 also passed all **18** assertions.

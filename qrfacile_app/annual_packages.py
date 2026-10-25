@@ -8,6 +8,17 @@ from fastapi import HTTPException
 from qrfacile_app.pricing_config import get_purchase_pack
 
 
+def italian_vat_is_well_formed(value: str) -> bool:
+    digits = "".join((value or "").strip().upper().removeprefix("IT").split())
+    if len(digits) != 11 or not digits.isdigit() or len(set(digits)) == 1:
+        return False
+    total = sum(int(digits[index]) for index in range(0, 10, 2))
+    for index in range(1, 10, 2):
+        doubled = int(digits[index]) * 2
+        total += doubled - 9 if doubled > 9 else doubled
+    return (10 - total % 10) % 10 == int(digits[-1])
+
+
 def anniversary(timestamp: int, years: int = 1) -> int:
     start = datetime.fromtimestamp(timestamp, timezone.utc)
     year = start.year + years
@@ -19,8 +30,8 @@ def annual_quote(pack: str, country: str, vat: str) -> dict:
     if not data or not data.get('annual'):
         raise HTTPException(400, 'Pacchetto annuale non valido')
     # Foreign/special fiscal cases need a reviewed quote, not a guessed exemption.
-    normalized_vat = vat.strip().upper().removeprefix('IT')
-    if country.strip().upper() != 'IT' or not normalized_vat.isdigit() or len(normalized_vat) != 11:
+    normalized_vat = "".join(vat.strip().upper().removeprefix('IT').split())
+    if country.strip().upper() != 'IT' or not italian_vat_is_well_formed(normalized_vat):
         raise HTTPException(422, 'Dati fiscali da verificare: richiedi un preventivo per il tuo paese o regime IVA.')
     net = int(data['amount_cents'])
     tax = int((Decimal(net) * Decimal('0.22')).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
@@ -29,6 +40,7 @@ def annual_quote(pack: str, country: str, vat: str) -> dict:
         'annual': True, 'wine_credits': data['wine_credits'], 'generic_credits': 0,
         'net_cents': net, 'vat_cents': tax, 'vat_rate': '22',
         'gross_cents': net + tax, 'currency': 'EUR', 'billing_country': 'IT',
+        'vat_number': normalized_vat,
         'renewal': 'manual', 'period_months': 12,
     }
 

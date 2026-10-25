@@ -159,7 +159,7 @@ class _Cursor:
 
     def fetchone(self):
         if "AS profile" in self.last_sql:
-            return {"profile": self.state.get("profile", {"vat": "00000000000", "country": "IT"})}
+            return {"profile": self.state.get("profile", {"vat": "12345678903", "country": "IT"})}
         if "SELECT * FROM orders" in self.last_sql:
             return self.state.get("order")
         if "FROM wineries" in self.last_sql:
@@ -359,7 +359,7 @@ def test_annual_start_uses_gross_price_and_immutable_snapshot(monkeypatch):
 ])
 def test_ineligible_annual_checkout_never_contacts_provider(monkeypatch, pack, confirmation, country):
     state = _install_checkout_mocks(monkeypatch, _ProviderResponse())
-    state["profile"] = {"vat": "00000000000", "country": country}
+    state["profile"] = {"vat": "12345678903", "country": country}
     request = _request("/paypal/start", "POST")
     with pytest.raises(HTTPException):
         paypal_ui.paypal_start(request, pack, csrf_token=csrf_token_for_request(request),
@@ -380,7 +380,7 @@ def test_annual_capture_grants_once_and_paid_replay_has_no_http(monkeypatch):
         "id": 77, "user_id": 42, "pack": "annual_start", "status": "pending",
         "amount_cents": 12078, "currency": "EUR", "paypal_order_id": "PP-77",
         "payment_environment": paypal_ui.PAYPAL_MODE,
-        "commercial_snapshot": annual_quote("annual_start", "IT", "00000000000"),
+        "commercial_snapshot": annual_quote("annual_start", "IT", "12345678903"),
     }
     request = _request("/paypal/return")
     response = paypal_ui.paypal_return(request, token="PP-77", order_id=77)
@@ -417,7 +417,7 @@ def test_capture_wrong_gross_amount_never_marks_paid_or_grants(monkeypatch):
         "id":77, "user_id":42, "pack":"annual_start", "status":"pending",
         "amount_cents":12078, "currency":"EUR", "paypal_order_id":"PP-77",
         "payment_environment":paypal_ui.PAYPAL_MODE,
-        "commercial_snapshot":annual_quote("annual_start","IT","00000000000"),
+        "commercial_snapshot":annual_quote("annual_start","IT","12345678903"),
     }
     response = paypal_ui.paypal_return(_request("/paypal/return"), token="PP-77", order_id=77)
     assert response.status_code == 303

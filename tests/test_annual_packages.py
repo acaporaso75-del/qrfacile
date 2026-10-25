@@ -5,7 +5,10 @@ from pathlib import Path
 import pytest
 from fastapi import HTTPException
 
-from qrfacile_app.annual_packages import anniversary, annual_quote, load_order_product, validate_capture
+from qrfacile_app.annual_packages import (
+    anniversary, annual_quote, italian_vat_is_well_formed,
+    load_order_product, validate_capture,
+)
 from qrfacile_app.pricing_config import list_qr_packs, get_purchase_pack, credit_cost_for_duration
 from qrfacile_app.premium_ui import _subscription_gate_for_new_wine
 
@@ -19,11 +22,12 @@ def test_annual_catalogue_and_italian_quote(pack, units, net, gross):
     product = get_purchase_pack(pack)
     assert product["annual"] and not product["subscription"]
     assert product["wine_credits"] == units
-    quote = annual_quote(pack, "IT", "IT00000000000")
+    quote = annual_quote(pack, "IT", "IT12345678903")
     assert quote["net_cents"] == net
     assert quote["gross_cents"] == gross
     assert quote["vat_cents"] == gross-net
     assert quote["period_months"] == 12 and quote["renewal"] == "manual"
+    assert quote["vat_number"] == "12345678903"
     assert "IVA esclusa" in product["price"]
 
 
@@ -35,14 +39,17 @@ def test_old_products_are_not_on_sale_but_original_entitlements_are_retained():
         assert product["amount_cents"] == amount and not product["annual"]
 
 
-@pytest.mark.parametrize("country,vat", [("FR","00000000000"),("IT",""),("IT","123"),("IT","abcdefghijk")])
+@pytest.mark.parametrize("country,vat", [
+    ("FR","12345678903"), ("IT",""), ("IT","123"), ("IT","abcdefghijk"),
+    ("IT","12345678901"), ("IT","00000000000"), ("IT","11111111111"),
+])
 def test_unsupported_tax_details_fail_closed(country, vat):
     with pytest.raises(HTTPException):
         annual_quote("annual_start", country, vat)
 
 
 def test_order_snapshot_not_current_catalogue_controls_fulfilment():
-    quote = annual_quote("annual_start", "IT", "00000000000")
+    quote = annual_quote("annual_start", "IT", "12345678903")
     quote["wine_credits"] = 17  # frozen, earlier offer
     order = {"pack": "annual_start", "amount_cents": 12078, "commercial_snapshot": quote}
     assert load_order_product(order)["wine_credits"] == 17
@@ -59,6 +66,11 @@ def test_anniversary_is_calendar_based_and_handles_leap_day():
     assert datetime.fromtimestamp(anniversary(start,25),timezone.utc) == datetime(2049,2,28,12,tzinfo=timezone.utc)
     assert credit_cost_for_duration(10) == 1
     assert credit_cost_for_duration(25) == 2
+
+
+@pytest.mark.parametrize("value", ["12345678903", "IT12345678903", "IT 12345678903"])
+def test_italian_vat_checksum_accepts_well_formed_numbers(value):
+    assert italian_vat_is_well_formed(value)
 
 
 def _capture():
