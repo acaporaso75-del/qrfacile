@@ -250,8 +250,8 @@ def _reset_token_error(row: dict | None) -> str:
 
 
 def _forgot_password_body(msg: str = "", err: str = "") -> str:
-    notice = f'<div class="note" style="margin-top:16px">{esc(msg)}</div>' if msg else ""
-    error = f'<div class="note note-err" style="margin-top:16px">{esc(err)}</div>' if err else ""
+    notice = f'<div class="note" role="status" aria-live="polite" style="margin-top:16px">{esc(msg)}</div>' if msg else ""
+    error = f'<div class="note note-err" role="alert" style="margin-top:16px">{esc(err)}</div>' if err else ""
     return f"""
     <section style="max-width:760px;margin:34px auto 0;padding:0 20px">
       <div class="card" style="padding:28px">
@@ -263,8 +263,8 @@ def _forgot_password_body(msg: str = "", err: str = "") -> str:
         {error}
         <form method="post" action="/forgot-password" style="margin-top:22px;display:grid;gap:14px">
           <div>
-            <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Email</label>
-            <input class="input" name="email" type="email" required autocomplete="email" placeholder="nome@azienda.it"
+            <label for="forgot-email" style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Email</label>
+            <input class="input" id="forgot-email" name="email" type="email" required autocomplete="email" placeholder="nome@azienda.it"
               style="width:100%;font-size:16px;padding:15px 15px;border-radius:14px">
           </div>
           <button class="btn btn-primary" type="submit" style="width:100%;font-size:16px;padding:15px 18px;border-radius:16px">
@@ -278,7 +278,7 @@ def _forgot_password_body(msg: str = "", err: str = "") -> str:
 
 
 def _reset_password_body(token: str, err: str = "") -> str:
-    error = f'<div class="note note-err" style="margin-top:16px">{esc(err)}</div>' if err else ""
+    error = f'<div class="note note-err" role="alert" style="margin-top:16px">{esc(err)}</div>' if err else ""
     return f"""
     <section style="max-width:760px;margin:34px auto 0;padding:0 20px">
       <div class="card" style="padding:28px">
@@ -290,13 +290,13 @@ def _reset_password_body(token: str, err: str = "") -> str:
         <form method="post" action="/reset-password" style="margin-top:22px;display:grid;gap:14px">
           <input type="hidden" name="token" value="{esc(token)}">
           <div>
-            <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Nuova password</label>
-            <input class="input" name="password" type="password" required minlength="8" autocomplete="new-password"
+            <label for="reset-password" style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Nuova password</label>
+            <input class="input" id="reset-password" name="password" type="password" required minlength="8" autocomplete="new-password"
               placeholder="Almeno 8 caratteri" style="width:100%;font-size:16px;padding:15px 15px;border-radius:14px">
           </div>
           <div>
-            <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Conferma password</label>
-            <input class="input" name="password_confirm" type="password" required minlength="8" autocomplete="new-password"
+            <label for="reset-password-confirm" style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Conferma password</label>
+            <input class="input" id="reset-password-confirm" name="password_confirm" type="password" required minlength="8" autocomplete="new-password"
               placeholder="Ripeti la password" style="width:100%;font-size:16px;padding:15px 15px;border-radius:14px">
           </div>
           <button class="btn btn-primary" type="submit" style="width:100%;font-size:16px;padding:15px 18px;border-radius:16px">
@@ -553,19 +553,19 @@ def login_get(request: Request, expired: str = "", created: str = "", reset: str
               <input type="hidden" name="next" value="{esc(next)}">
               <div style="display:grid;gap:14px">
                 <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">
+                  <label for="login-email" style="display:block;margin-bottom:7px;font-weight:700;color:#334155">
                     Email
                   </label>
-                  <input class="input" name="email" type="email" required
+                  <input class="input" id="login-email" name="email" type="email" required
                     placeholder="nome@azienda.it" autocomplete="email"
                     style="width:100%;font-size:16px;padding:15px 15px;border-radius:14px">
                 </div>
 
                 <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">
+                  <label for="login-password" style="display:block;margin-bottom:7px;font-weight:700;color:#334155">
                     Password
                   </label>
-                  <input class="input" name="password" type="password" required
+                  <input class="input" id="login-password" name="password" type="password" required
                     placeholder="••••••••" autocomplete="current-password"
                     style="width:100%;font-size:16px;padding:15px 15px;border-radius:14px">
                   <div style="margin-top:8px;text-align:right">

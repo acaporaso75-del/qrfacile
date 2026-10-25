@@ -44,6 +44,8 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
 17. limita i tentativi di login falliti per identità e indirizzo client in una
     finestra di 15 minuti, serializza i controlli concorrenti e usa una verifica
     password equivalente anche per indirizzi inesistenti, senza conservare l'email.
+18. collega esplicitamente etichette e campi nei flussi login/recupero password
+    e rende messaggi ed errori annunciabili dalle tecnologie assistive.
 
 ## Matrice di conformità
 
@@ -55,7 +57,7 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
 | Retention | Documentata, non certificata | Le durate proposte richiedono approvazione privacy/fiscale e prova del job in produzione. |
 | Cookie/ePrivacy | Coerente con lo stato attuale | Le pagine pubbliche osservate non impostano cookie né caricano script. Nuovi analytics/pixel richiederanno nuova valutazione e, se applicabile, consenso. |
 | AI Act | Framework presente, attivazione da governare | Registro sistemi AI, policy, revisione umana e divieto auto-publish per dati sensibili presenti; prima di attivare un provider servono scheda caso d'uso, DPA, trasferimenti, retention e formazione AI literacy. |
-| Accessibilità | Parziale | Aggiunti nomi accessibili e autocomplete ai form di registrazione; manca un audit WCAG completo con tastiera, screen reader, contrasto, zoom e flussi autenticati in staging. |
+| Accessibilità | Parziale avanzato | Aggiunti nomi accessibili e autocomplete ai form di registrazione e autenticazione; feedback globali con ruoli status/alert. Manca un audit WCAG completo con tastiera, screen reader, contrasto, zoom e flussi autenticati in staging. |
 | Sicurezza account | Parziale avanzato | Password reset, limite login falliti, scadenza sessione server-side a 14 giorni e verifica dei nuovi account presenti; gli account storici sono preservati. La migrazione `2026_login_rate_limit.sql`, invio SMTP e recupero vanno provati in staging; MFA admin non risulta implementata. |
 | Continuità | Evidenza staging esistente | Esistono runbook e restore staging; occorre prova periodica di restore del perimetro produttivo e owner operativo. |
 | Pagamenti e fatture | Sandbox-ready nel codice, non pronto per Live | Il checkout annuale calcola imponibile, IVA ordinaria italiana e totale, congela condizioni e profilo fiscale nell'ordine e blocca prima di PayPal profili italiani incompleti o formalmente incoerenti. Verifica ufficiale P.IVA, documento fiscale, riconciliazione, rimborsi e casi fiscali non ordinari richiedono processo contabile e test end-to-end. |

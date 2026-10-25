@@ -11,10 +11,10 @@ def banner(msg: str = "", err: str = "") -> str:
     out = []
 
     if msg:
-        out.append(f"<div class='note note-ok'><b>OK:</b> {esc(msg)}</div>")
+        out.append(f"<div class='note note-ok' role='status' aria-live='polite'><b>OK:</b> {esc(msg)}</div>")
 
     if err:
-        out.append(f"<div class='note note-err'><b>Errore:</b> {esc(err)}</div>")
+        out.append(f"<div class='note note-err' role='alert'><b>Errore:</b> {esc(err)}</div>")
 
     return "\n".join(out)
 
