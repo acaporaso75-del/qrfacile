@@ -35,3 +35,8 @@ receive an initial verification attempt and cannot enter role-protected routes
 until verified. Existing accounts retain their prior access state and are not
 silently reclassified as verified. SMTP delivery remains a staging acceptance
 requirement; a failed attempt leaves the account restricted with a protected resend path.
+
+Session tokens are accepted only while their server-side `created_at`/`expires_at`
+window remains within the 14-day maximum. Compatibility attempts cover the two
+known session tables and epoch/timestamp schemas; a table without a usable expiry
+column fails closed instead of accepting an unbounded token.

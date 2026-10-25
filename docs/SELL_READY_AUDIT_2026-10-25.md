@@ -33,6 +33,8 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
     e aggiunge un test che impedisce future route autenticate prive del gate.
 12. richiede la verifica email ai nuovi account Cantina e Studio senza riclassificare
     gli account storici; invio iniziale e reinvio protetto sono presenti, ma SMTP va provato in staging.
+13. applica anche lato server la scadenza delle sessioni dopo 14 giorni, inclusi
+    i due schemi legacy supportati, senza affidarsi soltanto alla durata del cookie.
 
 ## Matrice di conformità
 
@@ -45,7 +47,7 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
 | Cookie/ePrivacy | Coerente con lo stato attuale | Le pagine pubbliche osservate non impostano cookie né caricano script. Nuovi analytics/pixel richiederanno nuova valutazione e, se applicabile, consenso. |
 | AI Act | Framework presente, attivazione da governare | Registro sistemi AI, policy, revisione umana e divieto auto-publish per dati sensibili presenti; prima di attivare un provider servono scheda caso d'uso, DPA, trasferimenti, retention e formazione AI literacy. |
 | Accessibilità | Parziale | Aggiunti nomi accessibili e autocomplete ai form di registrazione; manca un audit WCAG completo con tastiera, screen reader, contrasto, zoom e flussi autenticati in staging. |
-| Sicurezza account | Parziale avanzato | Password reset e sessioni presenti; i nuovi account post-migrazione restano limitati fino alla verifica email, mentre gli account storici sono preservati. Invio SMTP e recupero vanno provati in staging; MFA admin non risulta implementata. |
+| Sicurezza account | Parziale avanzato | Password reset, scadenza sessione server-side a 14 giorni e verifica dei nuovi account presenti; gli account storici sono preservati. Invio SMTP e recupero vanno provati in staging; MFA admin non risulta implementata. |
 | Continuità | Evidenza staging esistente | Esistono runbook e restore staging; occorre prova periodica di restore del perimetro produttivo e owner operativo. |
 | Pagamenti e fatture | Sandbox-ready nel codice, non pronto per Live | Il checkout annuale calcola imponibile, IVA ordinaria italiana e totale, congela condizioni e profilo fiscale nell'ordine e blocca prima di PayPal profili italiani incompleti o formalmente incoerenti. Verifica ufficiale P.IVA, documento fiscale, riconciliazione, rimborsi e casi fiscali non ordinari richiedono processo contabile e test end-to-end. |
 
