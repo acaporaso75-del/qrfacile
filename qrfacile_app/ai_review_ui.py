@@ -33,15 +33,21 @@ def ai_review_queue(request: Request):
     for item in records:
         personal = "Sì" if item.get("contains_personal_data") else "No"
         record_id = int(item["id"])
+        risk = str(item.get("risk_classification") or "")
+        approve_control = (
+            '<span title="Gli output proibiti non possono essere approvati">Approvazione non consentita</span>'
+            if risk == "prohibited"
+            else '<button name="decision" value="approved" type="submit">Approva</button>'
+        )
         rows.append(f"""
         <tr>
           <td>{record_id}</td><td>{esc(str(item.get('created_at') or ''))}</td><td>{esc(str(item.get('use_case') or ''))}</td>
-          <td>{esc(str(item.get('provider') or ''))} / {esc(str(item.get('model') or ''))}</td><td>{esc(str(item.get('risk_classification') or ''))}</td>
+          <td>{esc(str(item.get('provider') or ''))} / {esc(str(item.get('model') or ''))}</td><td>{esc(risk)}</td>
           <td>{personal}</td>
           <td>
             <form method="post" action="/admin/compliance/ai-review/{record_id}" style="display:flex;gap:8px">
               {csrf_input(request)}
-              <button name="decision" value="approved" type="submit">Approva</button>
+              {approve_control}
               <button name="decision" value="rejected" type="submit">Rifiuta</button>
             </form>
           </td>

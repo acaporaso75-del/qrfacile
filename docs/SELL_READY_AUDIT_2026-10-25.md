@@ -70,6 +70,8 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
     AI, valida la classe di rischio e non espone eccezioni database nello stato compliance.
 29. serializza con lock la revisione degli output AI, impedisce sovrascritture
     concorrenti e vieta l'approvazione di output classificati come proibiti.
+30. allinea l'interfaccia ai gate: gli output proibiti mostrano soltanto il rifiuto
+    e l'auto-publish non viene presentato come opzione attivabile.
 
 ## Matrice di conformità
 

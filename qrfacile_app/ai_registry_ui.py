@@ -78,7 +78,7 @@ input,textarea,select{{padding:10px;border:1px solid #bbb;border-radius:8px}} te
 <label><input type="checkbox" name="special_category_data_allowed"> Ammette categorie particolari</label>
 <label><input type="checkbox" name="transparency_notice_required" checked> Informativa trasparenza richiesta</label>
 <label><input type="checkbox" name="human_oversight_required" checked> Supervisione umana richiesta</label>
-<label><input type="checkbox" name="auto_publish_allowed"> Pubblicazione automatica consentita</label>
+<label title="Richiede un futuro workflow separato di approvazione legale e sicurezza"><input type="checkbox" disabled> Pubblicazione automatica non disponibile</label>
 <label><input type="checkbox" name="training_data_reuse_allowed"> Riutilizzo dati per training consentito</label>
 <label><input type="checkbox" name="dpa_verified"> DPA verificato</label>
 <div class="full"><button class="btn btn-primary" type="submit">Salva nel registro</button></div>
