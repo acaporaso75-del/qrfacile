@@ -53,8 +53,10 @@ The 2026-10-25 legal version is still unreleased; its public terms hash has been
 
 ## Local verification
 
-Final local result after Studio-access hardening: **276 passed, 3 skipped**. The skipped checks require native PostgreSQL;
-the separate in-memory PostgreSQL/PGlite run passed all **18** assertions.
+Final local result after Studio-access hardening: **279 passed, 0 skipped** using an isolated native
+PostgreSQL 16.15 database bound to 127.0.0.1. This includes the two-connection overspend test and
+the staging reconciliation migration/rollback test. The separate in-memory PostgreSQL/PGlite run
+also passed all **18** assertions.
 Dependency audit found no known vulnerabilities; pip check, compile/import, secret scan,
 SQL parse/transaction guards and git diff formatting passed.
 
@@ -62,9 +64,9 @@ SQL parse/transaction guards and git diff formatting passed.
 - scripts/test_annual_packages_pglite.mjs: 18 real PostgreSQL-engine checks using local PGlite 0.5.11 in memory:
   migration replay, FIFO use, unused expiry, perpetual preservation, spent-grant expiry, rejected overdraft,
   duplicate order grant, rollback and unchanged existing-label fixture.
-- tests/test_annual_packages_database.py: native PostgreSQL expiry and two-connection concurrency tests,
-  enabled only through QRFACILE_TEST_DATABASE_URL pointing to a local qrfacile_test_* database.
-  Not a substitute for actual staging-schema verification.
+- tests/test_annual_packages_database.py: native PostgreSQL expiry and two-connection concurrency tests
+  passed through QRFACILE_TEST_DATABASE_URL pointing to the local qrfacile_test_native database.
+  This is still not a substitute for actual staging-schema verification.
 - No remote CI run, push, merge, deploy, production write, real payment, or credentials change performed.
 - Security audit: **0 findings** after requiring both the winery connection and an active per-label assignment
   on Studio dashboard, preview, wine hub, label ACL and bulk-export paths. Legacy duplicate invitation acceptance
