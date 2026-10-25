@@ -65,6 +65,8 @@ PRESETS = {
     "label_pro": {"label": "Retro etichetta Premium · 25mm · 600dpi · PNG",  "fmt": "png", "size_mm": 25, "dpi": 600},
     "carton":    {"label": "Cartone / Scatola · 30mm · 300dpi · PNG",        "fmt": "png", "size_mm": 30, "dpi": 300},
     "fair":      {"label": "Fiera / Stand · 40mm · 300dpi · PNG",            "fmt": "png", "size_mm": 40, "dpi": 300},
+    "vector_svg":{"label": "Vettoriale tipografia · SVG",                         "fmt": "svg", "size_mm": 25, "dpi": 600},
+    "square_pdf":{"label": "PDF quadrato · 25mm",                                 "fmt": "pdf", "size_mm": 25, "dpi": 600},
     "a4_pdf":    {"label": "PDF A4 pronto stampa · QR centrato",             "fmt": "pdf_a4", "size_mm": 25, "dpi": 600},
 }
 

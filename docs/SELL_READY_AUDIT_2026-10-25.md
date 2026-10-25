@@ -55,6 +55,8 @@ misurabili, poi estese con il listino annuale e il rafforzamento degli accessi S
 22. centralizza la validazione delle destinazioni di ritorno: selezione cantina,
     gestione Studio e invio tipografia rifiutano redirect esterni, slash codificati
     e caratteri di controllo; il cookie contesto usa Secure sotto HTTPS.
+23. ripristina la compatibilità dei vecchi link export verso preset realmente
+    supportati, aggiungendo SVG vettoriale e PDF quadrato e codificando i parametri.
 
 ## Matrice di conformità
 
