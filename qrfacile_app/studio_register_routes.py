@@ -1,4 +1,5 @@
 import time
+from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -7,6 +8,7 @@ from passlib.hash import pbkdf2_sha256
 
 from qrfacile_app.db import pg
 from qrfacile_app.legal_core import record_registration_acceptances
+from qrfacile_app.password_policy import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, new_password_error
 from qrfacile_app.services.email_verification import create_verification
 from qrfacile_app.ui_shell import page, top_actions, esc
 
@@ -131,7 +133,7 @@ def _input(name: str, type_: str, placeholder: str, value: str = "", required: b
     return f"""
 <input class="input" id="{esc(name)}" name="{esc(name)}" type="{esc(type_)}" value="{esc(value)}"
   aria-label="{esc(labels.get(name, name.replace('_', ' ').title()))}"
-  autocomplete="{esc(autocomplete)}" placeholder="{esc(placeholder)}" {req}
+  autocomplete="{esc(autocomplete)}" placeholder="{esc(placeholder)}" {req}{f' minlength="{MIN_PASSWORD_LENGTH}" maxlength="{MAX_PASSWORD_LENGTH}"' if type_ == 'password' else ''}
   style="width:100%;font-size:15px;padding:14px 15px;border-radius:14px">
 """.strip()
 
@@ -233,7 +235,7 @@ def register_studio_get(err: str = "", msg: str = "", invite: str = "", next: st
                 </div>
 
                 <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Password (min 8)</label>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Password (min {MIN_PASSWORD_LENGTH})</label>
                   {_input("password", "password", "••••••••", "", True)}
                 </div>
 
@@ -442,8 +444,9 @@ def register_studio_post(
     if "@" not in email:
         return RedirectResponse("/register-studio?err=Email%20non%20valida", status_code=303)
 
-    if len(password) < 8:
-        return RedirectResponse("/register-studio?err=Password%20minimo%208%20caratteri", status_code=303)
+    policy_error = new_password_error(password)
+    if policy_error:
+        return RedirectResponse(f"/register-studio?err={quote_plus(policy_error)}", status_code=303)
 
     if terms_accepted != "yes" or privacy_acknowledged != "yes":
         return RedirectResponse(

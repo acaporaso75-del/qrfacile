@@ -63,3 +63,8 @@ revision is enabled; records older than 24 hours are removed during subsequent
 login attempts, and the migration is transaction-wrapped and idempotent. The
 dedicated `2026_login_rate_limit_rollback.sql` removes only these transient
 counters and leaves users, credentials and sessions unchanged.
+
+All new passwords created through Cantina registration, Studio registration or
+password reset use the same server-side policy: 12 to 128 characters. Matching
+HTML bounds give immediate feedback but are not trusted for enforcement.
+Existing password hashes and login compatibility are unchanged.

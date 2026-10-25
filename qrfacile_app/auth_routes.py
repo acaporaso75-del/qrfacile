@@ -16,6 +16,7 @@ from passlib.hash import pbkdf2_sha256
 
 from qrfacile_app.db import pg
 from qrfacile_app.auth import COOKIE, SESSION_MAX_AGE_SECONDS
+from qrfacile_app.password_policy import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, new_password_error
 from qrfacile_app.ui_shell import page, top_actions, esc
 
 router = APIRouter()
@@ -291,12 +292,12 @@ def _reset_password_body(token: str, err: str = "") -> str:
           <input type="hidden" name="token" value="{esc(token)}">
           <div>
             <label for="reset-password" style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Nuova password</label>
-            <input class="input" id="reset-password" name="password" type="password" required minlength="8" autocomplete="new-password"
-              placeholder="Almeno 8 caratteri" style="width:100%;font-size:16px;padding:15px 15px;border-radius:14px">
+            <input class="input" id="reset-password" name="password" type="password" required minlength="{MIN_PASSWORD_LENGTH}" maxlength="{MAX_PASSWORD_LENGTH}" autocomplete="new-password"
+              placeholder="Almeno {MIN_PASSWORD_LENGTH} caratteri" style="width:100%;font-size:16px;padding:15px 15px;border-radius:14px">
           </div>
           <div>
             <label for="reset-password-confirm" style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Conferma password</label>
-            <input class="input" id="reset-password-confirm" name="password_confirm" type="password" required minlength="8" autocomplete="new-password"
+            <input class="input" id="reset-password-confirm" name="password_confirm" type="password" required minlength="{MIN_PASSWORD_LENGTH}" maxlength="{MAX_PASSWORD_LENGTH}" autocomplete="new-password"
               placeholder="Ripeti la password" style="width:100%;font-size:16px;padding:15px 15px;border-radius:14px">
           </div>
           <button class="btn btn-primary" type="submit" style="width:100%;font-size:16px;padding:15px 18px;border-radius:16px">
@@ -448,11 +449,12 @@ def reset_password_post(
     password = password or ""
     password_confirm = password_confirm or ""
 
-    if len(password) < 8:
+    policy_error = new_password_error(password)
+    if policy_error:
         return HTMLResponse(page(
             title="QRFACILE · Reimposta password",
             subtitle="Reimposta password",
-            body_html=_reset_password_body(token, err="Password minimo 8 caratteri."),
+            body_html=_reset_password_body(token, err=policy_error),
             actions_html=top_actions(("/login", "Login"), ("/forgot-password", "Richiedi nuovo link")),
             msg="",
             err="",
