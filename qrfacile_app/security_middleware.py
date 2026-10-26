@@ -7,6 +7,22 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 
+SENSITIVE_PATHS = (
+    "/admin",
+    "/api",
+    "/app",
+    "/paypal",
+    "/preview",
+    "/reset-password",
+    "/studio",
+    "/verify-email",
+)
+
+
+def _is_sensitive_path(path: str) -> bool:
+    return any(path == prefix or path.startswith(f"{prefix}/") for prefix in SENSITIVE_PATHS)
+
+
 def paypal_checkout_origin() -> str:
     mode = (os.getenv("PAYPAL_MODE") or "sandbox").strip().lower()
     return (
@@ -53,7 +69,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 "max-age=31536000; includeSubDomains",
             )
 
-        if request.url.path.startswith(("/admin", "/app", "/api")):
+        if _is_sensitive_path(request.url.path):
             response.headers.setdefault("Cache-Control", "no-store")
 
         return response
