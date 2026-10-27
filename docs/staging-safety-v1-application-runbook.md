@@ -56,7 +56,10 @@ Se tutti i controlli passano:
 mv /opt/qrfacile-staging "/opt/qrfacile-staging.quarantine-${release_id}"
 mv "/opt/qrfacile-staging-next-${release_id}" /opt/qrfacile-staging
 systemctl start qrfacile-staging.service
-curl --fail http://127.0.0.1:8001/healthz
+python scripts/verify_release_health.py \
+  --url http://127.0.0.1:8001/healthz \
+  --expected-environment staging \
+  --expected-release <COMMIT_CORRETTIVO>
 ```
 
 La risposta deve riportare `environment=staging`, `database=OK` e il campo
@@ -81,7 +84,10 @@ psql -X -v ON_ERROR_STOP=1 \
 mv /opt/qrfacile-staging "/opt/qrfacile-staging.failed-${release_id}"
 mv "/opt/qrfacile-staging.quarantine-${release_id}" /opt/qrfacile-staging
 systemctl start qrfacile-staging.service
-curl --fail http://127.0.0.1:8001/healthz
+python scripts/verify_release_health.py \
+  --url http://127.0.0.1:8001/healthz \
+  --expected-environment staging \
+  --expected-release <SHA_PRECEDENTE>
 ```
 
 Se il rollback SQL non è sufficiente, usare il ripristino con swap del database
