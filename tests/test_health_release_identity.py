@@ -9,7 +9,7 @@ from qrfacile_app import health as health_module
 from qrfacile_app.runtime_config import RuntimeConfig
 
 
-SHA = "b0c0b44d6865531cf51635db48f9dbcf0ec5ca14"
+SHA = "b0c0b44d6865531cf51635db48f9dbcf0ec5ca14"  # pragma: allowlist secret
 
 
 def _config(environment: str, root: Path) -> RuntimeConfig:
