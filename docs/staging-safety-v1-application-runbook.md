@@ -59,6 +59,10 @@ systemctl start qrfacile-staging.service
 curl --fail http://127.0.0.1:8001/healthz
 ```
 
+La risposta deve riportare `environment=staging`, `database=OK` e il campo
+`release` uguale allo SHA completo distribuito. Qualunque valore diverso,
+`not-versioned` o `unavailable` blocca il collaudo e richiede rollback.
+
 Collaudare login, dashboard, upload su percorso staging, inviti, Compliance
 Advisor e route pubbliche. Non inviare e-mail reali né effettuare chiamate PayPal
 finché sandbox e origin staging non sono verificati.
