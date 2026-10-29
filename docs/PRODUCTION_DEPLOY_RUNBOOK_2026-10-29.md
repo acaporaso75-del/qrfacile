@@ -27,6 +27,7 @@ Prima del rilascio sostituire la release candidate con lo SHA di merge effettivo
 - [ ] Percorso rollback e responsabile rollback confermati.
 - [ ] Nessun ordine o riconciliazione in corso durante la finestra.
 - [ ] SMTP transazionale e monitoraggio verificabili.
+- [ ] Il monitor esegue `scripts/check_paypal_webhook_queue.py` con il `DATABASE_URL` già montato nel runtime e consegna l’alert al responsabile operativo nominato.
 - [ ] PayPal resta Sandbox finché il relativo gate Live non è chiuso.
 
 ## Stato pre-deploy da registrare
@@ -101,6 +102,7 @@ Un valore `not-versioned`, `unavailable`, ambiente errato, database non OK o SHA
 - [ ] Flusso AI non può pubblicare senza revisione umana.
 - [ ] Navigazione tastiera, focus, zoom ed errori essenziali sono utilizzabili.
 - [ ] SMTP transazionale viene verificato con un destinatario interno autorizzato.
+- [ ] `python scripts/check_paypal_webhook_queue.py --max-open-age-minutes 15 --max-open-count 10` restituisce `PAYPAL_WEBHOOK_QUEUE_OK`; è provata anche la consegna di un alert sintetico senza payload, event ID o credenziali.
 - [ ] PayPal segue esclusivamente la modalità approvata.
 
 Non creare ordini pagati e non effettuare pagamenti reali durante lo smoke test.

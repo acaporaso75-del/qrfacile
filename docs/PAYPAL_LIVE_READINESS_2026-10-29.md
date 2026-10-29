@@ -57,7 +57,7 @@ Restano da provare o completare prima di Live:
 1. registrazione del webhook nella REST app Sandbox;
 2. evento Sandbox firmato end-to-end;
 3. retry reale PayPal e replay dello stesso event ID;
-4. alert operativo esterno per gli eventi `manual_review` e `failed` (la vista amministrativa è implementata, ma non ancora installata né collaudata in ambiente);
+4. consegna dell’alert operativo esterno per gli eventi `manual_review` e `failed`: la vista amministrativa e il probe aggregato fail-closed `scripts/check_paypal_webhook_queue.py` sono implementati, ma non ancora installati, collegati al monitor o collaudati in ambiente;
 5. procedura approvata di rimborso, reversal, disputa e chargeback;
 6. registrazione del webhook nella REST app Live soltanto dopo tutti i gate.
 

@@ -85,7 +85,7 @@ Post-migration evidence from the restored copy:
 | Accessibility | Automated and regression checks present for essential flows | Technical review completed | Not installed | Documented human keyboard/screen-reader acceptance on the release candidate |
 | SEO and AI discoverability | Technical metadata and public-route coverage present | Installed | Legacy version only | Production-domain crawl and indexability readback after deployment |
 | Backup, restore and rollback | Release scripts and migration checks present | Staging backup/restore evidence recorded | Fresh production backup and isolated restore verified | Confirm backup path still readable immediately before deployment |
-| Monitoring and transactional email | Code and documentation present | Partial technical evidence | Not verified for the release candidate | Named on-call owner, alert delivery test, and transactional-email delivery evidence |
+| Monitoring and transactional email | Code, queue probe aggregato senza payload e documentazione presenti | Partial technical evidence | Not verified for the release candidate | Named on-call owner, alert delivery test, and transactional-email delivery evidence |
 | Historical QR preservation | Migration is exact, fail-closed, transactional and audited | Historical staging QR verified | 48 QR items preserved in restore rehearsal | Public QR sample and complete count readback after deployment |
 
 ## Automated evidence
