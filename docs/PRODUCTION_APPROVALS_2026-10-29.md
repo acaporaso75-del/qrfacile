@@ -1,7 +1,7 @@
 # QRFacile — pacchetto approvazioni produzione
 
-Release candidate: `a2c8874276c0e256891483eccdf2d7533f4fe8af`  
-PR: `#12`, Draft verso `main`  
+Release candidate: `a2c8874276c0e256891483eccdf2d7533f4fe8af`
+PR: `#12`, Draft verso `main`
 Data preparazione: 2026-10-29
 
 Questo documento raccoglie decisioni esterne necessarie prima di rendere la PR Ready. Non inserire password, credenziali PayPal, chiavi, token o dati personali dei clienti.
@@ -142,4 +142,3 @@ Esito finale: [ ] GO  [ ] NO-GO
 - Ruolo:
 - Data e fuso orario:
 - Note:
-

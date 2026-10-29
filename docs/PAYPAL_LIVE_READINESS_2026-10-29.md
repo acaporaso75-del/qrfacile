@@ -66,4 +66,3 @@ Dopo la chiusura dei gate e usando esclusivamente credenziali già montate:
 - [ ] registrare esclusivamente ID non segreti, timestamp, SHA e risultato.
 
 Non effettuare un pagamento reale per completare questa checklist.
-

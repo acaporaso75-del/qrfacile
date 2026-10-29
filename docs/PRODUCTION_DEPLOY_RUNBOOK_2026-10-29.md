@@ -135,4 +135,3 @@ Registrare:
 - campione QR storici;
 - eventuale rollback;
 - rischi residui e responsabile dell’osservazione post-deploy.
-
