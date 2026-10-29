@@ -113,3 +113,9 @@ No real payment is part of the release procedure. If a credential is absent, it 
 ## Canonical next step
 
 Record the external approvals above and confirm the authorized Live secret-store path. Then re-check that PR #12, remote branch, CI head, backup, and production baseline still match the exact SHAs before converting the PR from Draft to Ready.
+
+Prepared operator documents:
+
+- `PRODUCTION_APPROVALS_2026-10-29.md`
+- `PAYPAL_LIVE_READINESS_2026-10-29.md`
+- `PRODUCTION_DEPLOY_RUNBOOK_2026-10-29.md`
