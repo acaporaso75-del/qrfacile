@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import os
 import secrets
-import smtplib
 import time
-from email.message import EmailMessage
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Request, Form, HTTPException
@@ -15,6 +12,7 @@ from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.checkout_ui import paypal_checkout_form, paypal_checkout_script
 from qrfacile_app.db import pg
+from qrfacile_app.services.transactional_email import send_text_email
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 
 router = APIRouter()
@@ -41,23 +39,6 @@ def _clean_email(email: str) -> str:
     return "".join((email or "").split()).strip().lower()
 
 
-def _smtp_cfg():
-    host = (os.getenv("SMTP_HOST", "") or "").strip()
-    port = int((os.getenv("SMTP_PORT", "465") or "465").strip())
-    user = (os.getenv("SMTP_USER", "") or "").strip()
-    pwd = (os.getenv("SMTP_PASS", "") or "").strip()
-    from_email = (
-        (os.getenv("SMTP_FROM", "") or "").strip()
-        or (os.getenv("FROM_EMAIL", "") or "").strip()
-        or user
-    )
-
-    if not host or not user or not pwd or not from_email:
-        return None
-
-    return host, port, user, pwd, from_email
-
-
 def _send_winery_invite_email(
     *,
     to_email: str,
@@ -71,12 +52,6 @@ def _send_winery_invite_email(
     Non deve mai bloccare il flusso: se fallisce, l'invito resta creato
     e il link è copiabile dalla pagina Studio.
     """
-    cfg = _smtp_cfg()
-    if not cfg:
-        return False, "SMTP non configurato"
-
-    host, port, user, pwd, from_email = cfg
-
     subject = "Invito QRFACILE per gestire i QR delle etichette vino"
 
     pack_text = ""
@@ -104,26 +79,7 @@ QRFACILE
 Il QR del vino, fatto semplice.
 """
 
-    msg = EmailMessage()
-    msg["From"] = from_email
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.set_content(body)
-
-    try:
-        if port == 465:
-            with smtplib.SMTP_SSL(host, port, timeout=25) as s:
-                s.login(user, pwd)
-                s.send_message(msg)
-        else:
-            with smtplib.SMTP(host, port, timeout=25) as s:
-                s.starttls()
-                s.login(user, pwd)
-                s.send_message(msg)
-
-        return True, ""
-    except Exception as e:
-        return False, str(e)
+    return send_text_email(to_email=to_email, subject=subject, body=body)
 
 
 def _thumb_for_winery(cur, winery_id: int) -> str:
