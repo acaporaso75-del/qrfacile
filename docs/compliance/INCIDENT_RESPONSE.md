@@ -48,3 +48,13 @@ Per output AI errati o ingannevoli:
 - comunicazioni;
 - test di ripristino;
 - azioni preventive.
+
+## Monitoraggio SLA aggregato
+
+Il monitor operativo può eseguire, con il `DATABASE_URL` già montato nel runtime:
+
+```bash
+python scripts/check_privacy_sla.py --privacy-warning-days 7 --incident-assessment-hours 24
+```
+
+Il probe non restituisce ID, email, dettagli delle richieste, sintesi degli incidenti o altre PII. Esce con codice `1` per richieste scadute/in scadenza, incidenti alti o critici aperti, incidenti senza responsabile, notifiche richieste ma non registrate o valutazioni su dati personali non completate entro la soglia. Esce con codice `2` se configurazione, schema o database non sono verificabili. L’allerta non sostituisce la valutazione del DPO né determina automaticamente l’obbligo di notifica.
