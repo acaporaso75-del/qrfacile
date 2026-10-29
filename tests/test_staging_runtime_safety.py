@@ -131,8 +131,32 @@ def test_production_may_use_live_paypal_mode(tmp_path):
         "UPLOADS_DIR": str(root / "uploads"),
         "TEMPLATES_DIR": str(root / "templates"),
         "STATIC_DIR": str(root / "static"),
+        "APP_BASE_URL": "https://www.qrfacile.it",
+        "DATABASE_URL": "postgresql://app:secret@db.example.test/app",  # pragma: allowlist secret
+        "PAYPAL_MODE": "live",
+        "PAYPAL_CLIENT_ID": "configured-client-id",
+        "PAYPAL_SECRET": "configured-secret",  # pragma: allowlist secret
+        "PAYPAL_WEBHOOK_ID": "configured-webhook-id",
+    })
+    assert config.environment == "production"
+
+
+def test_production_live_fails_closed_without_webhook_and_canonical_origin(tmp_path):
+    root = tmp_path / "production-app"
+    for directory in (root, root / "uploads", root / "templates", root / "static"):
+        directory.mkdir(parents=True, exist_ok=True)
+    environ = {
+        "APP_ENV": "production",
+        "APP_ROOT": str(root),
+        "UPLOADS_DIR": str(root / "uploads"),
+        "TEMPLATES_DIR": str(root / "templates"),
+        "STATIC_DIR": str(root / "static"),
         "APP_BASE_URL": "https://example.test",
         "DATABASE_URL": "postgresql://app:secret@db.example.test/app",  # pragma: allowlist secret
         "PAYPAL_MODE": "live",
-    })
-    assert config.environment == "production"
+        "PAYPAL_CLIENT_ID": "configured-client-id",
+        "PAYPAL_SECRET": "configured-secret",  # pragma: allowlist secret
+    }
+
+    with pytest.raises(RuntimeError, match="PAYPAL_WEBHOOK_ID.*dominio QRFacile"):
+        load_runtime_config(environ)

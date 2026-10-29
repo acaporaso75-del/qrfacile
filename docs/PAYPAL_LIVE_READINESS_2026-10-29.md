@@ -35,22 +35,36 @@ Le credenziali devono già esistere nel secret store autorizzato. Non devono ess
 - Idempotenza creazione: `PayPal-Request-Id: qrfacile-order-<ID_INTERNO>`
 - Idempotenza capture: `PayPal-Request-Id: qrfacile-capture-<ID_INTERNO>`
 
-## Gate tecnico attualmente mancante
+## Stato webhook preparato
 
-La release candidate gestisce creazione ordine e capture tramite il ritorno browser, ma non espone ancora un endpoint webhook PayPal e non configura un `PAYPAL_WEBHOOK_ID`.
+La release candidate espone ora `/paypal/webhook`, verifica la firma tramite l’API ufficiale PayPal e conserva un ledger minimale senza payload completo. Il fulfillment `PAYMENT.CAPTURE.COMPLETED` riusa la stessa procedura atomica del ritorno browser; eventi pendenti, negati, rimborsati, reversed e dispute non erogano crediti e vengono registrati per revisione.
 
-Per un esercizio Live robusto occorre decidere e implementare prima dell’attivazione:
+Sono implementati:
 
-1. eventi PayPal da ricevere;
-2. verifica crittografica della firma mediante API PayPal;
+1. `PAYPAL_WEBHOOK_ID` obbligatorio quando `PAYPAL_MODE=live`;
+2. verifica firma con `/v1/notifications/verify-webhook-signature`;
 3. associazione fail-closed fra capture, ordine, importo, valuta e ambiente;
-4. idempotenza e audit dell’evento;
-5. riconciliazione quando il cliente non torna al sito;
-6. gestione rimborso, reversal, disputa e chargeback;
-7. retry, dead-letter operativa e alert;
-8. test Sandbox end-to-end del webhook.
+4. deduplica su event ID, audit e hash del payload;
+5. riconciliazione della capture completata quando il cliente non torna al sito;
+6. stato `manual_review` per rimborsi, denial, reversal e dispute;
+7. migrazione additiva/idempotente del ledger, inclusa la tabella legacy già presente.
 
-Finché questo gate non è chiuso, `PAYPAL_MODE` deve restare `sandbox` e la vendita Live non deve essere abilitata.
+Restano da provare o completare prima di Live:
+
+1. registrazione del webhook nella REST app Sandbox;
+2. evento Sandbox firmato end-to-end;
+3. retry reale PayPal e replay dello stesso event ID;
+4. vista/alert operativo per gli eventi `manual_review` e `failed`;
+5. procedura approvata di rimborso, reversal, disputa e chargeback;
+6. registrazione del webhook nella REST app Live soltanto dopo tutti i gate.
+
+Finché le prove Sandbox e i gate operativi non sono chiusi, `PAYPAL_MODE` deve restare `sandbox` e la vendita Live non deve essere abilitata.
+
+Riferimenti ufficiali:
+
+- https://developer.paypal.com/api/rest/webhooks/
+- https://developer.paypal.com/api/rest/webhooks/rest/
+- https://developer.paypal.com/payment-methods/webhooks/
 
 ## Prova Live senza pagamento reale
 

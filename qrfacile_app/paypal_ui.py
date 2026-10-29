@@ -1,14 +1,16 @@
 # /opt/qrfacile/qrfacile_app/paypal_ui.py
 
 import logging
+import hashlib
 import json
 import os
 import time
 import requests
+from decimal import Decimal, InvalidOperation
 from urllib.parse import quote_plus, urlsplit
 
 from fastapi import APIRouter, Request, HTTPException, Form
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
@@ -27,6 +29,7 @@ logger = logging.getLogger("qrfacile.paypal")
 
 PAYPAL_CLIENT_ID = (os.getenv("PAYPAL_CLIENT_ID") or "").strip()
 PAYPAL_SECRET = (os.getenv("PAYPAL_SECRET") or "").strip()
+PAYPAL_WEBHOOK_ID = (os.getenv("PAYPAL_WEBHOOK_ID") or "").strip()
 PAYPAL_MODE = (os.getenv("PAYPAL_MODE") or "sandbox").strip().lower()
 
 if PAYPAL_MODE not in {"sandbox", "live"}:
@@ -207,6 +210,265 @@ def _add_credit(
             now(),
         ),
     )
+
+
+def _fulfill_completed_order(cur, order: dict, capture_id: str, paid_timestamp: int) -> bool:
+    """Mark and grant a locked order exactly once.
+
+    The caller must select the order FOR UPDATE in the current transaction.
+    """
+    status = str(order.get("status") or "").strip().lower()
+    stored_capture_id = str(order.get("paypal_capture_id") or "").strip()
+    if status == "paid":
+        if stored_capture_id and stored_capture_id != capture_id:
+            raise RuntimeError("Ordine già pagato con capture PayPal differente")
+        return False
+    if status != "pending":
+        raise RuntimeError("Stato ordine non pagabile")
+
+    data = load_order_product(order)
+    order_id = int(order["id"])
+    user_id = int(order["user_id"])
+    cur.execute(
+        """
+        UPDATE orders
+        SET status='paid', paypal_capture_id=%s, paid_at=%s
+        WHERE id=%s AND status='pending'
+        """,
+        (capture_id, paid_timestamp, order_id),
+    )
+    if getattr(cur, "rowcount", 1) != 1:
+        raise RuntimeError("Ordine PayPal non aggiornato in modo atomico")
+
+    if data.get("annual"):
+        grant_annual_units(
+            cur,
+            user_id=user_id,
+            order_id=order_id,
+            units=int(data["wine_credits"]),
+            paid_at=paid_timestamp,
+        )
+    elif int(data.get("wine_credits") or 0):
+        _add_credit(
+            cur,
+            user_id,
+            "wine",
+            int(data["wine_credits"]),
+            "purchase",
+            "orders",
+            order_id,
+        )
+
+    if int(data.get("generic_credits") or 0):
+        _add_credit(
+            cur,
+            user_id,
+            "generic",
+            int(data["generic_credits"]),
+            "purchase",
+            "orders",
+            order_id,
+        )
+    return True
+
+
+def _webhook_capture_identity(event: dict, order: dict) -> tuple[str, str]:
+    try:
+        resource = event["resource"]
+        capture_id = str(resource["id"]).strip()
+        paypal_order_id = str(
+            resource["supplementary_data"]["related_ids"]["order_id"]
+        ).strip()
+        amount = resource["amount"]
+        expected = Decimal(int(order["amount_cents"])) / 100
+        actual = Decimal(str(amount["value"]))
+        if (
+            event.get("event_type") != "PAYMENT.CAPTURE.COMPLETED"
+            or str(resource.get("status") or "").upper() != "COMPLETED"
+            or not capture_id
+            or paypal_order_id != str(order.get("paypal_order_id") or "").strip()
+            or str(amount.get("currency_code") or "") != str(order.get("currency") or "")
+            or actual != expected
+        ):
+            raise ValueError("capture mismatch")
+        return paypal_order_id, capture_id
+    except (KeyError, TypeError, ValueError, InvalidOperation, ArithmeticError) as exc:
+        raise RuntimeError("Evento capture PayPal non coerente con ordine") from exc
+
+
+def _verify_paypal_webhook(event: dict, headers) -> bool:
+    if not PAYPAL_WEBHOOK_ID:
+        raise HTTPException(503, "Webhook PayPal non configurato")
+
+    names = {
+        "transmission_id": "paypal-transmission-id",
+        "transmission_time": "paypal-transmission-time",
+        "cert_url": "paypal-cert-url",
+        "auth_algo": "paypal-auth-algo",
+        "transmission_sig": "paypal-transmission-sig",
+    }
+    values = {key: str(headers.get(name) or "").strip() for key, name in names.items()}
+    if any(not value for value in values.values()):
+        return False
+
+    cert = urlsplit(values["cert_url"])
+    expected_host = urlsplit(PAYPAL_BASE).hostname
+    if cert.scheme != "https" or cert.hostname != expected_host:
+        return False
+
+    token = _paypal_token()
+    try:
+        response = requests.post(
+            f"{PAYPAL_BASE}/v1/notifications/verify-webhook-signature",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+            json={
+                **values,
+                "webhook_id": PAYPAL_WEBHOOK_ID,
+                "webhook_event": event,
+            },
+            timeout=30,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(503, "Verifica webhook PayPal non disponibile") from exc
+    if response.status_code >= 400:
+        raise HTTPException(503, "Verifica webhook PayPal non disponibile")
+    try:
+        result = response.json()
+    except ValueError as exc:
+        raise HTTPException(503, "Risposta verifica webhook non valida") from exc
+    return str(result.get("verification_status") or "").upper() == "SUCCESS"
+
+
+_PAYPAL_MANUAL_REVIEW_EVENTS = {
+    "PAYMENT.CAPTURE.DENIED",
+    "PAYMENT.CAPTURE.REFUNDED",
+    "CHECKOUT.PAYMENT-APPROVAL.REVERSED",
+    "CUSTOMER.DISPUTE.CREATED",
+}
+
+
+@router.post("/paypal/webhook")
+async def paypal_webhook(request: Request):
+    raw = await request.body()
+    if not raw or len(raw) > 262_144:
+        raise HTTPException(413, "Payload webhook non valido")
+    try:
+        event = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise HTTPException(400, "Payload webhook non valido") from exc
+    if not isinstance(event, dict):
+        raise HTTPException(400, "Payload webhook non valido")
+
+    event_id = str(event.get("id") or "").strip()
+    event_type = str(event.get("event_type") or "").strip().upper()
+    if not event_id or len(event_id) > 128 or not event_type or len(event_type) > 128:
+        raise HTTPException(400, "Identità webhook non valida")
+    if not _verify_paypal_webhook(event, request.headers):
+        raise HTTPException(400, "Firma webhook PayPal non valida")
+
+    payload_sha256 = hashlib.sha256(raw).hexdigest()
+    resource = event.get("resource") if isinstance(event.get("resource"), dict) else {}
+    resource_id = str(resource.get("id") or "").strip() or None
+    related = resource.get("supplementary_data") or {}
+    related_ids = related.get("related_ids") if isinstance(related, dict) else {}
+    paypal_order_id = (
+        str((related_ids or {}).get("order_id") or "").strip() or None
+        if isinstance(related_ids, dict)
+        else None
+    )
+
+    with pg() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                INSERT INTO paypal_webhook_events (
+                    event_id, event_type, payment_environment, verification_status,
+                    resource_id, paypal_order_id, payload_sha256, verified_at
+                ) VALUES (%s,%s,%s,'verified',%s,%s,%s,now())
+                ON CONFLICT (event_id) DO NOTHING
+                RETURNING id
+                """,
+                (
+                    event_id,
+                    event_type,
+                    PAYPAL_MODE,
+                    resource_id,
+                    paypal_order_id,
+                    payload_sha256,
+                ),
+            )
+            inserted = cur.fetchone()
+            if not inserted:
+                conn.commit()
+                return JSONResponse({"ok": True, "status": "duplicate"})
+
+            status = "ignored"
+            failure_code = None
+            order_id = None
+            capture_id = resource_id if event_type.startswith("PAYMENT.CAPTURE.") else None
+
+            if event_type == "PAYMENT.CAPTURE.COMPLETED":
+                cur.execute(
+                    """
+                    SELECT * FROM orders
+                    WHERE paypal_order_id=%s AND payment_environment=%s
+                    FOR UPDATE
+                    """,
+                    (paypal_order_id, PAYPAL_MODE),
+                )
+                order = cur.fetchone()
+                if not order:
+                    status = "manual_review"
+                    failure_code = "order_not_found"
+                else:
+                    order_id = int(order["id"])
+                    try:
+                        _, capture_id = _webhook_capture_identity(event, order)
+                        _fulfill_completed_order(cur, order, capture_id, now())
+                    except RuntimeError:
+                        status = "manual_review"
+                        failure_code = "capture_mismatch"
+                    else:
+                        status = "processed"
+            elif event_type == "PAYMENT.CAPTURE.PENDING":
+                status = "verified"
+            elif event_type in _PAYPAL_MANUAL_REVIEW_EVENTS:
+                status = "manual_review"
+                failure_code = "payment_state_requires_review"
+
+            cur.execute(
+                """
+                UPDATE paypal_webhook_events
+                SET verification_status=%s, order_id=%s, paypal_capture_id=%s,
+                    failure_code=%s, processed_at=now()
+                WHERE event_id=%s
+                """,
+                (status, order_id, capture_id, failure_code, event_id),
+            )
+            cur.execute(
+                """
+                INSERT INTO audit_log (
+                    user_id, role, action, entity_type, entity_id,
+                    ip, user_agent, meta, created_at
+                ) VALUES (
+                    NULL, 'system', 'paypal_webhook_processed', 'orders', %s,
+                    NULL, 'paypal-webhook',
+                    jsonb_build_object(
+                        'event_id', %s,
+                        'event_type', %s,
+                        'payment_environment', %s,
+                        'status', %s,
+                        'failure_code', %s
+                    ), now()
+                )
+                """,
+                (order_id, event_id, event_type, PAYPAL_MODE, status, failure_code),
+            )
+            conn.commit()
+    return JSONResponse({"ok": True, "status": status})
 
 
 @router.post("/paypal/start")
@@ -515,66 +777,8 @@ def paypal_return(
                     status_code=303,
                 )
 
-            pack = (locked_order.get("pack") or "").strip().lower()
-
-            data = load_order_product(locked_order)
-
-            if not data:
-                raise HTTPException(
-                    400,
-                    "Pacchetto ordine non valido",
-                )
-
-            order_id_int = int(locked_order["id"])
             validate_capture(capture_data, locked_order)
-            paid_timestamp = now()
-
-            cur.execute(
-                """
-                UPDATE orders
-                SET status='paid',
-                    paypal_order_id=%s,
-                    paypal_capture_id=%s,
-                    paid_at=%s
-                WHERE id=%s
-                """,
-                (
-                    paypal_order_id,
-                    capture_id,
-                    paid_timestamp,
-                    order_id_int,
-                ),
-            )
-
-            # wine credits
-            if data.get('annual'):
-                grant_annual_units(cur, user_id=uid, order_id=order_id_int,
-                                   units=int(data['wine_credits']), paid_at=paid_timestamp)
-            elif int(data.get("wine_credits") or 0):
-
-                _add_credit(
-                    cur,
-                    uid,
-                    "wine",
-                    int(data["wine_credits"]),
-                    "purchase",
-                    "orders",
-                    order_id_int,
-                )
-
-            # generic credits
-            if int(data.get("generic_credits") or 0):
-
-                _add_credit(
-                    cur,
-                    uid,
-                    "generic",
-                    int(data["generic_credits"]),
-                    "purchase",
-                    "orders",
-                    order_id_int,
-                )
-
+            _fulfill_completed_order(cur, locked_order, capture_id, now())
             conn.commit()
 
     return RedirectResponse(

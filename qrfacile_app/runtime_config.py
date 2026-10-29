@@ -198,6 +198,25 @@ def validate_runtime_config(
         if paypal_mode != "sandbox":
             errors.append("PAYPAL_MODE staging deve essere sandbox")
 
+    paypal_mode = _clean(values.get("PAYPAL_MODE")).lower()
+    if paypal_mode == "live":
+        required_live = (
+            "PAYPAL_CLIENT_ID",
+            "PAYPAL_SECRET",
+            "PAYPAL_WEBHOOK_ID",
+            "APP_BASE_URL",
+        )
+        missing_live = [name for name in required_live if not _clean(values.get(name))]
+        if missing_live:
+            errors.append("configurazione PayPal Live incompleta: " + ", ".join(missing_live))
+        try:
+            live_origin = _normalised_origin(config.app_base_url)
+        except RuntimeError as exc:
+            errors.append(str(exc))
+        else:
+            if live_origin not in PRODUCTION_ORIGINS:
+                errors.append("PayPal Live richiede APP_BASE_URL sul dominio QRFacile produttivo")
+
     if errors:
         raise RuntimeError("Configurazione runtime non sicura: " + "; ".join(errors))
 

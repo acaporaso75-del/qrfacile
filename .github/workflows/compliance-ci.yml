@@ -106,7 +106,11 @@ jobs:
           from pathlib import Path
           from pglast import parse_sql
 
-          path = Path("sql/2026_production_qr_wines_qr_item_unique.sql")
-          parse_sql(path.read_text(encoding="utf-8"))
-          print(f"PARSE_OK {path}")
+          files = (
+              Path("sql/2026_production_qr_wines_qr_item_unique.sql"),
+              Path("sql/2026_paypal_webhook_events.sql"),
+          )
+          for path in files:
+              parse_sql(path.read_text(encoding="utf-8"))
+              print(f"PARSE_OK {path}")
           PY

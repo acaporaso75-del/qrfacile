@@ -27,6 +27,7 @@ def test_every_authenticated_mutation_has_an_explicit_csrf_or_origin_gate():
     public_mutations = {
         "/login", "/forgot-password", "/reset-password",
         "/register-studio", "/register-winery",
+        "/paypal/webhook",
     }
     missing = []
     for path in sorted((ROOT / "qrfacile_app").glob("*.py")):

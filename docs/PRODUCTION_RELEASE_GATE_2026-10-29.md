@@ -52,6 +52,7 @@ The exact production backup was restored into an isolated temporary database. Th
 16. `2026_email_verification_enforcement.sql`
 17. `2026_login_rate_limit.sql`
 18. `2026_terms_single_reference_qr.sql`
+19. `2026_paypal_webhook_events.sql`
 
 Both passes succeeded. The staging-only duplicate repair must never be used in production.
 
@@ -77,7 +78,7 @@ Post-migration evidence from the restored copy:
 | VAT-exclusive order calculation and fiscal snapshot | Implemented with frozen commercial/fiscal order snapshots | Tested in staging flows | Not installed | Accountant approval, invoicing/reconciliation/refund operating procedure |
 | Winery and Studio onboarding | Implemented and covered by regression tests | Main flows exercised | Legacy version only | Final acceptance run on the production SHA after deployment |
 | Studio single-label access | Fail-closed access controls and tests present | Verified in the staging release | Legacy version only | Post-deploy authorization smoke test with non-production test identities |
-| Checkout and PayPal idempotency | Code and regression tests present | Sandbox OAuth and order creation verified; no capture | Sandbox-only configuration present | Live secret-store credentials and webhook/URL validation; no real payment authorized |
+| Checkout and PayPal idempotency | Return e webhook condividono fulfillment atomico; firma, ambiente, importo, valuta ed event ID verificati | Sandbox OAuth e creazione ordine verificati; prova provider webhook ancora richiesta | Sandbox-only configuration present | Secret store Live, evento webhook Sandbox firmato, alert revisione manuale e URL Live; nessun pagamento reale autorizzato |
 | Privacy, GDPR and data-subject processes | Routes, audit trail, retention and incident documentation present | Technical controls available | Not installed | DPO/legal approval, named owners, SLA and processor/subprocessor decisions |
 | AI governance and human review | Registry and fail-closed human-review controls present | Technical workflow available | Not installed | Legal classification, AI literacy evidence, approved provider/DPA before activation |
 | Account and administration security | CSRF, rate limiting, session and role checks covered | Compliance and staging checks green | Legacy version only | Post-deploy smoke test and operational alert ownership |
@@ -89,7 +90,7 @@ Post-migration evidence from the restored copy:
 
 ## Automated evidence
 
-- Local regression suite: 380 passed, 6 skipped
+- Local regression suite: 385 passed, 6 skipped
 - Static project security audit: 0 findings
 - Dependency audit: no known vulnerabilities
 - Secret scan: 305 tracked files, no findings
