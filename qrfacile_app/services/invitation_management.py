@@ -1,17 +1,15 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import secrets
-import smtplib
 import time
-from email.message import EmailMessage
 from typing import Any, Mapping
 
 from fastapi import HTTPException
 from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
+from qrfacile_app.services.transactional_email import send_text_email
 
 INVITE_TTL_SECONDS = 14 * 24 * 60 * 60
 # The canonical service generates each raw secret with secrets.token_urlsafe(32)
@@ -37,45 +35,12 @@ def _permissions(preset: str) -> tuple[bool, bool, bool]:
     raise HTTPException(422, "Profilo permessi non valido")
 
 
-def _smtp_config() -> tuple[str, int, str, str, str] | None:
-    host = (os.getenv("SMTP_HOST") or "").strip()
-    user = (os.getenv("SMTP_USER") or "").strip()
-    password = (os.getenv("SMTP_PASS") or "").strip()
-    sender = (os.getenv("SMTP_FROM") or os.getenv("FROM_EMAIL") or user).strip()
-    try:
-        port = int(os.getenv("SMTP_PORT") or "465")
-    except ValueError:
-        port = 465
-    if not all((host, user, password, sender)):
-        return None
-    return host, port, user, password, sender
-
-
 def _send_email(*, to_email: str, winery_name: str, invite_url: str) -> tuple[bool, str]:
-    cfg = _smtp_config()
-    if not cfg:
-        return False, "SMTP non configurato"
-    host, port, user, password, sender = cfg
-    msg = EmailMessage()
-    msg["From"] = sender
-    msg["To"] = to_email
-    msg["Subject"] = f"{winery_name} ti invita a collaborare su QRFACILE"
-    msg.set_content(
-        f"""Buongiorno,\n\n{winery_name} ti invita a collaborare sulle proprie etichette in QRFACILE.\n\nApri il collegamento seguente per accettare o registrare lo studio:\n{invite_url}\n\nL'invito scade dopo 14 giorni e può essere revocato dalla cantina. La pubblicazione finale resta sempre alla cantina.\n\nSe non riconosci l'invito, ignoralo.\n"""
+    return send_text_email(
+        to_email=to_email,
+        subject=f"{winery_name} ti invita a collaborare su QRFACILE",
+        body=f"""Buongiorno,\n\n{winery_name} ti invita a collaborare sulle proprie etichette in QRFACILE.\n\nApri il collegamento seguente per accettare o registrare lo studio:\n{invite_url}\n\nL'invito scade dopo 14 giorni e può essere revocato dalla cantina. La pubblicazione finale resta sempre alla cantina.\n\nSe non riconosci l'invito, ignoralo.\n""",
     )
-    try:
-        if port == 465:
-            with smtplib.SMTP_SSL(host, port, timeout=25) as client:
-                client.login(user, password)
-                client.send_message(msg)
-        else:
-            with smtplib.SMTP(host, port, timeout=25) as client:
-                client.starttls()
-                client.login(user, password)
-                client.send_message(msg)
-        return True, ""
-    except Exception as exc:
-        return False, str(exc)[:500]
 
 
 def create_invite(*, winery_id: int, actor_user_id: int, studio_email: str, preset: str, base_url: str) -> dict[str, Any]:

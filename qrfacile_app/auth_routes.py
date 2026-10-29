@@ -1,12 +1,9 @@
 # /opt/qrfacile/qrfacile_app/auth_routes.py
 import time
 import secrets
-import os
-import smtplib
 import hashlib
 import logging
 from urllib.parse import quote
-from email.message import EmailMessage
 
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -17,6 +14,7 @@ from passlib.hash import pbkdf2_sha256
 from qrfacile_app.db import pg
 from qrfacile_app.auth import COOKIE, SESSION_MAX_AGE_SECONDS
 from qrfacile_app.password_policy import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, new_password_error
+from qrfacile_app.services.transactional_email import send_text_email
 from qrfacile_app.ui_shell import page, top_actions, esc
 
 router = APIRouter()
@@ -148,40 +146,15 @@ def _base_url(request: Request) -> str:
     return base
 
 
-def _smtp_cfg():
-    host = (os.getenv("SMTP_HOST", "") or "").strip()
-    port = int((os.getenv("SMTP_PORT", "465") or "465").strip())
-    user = (os.getenv("SMTP_USER", "") or "").strip()
-    pwd = (os.getenv("SMTP_PASS", "") or "").strip()
-    from_email = (
-        (os.getenv("SMTP_FROM", "") or "").strip()
-        or (os.getenv("FROM_EMAIL", "") or "").strip()
-        or user
-    )
-
-    if not host or not user or not pwd or not from_email:
-        return None
-
-    return host, port, user, pwd, from_email
-
-
 def _token_hash(token: str) -> str:
     return hashlib.sha256((token or "").encode("utf-8")).hexdigest()
 
 
 def _send_password_reset_email(*, to_email: str, reset_link: str) -> tuple[bool, str]:
-    cfg = _smtp_cfg()
-    if not cfg:
-        return False, "SMTP non configurato"
-
-    host, port, user, pwd, from_email = cfg
-
-    msg = EmailMessage()
-    msg["From"] = from_email
-    msg["To"] = to_email
-    msg["Subject"] = "Recupero password QRFACILE"
-    msg.set_content(
-        f"""Buongiorno,
+    return send_text_email(
+        to_email=to_email,
+        subject="Recupero password QRFACILE",
+        body=f"""Buongiorno,
 
 abbiamo ricevuto una richiesta di reimpostazione password per il tuo account QRFACILE.
 
@@ -192,22 +165,8 @@ Per scegliere una nuova password apri questo link entro 60 minuti:
 Se non hai richiesto tu il recupero password, ignora questa email.
 
 QRFACILE
-"""
+""",
     )
-
-    try:
-        if port == 465:
-            with smtplib.SMTP_SSL(host, port, timeout=25) as s:
-                s.login(user, pwd)
-                s.send_message(msg)
-        else:
-            with smtplib.SMTP(host, port, timeout=25) as s:
-                s.starttls()
-                s.login(user, pwd)
-                s.send_message(msg)
-        return True, ""
-    except Exception as e:
-        return False, str(e)
 
 
 def _reset_request_ip(request: Request) -> str:

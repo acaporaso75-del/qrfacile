@@ -1,17 +1,15 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import secrets
-import smtplib
 from datetime import datetime, timedelta, timezone
-from email.message import EmailMessage
 from typing import Any
 
 from fastapi import HTTPException
 from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
+from qrfacile_app.services.transactional_email import send_text_email
 
 TOKEN_TTL_HOURS = 24
 MAX_SEND_ATTEMPTS = 5
@@ -22,44 +20,15 @@ def token_hash(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-def _smtp_config():
-    host = (os.getenv("SMTP_HOST") or "").strip()
-    user = (os.getenv("SMTP_USER") or "").strip()
-    password = (os.getenv("SMTP_PASS") or "").strip()
-    sender = (os.getenv("SMTP_FROM") or os.getenv("FROM_EMAIL") or user).strip()
-    try:
-        port = int(os.getenv("SMTP_PORT") or "465")
-    except ValueError:
-        port = 465
-    return (host, port, user, password, sender) if all((host, user, password, sender)) else None
-
-
 def _send_email(to_email: str, verification_url: str) -> tuple[bool, str]:
-    cfg = _smtp_config()
-    if not cfg:
-        return False, "SMTP non configurato"
-    host, port, user, password, sender = cfg
-    msg = EmailMessage()
-    msg["From"] = sender
-    msg["To"] = to_email
-    msg["Subject"] = "Verifica il tuo indirizzo email QRFACILE"
-    msg.set_content(
-        "Conferma il tuo indirizzo email aprendo questo collegamento:\n\n"
-        f"{verification_url}\n\nIl collegamento scade dopo 24 ore."
+    return send_text_email(
+        to_email=to_email,
+        subject="Verifica il tuo indirizzo email QRFACILE",
+        body=(
+            "Conferma il tuo indirizzo email aprendo questo collegamento:\n\n"
+            f"{verification_url}\n\nIl collegamento scade dopo 24 ore."
+        ),
     )
-    try:
-        if port == 465:
-            with smtplib.SMTP_SSL(host, port, timeout=25) as client:
-                client.login(user, password)
-                client.send_message(msg)
-        else:
-            with smtplib.SMTP(host, port, timeout=25) as client:
-                client.starttls()
-                client.login(user, password)
-                client.send_message(msg)
-        return True, ""
-    except Exception as exc:
-        return False, str(exc)[:500]
 
 
 def create_verification(*, user_id: int, base_url: str) -> dict[str, Any]:

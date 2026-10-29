@@ -27,6 +27,7 @@ Prima del rilascio sostituire la release candidate con lo SHA di merge effettivo
 - [ ] Percorso rollback e responsabile rollback confermati.
 - [ ] Nessun ordine o riconciliazione in corso durante la finestra.
 - [ ] SMTP transazionale e monitoraggio verificabili.
+- [ ] `python scripts/check_transactional_email.py` restituisce `TRANSACTIONAL_EMAIL_CONFIG_OK` senza mostrare host, mittente, utente o password.
 - [ ] Il monitor esegue `scripts/check_paypal_webhook_queue.py` con il `DATABASE_URL` già montato nel runtime e consegna l’alert al responsabile operativo nominato.
 - [ ] PayPal resta Sandbox finché il relativo gate Live non è chiuso.
 
