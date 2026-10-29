@@ -3,12 +3,17 @@ from pathlib import Path
 import pytest
 from fastapi import HTTPException
 
-from qrfacile_app.privacy_requests_ui import MAX_PRIVACY_TEXT_LENGTH, _bounded_text
+from qrfacile_app.privacy_requests_ui import (
+    MAX_PRIVACY_TEXT_LENGTH,
+    _bounded_text,
+    _validate_terminal_resolution,
+)
 from qrfacile_app.compliance_incidents_ui import (
     MAX_INCIDENT_CATEGORY_LENGTH,
     MAX_INCIDENT_EVIDENCE_BYTES,
     _incident_evidence,
     _incident_text,
+    _validated_incident_transition,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,6 +57,8 @@ def test_users_receive_resolution_and_reopened_requests_clear_completion():
     text = (ROOT / "qrfacile_app" / "privacy_requests_ui.py").read_text(encoding="utf-8")
     assert "completed_at, resolution" in text
     assert "THEN now() ELSE NULL END" in text
+    assert '"resolution_recorded": bool(resolution)' in text
+    assert '"resolution": resolution[:500]' not in text
 
 
 def test_incident_text_and_evidence_are_bounded():
@@ -68,3 +75,78 @@ def test_incident_text_and_evidence_are_bounded():
 def test_reopened_incident_clears_old_closed_timestamp():
     text = (ROOT / "qrfacile_app" / "compliance_incidents_ui.py").read_text(encoding="utf-8")
     assert "closed_at=CASE WHEN %s='closed' THEN now() ELSE NULL END" in text
+    assert '"authority_notification_recorded": mark_authority' in text
+    assert '"data_subject_notification_recorded": mark_subjects' in text
+
+
+def test_terminal_privacy_request_requires_resolution():
+    _validate_terminal_resolution("in_progress", "")
+    _validate_terminal_resolution("completed", "Consegna verificata")
+    with pytest.raises(HTTPException, match="Risoluzione obbligatoria"):
+        _validate_terminal_resolution("rejected", "")
+
+
+def test_personal_data_incident_cannot_close_before_notification_assessment():
+    current = {
+        "personal_data_involved": True,
+        "authority_notification_required": None,
+        "authority_notified_at": None,
+        "data_subject_notification_required": None,
+        "data_subjects_notified_at": None,
+    }
+    with pytest.raises(HTTPException, match="Valutazione notifiche privacy incompleta"):
+        _validated_incident_transition(payload={}, current=current, status="closed")
+
+    transition = _validated_incident_transition(
+        payload={
+            "authority_notification_required": False,
+            "data_subject_notification_required": False,
+        },
+        current=current,
+        status="closed",
+    )
+    assert transition == (False, False, False, False)
+
+
+def test_required_incident_notifications_must_be_registered_before_closure():
+    current = {
+        "personal_data_involved": True,
+        "authority_notification_required": True,
+        "authority_notified_at": None,
+        "data_subject_notification_required": True,
+        "data_subjects_notified_at": None,
+    }
+    with pytest.raises(HTTPException, match="Notifica autorità richiesta"):
+        _validated_incident_transition(payload={}, current=current, status="closed")
+
+    transition = _validated_incident_transition(
+        payload={
+            "mark_authority_notified": True,
+            "mark_data_subjects_notified": True,
+        },
+        current=current,
+        status="closed",
+    )
+    assert transition == (None, True, None, True)
+
+
+def test_notification_markers_are_strict_booleans_and_cannot_invent_requirement():
+    current = {
+        "personal_data_involved": False,
+        "authority_notification_required": False,
+        "authority_notified_at": None,
+        "data_subject_notification_required": False,
+        "data_subjects_notified_at": None,
+    }
+    with pytest.raises(HTTPException, match="valore booleano non valido"):
+        _validated_incident_transition(
+            payload={"mark_authority_notified": "false"},
+            current=current,
+            status="investigating",
+        )
+    with pytest.raises(HTTPException, match="Notifica autorità non richiesta"):
+        _validated_incident_transition(
+            payload={"mark_authority_notified": True},
+            current=current,
+            status="investigating",
+        )

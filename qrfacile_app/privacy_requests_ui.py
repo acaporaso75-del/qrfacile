@@ -26,6 +26,14 @@ def _bounded_text(value: Any, field_name: str) -> str:
     return text
 
 
+def _validate_terminal_resolution(status: str, resolution: str) -> None:
+    if status in {"completed", "rejected"} and not resolution:
+        raise HTTPException(
+            status_code=422,
+            detail="Risoluzione obbligatoria per completare o rifiutare la richiesta",
+        )
+
+
 @router.post("/api/me/privacy-requests")
 async def create_privacy_request(request: Request):
     require_csrf_or_same_origin(request)
@@ -125,6 +133,7 @@ async def update_privacy_request(request_id: int, request: Request):
         raise HTTPException(status_code=422, detail="Stato non valido")
 
     resolution = _bounded_text(payload.get("resolution"), "Risoluzione")
+    _validate_terminal_resolution(status, resolution)
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
@@ -151,6 +160,6 @@ async def update_privacy_request(request_id: int, request: Request):
         resource_id=request_id,
         actor=admin,
         request=request,
-        metadata={"status": status, "resolution": resolution[:500]},
+        metadata={"status": status, "resolution_recorded": bool(resolution)},
     )
     return {"ok": True, "request": row}
