@@ -105,6 +105,7 @@ Un valore `not-versioned`, `unavailable`, ambiente errato, database non OK o SHA
 - [ ] Admin distingue ordini Sandbox, Live, manuali e unknown.
 - [ ] Flusso AI non può pubblicare senza revisione umana.
 - [ ] Navigazione tastiera, focus, zoom ed errori essenziali sono utilizzabili.
+- [ ] `ACCESSIBILITY_ACCEPTANCE_2026-10-29.md` è compilato sullo SHA installato, senza `BLOCKER` o `HIGH` aperti e senza dati personali o segreti nelle evidenze.
 - [ ] SMTP transazionale viene verificato con un destinatario interno autorizzato.
 - [ ] `python scripts/check_paypal_webhook_queue.py --max-open-age-minutes 15 --max-open-count 10` restituisce `PAYPAL_WEBHOOK_QUEUE_OK`; è provata anche la consegna di un alert sintetico senza payload, event ID o credenziali.
 - [ ] `python scripts/check_privacy_sla.py --privacy-warning-days 7 --incident-assessment-hours 24` restituisce `PRIVACY_SLA_OK`; è provata la consegna di un alert sintetico privo di PII.

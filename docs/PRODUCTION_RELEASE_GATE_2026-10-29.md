@@ -84,7 +84,7 @@ Post-migration evidence from the restored copy:
 | Privacy, GDPR and data-subject processes | Routes, audit trail, retention, incident documentation e probe SLA aggregato senza PII presenti | Technical controls available | Not installed | DPO/legal approval, named owners, alert delivery, SLA and processor/subprocessor decisions |
 | AI governance and human review | Registry and fail-closed human-review controls present | Technical workflow available | Not installed | Legal classification, AI literacy evidence, approved provider/DPA before activation |
 | Account and administration security | CSRF, rate limiting, session and role checks covered | Compliance and staging checks green | Legacy version only | Post-deploy smoke test and operational alert ownership |
-| Accessibility | Automated and regression checks present for essential flows | Technical review completed | Not installed | Documented human keyboard/screen-reader acceptance on the release candidate |
+| Accessibility | Automated checks and a fail-closed manual acceptance protocol cover essential flows | Technical review completed; protocol not yet executed on current candidate | Not installed | Complete `ACCESSIBILITY_ACCEPTANCE_2026-10-29.md` with keyboard, screen reader and 200%/400% zoom evidence on the installed SHA |
 | SEO and AI discoverability | Technical metadata, public-route coverage and read-only HTTP preflight present | Installed | Legacy version only | Staging and production-domain preflight/indexability readback after deployment |
 | Backup, restore and rollback | Release scripts and migration checks present | Staging backup/restore evidence recorded | Fresh production backup and isolated restore verified | Confirm backup path still readable immediately before deployment |
 | Monitoring and transactional email | Mittente centralizzato per verifica account, reset e inviti; preflight SMTP senza segreti; queue probe aggregato e documentazione presenti | Partial technical evidence | Not verified for the release candidate | Named on-call owner, alert delivery test, and transactional-email delivery evidence |
@@ -122,3 +122,4 @@ Prepared operator documents:
 - `PRODUCTION_APPROVALS_2026-10-29.md`
 - `PAYPAL_LIVE_READINESS_2026-10-29.md`
 - `PRODUCTION_DEPLOY_RUNBOOK_2026-10-29.md`
+- `ACCESSIBILITY_ACCEPTANCE_2026-10-29.md`
