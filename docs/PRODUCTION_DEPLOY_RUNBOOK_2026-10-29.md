@@ -83,10 +83,12 @@ python scripts/check_release_preflight.py \
   --rollback-path /opt/qrfacile \
   --expected-environment production \
   --expected-release <SHA_MERGE_COMPLETO> \
-  --expected-paypal-mode <sandbox|live>
+  --expected-paypal-mode <sandbox|live> \
+  --approvals-path docs/PRODUCTION_APPROVALS_2026-10-29.md \
+  --expected-pr 12
 ```
 
-Il comando verifica identità del checkout e del runtime, configurazione senza mostrarla, SMTP, modalità PayPal, database produttivo, set delle 19 migrazioni, backup leggibile, percorso rollback e spazio disco. Qualunque esito diverso da `RELEASE_PREFLIGHT_OK` impedisce lo swap.
+Il comando verifica identità del checkout e del runtime, configurazione senza mostrarla, approvazioni esterne per lo SHA/PR esatti, SMTP, modalità PayPal, database produttivo, set delle 19 migrazioni, backup leggibile, percorso rollback e spazio disco. Qualunque esito diverso da `RELEASE_PREFLIGHT_OK` impedisce lo swap. Il validatore delle approvazioni stampa soltanto nomi di sezioni/campi mancanti, mai i contenuti compilati.
 
 ## Migrazioni
 

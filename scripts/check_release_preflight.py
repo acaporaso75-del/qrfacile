@@ -17,6 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from qrfacile_app.runtime_config import load_runtime_config
 from qrfacile_app.services.transactional_email import load_smtp_config
+from scripts.check_production_approvals import validate_approvals
 
 
 FULL_GIT_SHA = re.compile(r"[0-9a-f]{40}")
@@ -84,8 +85,11 @@ def evaluate_preflight(
     git_head: str,
     free_bytes: int,
     min_free_bytes: int,
+    approval_errors: list[str] | None = None,
 ) -> list[str]:
     errors: list[str] = []
+    if approval_errors:
+        errors.append("approvazioni produzione incomplete o incoerenti")
     if not config.environment_explicit:
         errors.append("APP_ENV deve essere dichiarato esplicitamente")
     if config.environment != expected_environment:
@@ -165,6 +169,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-environment", choices=("staging", "production"), required=True)
     parser.add_argument("--expected-release", required=True)
     parser.add_argument("--expected-paypal-mode", choices=("sandbox", "live"), required=True)
+    parser.add_argument("--approvals-path", type=Path, required=True)
+    parser.add_argument("--expected-pr", type=int, required=True)
     parser.add_argument("--min-free-gb", type=float, default=2.0)
     args = parser.parse_args(argv)
 
@@ -173,6 +179,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--expected-release deve essere uno SHA Git completo")
     if args.min_free_gb <= 0:
         parser.error("--min-free-gb deve essere maggiore di zero")
+    if args.expected_pr <= 0:
+        parser.error("--expected-pr deve essere positivo")
 
     candidate_root = args.candidate_root.resolve()
     backup_path = args.backup_path.resolve()
@@ -181,6 +189,7 @@ def main(argv: list[str] | None = None) -> int:
         config = load_runtime_config(os.environ)
         git_head = _git_head(candidate_root)
         free_bytes = shutil.disk_usage(candidate_root).free
+        approvals_text = args.approvals_path.read_text(encoding="utf-8")
     except (RuntimeError, OSError, subprocess.SubprocessError) as exc:
         print(f"RELEASE_PREFLIGHT_ERROR {type(exc).__name__}", file=sys.stderr)
         return 2
@@ -197,6 +206,11 @@ def main(argv: list[str] | None = None) -> int:
         git_head=git_head,
         free_bytes=free_bytes,
         min_free_bytes=int(args.min_free_gb * 1024**3),
+        approval_errors=validate_approvals(
+            approvals_text,
+            expected_release=expected_release,
+            expected_pr=args.expected_pr,
+        ),
     )
     if errors:
         for error in errors:

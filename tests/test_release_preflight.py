@@ -102,6 +102,36 @@ def test_preflight_fails_closed_without_identity_backup_rollback_and_capacity(tm
     assert "spazio disco libero inferiore alla soglia" in errors
 
 
+def test_preflight_blocks_incomplete_external_approvals(tmp_path):
+    runtime_root = tmp_path / "runtime"
+    candidate = tmp_path / "candidate"
+    rollback = tmp_path / "rollback"
+    backup = tmp_path / "backup"
+    _release_tree(candidate)
+    _release_tree(rollback)
+    backup.mkdir()
+    (backup / "database.dump").write_bytes(b"database")
+    (backup / "filesystem.tar").write_bytes(b"filesystem")
+    source = _production_source(runtime_root)
+
+    errors = check_release_preflight.evaluate_preflight(
+        source=source,
+        config=load_runtime_config(source),
+        candidate_root=candidate,
+        backup_path=backup,
+        rollback_path=rollback,
+        expected_environment="production",
+        expected_release=SHA,
+        expected_paypal_mode="sandbox",
+        git_head=SHA,
+        free_bytes=5 * 1024**3,
+        min_free_bytes=2 * 1024**3,
+        approval_errors=["campo esterno mancante"],
+    )
+
+    assert errors == ["approvazioni produzione incomplete o incoerenti"]
+
+
 def test_preflight_rejects_missing_runtime_directory_without_exposing_database_url(tmp_path):
     runtime_root = tmp_path / "runtime"
     candidate = tmp_path / "candidate"
@@ -146,6 +176,8 @@ def test_preflight_never_reports_sensitive_configuration(tmp_path, monkeypatch, 
         "--expected-environment", "production",
         "--expected-release", SHA,
         "--expected-paypal-mode", "sandbox",
+        "--approvals-path", str(tmp_path / "missing-approvals.md"),
+        "--expected-pr", "12",
     ]) == 2
     output = capsys.readouterr()
     assert "RuntimeError" in output.err
