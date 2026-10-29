@@ -33,6 +33,19 @@ Prima del rilascio sostituire la release candidate con lo SHA di merge effettivo
 - [ ] `scripts/check_payment_reconciliation.py` è verde con l’eventuale soglia degli ordini storici `unknown` approvata e registrata dalla contabilità.
 - [ ] PayPal resta Sandbox finché il relativo gate Live non è chiuso.
 
+Il monitor può eseguire i quattro probe tecnici con un unico comando, mantenendo `DATABASE_URL` esclusivamente nell'ambiente del processo:
+
+```text
+python scripts/check_operational_readiness.py \
+  --max-open-age-minutes 15 \
+  --max-open-count 10 \
+  --privacy-warning-days 7 \
+  --incident-assessment-hours 24 \
+  --max-unknown-environment-paid <SOGLIA_CONTABILE_APPROVATA>
+```
+
+L'aggregatore non inoltra stdout/stderr dei probe figli e pubblica soltanto `ok`, `alert` o `error` per nome controllo. La consegna dell'alert al responsabile nominato deve comunque essere provata nell'ambiente reale.
+
 ## Stato pre-deploy da registrare
 
 Registrare senza stampare configurazioni o segreti:
