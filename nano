@@ -7,4 +7,3 @@ def pg():
     if not dsn:
         raise RuntimeError("DATABASE_URL mancante in /opt/qrfacile/.env")
     return psycopg.connect(dsn, row_factory=dict_row)
-

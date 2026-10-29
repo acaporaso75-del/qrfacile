@@ -1,7 +1,7 @@
 # QRFACILE Audit prudente read-only
 
-Data: 2026-05-16 11:29 Europe/Rome  
-Modalita: analisi statica filesystem, senza lettura/stampa di `.env` o `.env.*`.  
+Data: 2026-05-16 11:29 Europe/Rome
+Modalita: analisi statica filesystem, senza lettura/stampa di `.env` o `.env.*`.
 Scritture effettuate: solo questo report.
 
 ## Executive summary

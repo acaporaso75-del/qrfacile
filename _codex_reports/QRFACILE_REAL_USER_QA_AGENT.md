@@ -1,8 +1,8 @@
 # QRFACILE_REAL_USER_QA_AGENT
 
-Ambiente testato: `http://192.168.1.139:8000`  
-Data: 2026-05-20  
-Modalita: QA non distruttiva. Non sono stati modificati file applicativi, non e' stato letto `.env`, non sono stati creati account, non sono stati cancellati dati, non sono stati eseguiti pagamenti reali.  
+Ambiente testato: `http://192.168.1.139:8000`
+Data: 2026-05-20
+Modalita: QA non distruttiva. Non sono stati modificati file applicativi, non e' stato letto `.env`, non sono stati creati account, non sono stati cancellati dati, non sono stati eseguiti pagamenti reali.
 Metodo: smoke test HTTP GET/HEAD su pagine pubbliche/protette e analisi dei flussi gia' presenti nel codice.
 
 ## 1. Executive summary

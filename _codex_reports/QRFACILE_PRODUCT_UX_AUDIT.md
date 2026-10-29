@@ -1,7 +1,7 @@
 # QRFACILE Product & UX Audit
 
-Data: 2026-05-16  
-Modalita: analisi prudente, statica, senza lettura/stampa di `.env` o `.env.*`.  
+Data: 2026-05-16
+Modalita: analisi prudente, statica, senza lettura/stampa di `.env` o `.env.*`.
 Scritture effettuate: solo questo report.
 
 ## Executive summary
