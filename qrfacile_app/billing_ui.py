@@ -466,6 +466,7 @@ def billing(request: Request, msg: str = "", err: str = ""):
             <div class="h2">Come funzionano i crediti</div>
             <div class="billingRules">
               <div><b>Wine credits</b><span>Servono per creare QR vino/lotti: 1 credito = QR da 10 anni, 2 crediti = QR da 25 anni.</span></div>
+              <div><b>Tutte le bottiglie della referenza</b><span>Puoi ristampare lo stesso QR sullo stesso vino, annata e lotto. Per una referenza differente devi creare un nuovo QR.</span></div>
               <div><b>Generic credits</b><span>Servono per QR link esterni o contenuti non vino.</span></div>
               <div><b>Pubblicazione</b><span>La pubblicazione può essere bloccata se mancano dati obbligatori.</span></div>
               <div><b>Pagamento</b><span>Il pagamento online carica automaticamente i crediti acquistati. I servizi assistiti non caricano crediti.</span></div>

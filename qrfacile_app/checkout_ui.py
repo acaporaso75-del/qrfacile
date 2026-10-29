@@ -37,6 +37,7 @@ def paypal_checkout_form(
         Confermo acquisto professionale con sede fiscale in Italia, regime IVA ordinario
         e accetto il totale e le <a href="/terms">condizioni di acquisto</a>:
         unità non utilizzate in scadenza a 12 mesi, senza riporto; i QR creati restano attivi per la durata scelta.
+        Lo stesso QR è utilizzabile sulle bottiglie della medesima referenza; vino, annata o lotto differenti richiedono un nuovo QR.
         Per estero o regimi speciali: <a href="/support">richiedi preventivo</a>.</label>'''
     return f"""
     <form method="post" action="/paypal/start" data-paypal-checkout{style_attr}>

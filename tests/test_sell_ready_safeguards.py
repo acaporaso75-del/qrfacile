@@ -99,11 +99,26 @@ def test_registration_acceptance_records_every_required_version():
 
 
 def test_seeded_legal_hashes_match_the_published_html_snapshots():
-    migration = (ROOT / "sql" / "2026_sell_ready_legal_documents.sql").read_text(encoding="utf-8")
+    migration = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (ROOT / "sql").glob("*.sql")
+        if "legal" in path.name or "terms" in path.name
+    )
     request = _request()
     for route in (terms, privacy):
         digest = hashlib.sha256(route(request).body).hexdigest()
         assert digest in migration
+
+
+def test_qr_reference_terms_are_additive_and_preserve_acceptances():
+    migration = (ROOT / "sql" / "2026_terms_single_reference_qr.sql").read_text(encoding="utf-8")
+    normalized = migration.upper()
+
+    assert migration.startswith("BEGIN;") and migration.rstrip().endswith("COMMIT;")
+    assert "'terms',\n    '2026-10-29'" in migration
+    assert "ON CONFLICT (document_key, version) DO UPDATE" in migration
+    assert "DELETE FROM LEGAL_ACCEPTANCES" not in normalized
+    assert "UPDATE LEGAL_ACCEPTANCES" not in normalized
 
 
 def test_registration_fails_closed_when_legal_catalogue_is_missing():

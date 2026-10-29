@@ -613,8 +613,9 @@ def terms(request: Request):
       <div class="legalCard">
         <h2>4. QR gratuiti, piani e crediti</h2>
         <p>
-          I pacchetti Wine B2B Start (15 unità, 99 €/anno), Cantina (50 unità, 179 €/anno)
-          e Business (100 unità, 299 €/anno) sono riservati a clienti professionali.
+          I pacchetti Wine B2B Start (15 unità, 99 € per pacchetto), Cantina (50 unità,
+          179 € per pacchetto) e Business (100 unità, 299 € per pacchetto) sono riservati
+          a clienti professionali.
           I prezzi sono IVA esclusa; il checkout espone imponibile, IVA e totale prima del pagamento.
           Per studi, multi-cantina, clienti esteri e regimi fiscali speciali è disponibile un preventivo.
         </p>
@@ -627,6 +628,13 @@ def terms(request: Request):
           per la durata scelta. I crediti acquistati prima del nuovo listino mantengono le condizioni originarie.
           La durata commerciale non sostituisce la valutazione degli obblighi applicabili alla singola etichetta;
           eventuali esigenze di conservazione più lunga devono essere concordate.
+        </p>
+        <p>
+          Ogni QR identifica una singola referenza, definita almeno da vino, annata e lotto dichiarati.
+          Il medesimo QR può essere stampato senza limiti di copie sulle bottiglie appartenenti a quella
+          referenza. L’utilizzo su un vino, un’annata o un lotto differente richiede la creazione di un
+          nuovo QR e il consumo delle relative unità. Restano consentite le correzioni dei dati della
+          medesima referenza, nel rispetto degli obblighi applicabili e della tracciabilità delle modifiche.
         </p>
         <p>
           Le condizioni economiche, i limiti dei piani, il numero di QR inclusi, eventuali funzionalità premium

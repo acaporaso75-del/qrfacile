@@ -6,7 +6,7 @@ from fastapi import Request
 
 
 REQUIRED_LEGAL_DOCUMENTS = {
-    "terms": "2026-10-25",
+    "terms": "2026-10-29",
     "privacy": "2026-10-25",
 }
 

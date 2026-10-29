@@ -529,6 +529,8 @@ def wine_home(request: Request):
             Acquisti crediti utilizzabili entro 12 mesi. Nessun abbonamento obbligatorio,
             nessun rinnovo automatico: ogni QR creato resta online e modificabile per
             i 10 o 25 anni scelti, anche senza altri acquisti.
+            Lo stesso QR può essere stampato su tutte le bottiglie della medesima referenza;
+            un vino, un’annata o un lotto differente richiede un nuovo QR.
           </p>
         </div>
 
@@ -539,11 +541,11 @@ def wine_home(request: Request):
           </div>
           <div class="winePlan">
             <b>QR vino 10 anni</b>
-            <span>1 credito Wine per un QR vino standard.</span>
+            <span>1 credito Wine per una referenza, su tutte le sue bottiglie.</span>
           </div>
           <div class="winePlan">
             <b>QR vino 25 anni</b>
-            <span>2 crediti Wine per un QR vino esteso.</span>
+            <span>2 crediti Wine per una referenza, su tutte le sue bottiglie.</span>
           </div>
           <div class="winePlan">
             <b>Pacchetti crediti</b>

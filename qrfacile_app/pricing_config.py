@@ -91,6 +91,7 @@ QR_PACKS = {
             f"{qty} unità utilizzabili entro 12 mesi",
             "Nessun abbonamento o rinnovo automatico",
             "QR già creati online per 10 o 25 anni, senza rinnovo",
+            "Lo stesso QR su tutte le bottiglie della referenza",
             "Prezzi IVA esclusa",
         ],
     }
@@ -264,7 +265,7 @@ def _qr_pack_payload(key: str, pack: dict) -> dict:
 
     return {
         "name": pack.get("label") or key,
-        "price": euro(pack.get("amount_cents")) + (" / anno · IVA esclusa" if pack.get("annual") else ""),
+        "price": euro(pack.get("amount_cents")) + (" / pacchetto · IVA esclusa" if pack.get("annual") else ""),
         "amount_cents": int(pack.get("amount_cents") or 0),
 
         "wine_credits":
