@@ -15,7 +15,7 @@ def test_production_duplicate_repair_is_transactional_and_fail_closed():
     assert "LOCK TABLE qr_wines IN ACCESS EXCLUSIVE MODE" in text
     assert "ARRAY[7::BIGINT, 8::BIGINT]" in text
     assert "unexpected duplicate qr_item_id groups outside qr_item_id=22" in text
-    assert "ef8c02025aa14cba54dbdc733fe3040d" in text
+    assert "ef8c02025aa14cba54dbdc733fe3040d" in text  # pragma: allowlist secret
 
 
 def test_production_repair_deletes_only_the_empty_duplicate():
