@@ -131,7 +131,7 @@ BEGIN
        AND wine_master_id = 5
        AND qr_duration_years = 25;
 
-    IF discarded_fingerprint IS DISTINCT FROM 'ef8c02025aa14cba54dbdc733fe3040d'
+    IF discarded_fingerprint IS DISTINCT FROM 'ef8c02025aa14cba54dbdc733fe3040d' -- pragma: allowlist secret (non-secret data fingerprint)
        OR kept_fingerprint IS DISTINCT FROM discarded_fingerprint THEN
         RAISE EXCEPTION
             'duplicate identity validation failed: discarded %, kept %',
