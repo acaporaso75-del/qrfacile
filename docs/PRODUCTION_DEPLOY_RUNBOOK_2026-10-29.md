@@ -46,6 +46,8 @@ python scripts/check_operational_readiness.py \
 
 L'aggregatore non inoltra stdout/stderr dei probe figli e pubblica soltanto `ok`, `alert` o `error` per nome controllo. La consegna dell'alert al responsabile nominato deve comunque essere provata nell'ambiente reale.
 
+Per il monitor schedulato usare `scripts/run_operational_monitor.py` con le stesse soglie. Il destinatario interno nominato viene letto esclusivamente da `QRFACILE_OPERATIONAL_ALERT_TO`; se manca, non è valido o SMTP non consegna, un esito non verde termina con errore. Il wrapper non invia email quando tutti i probe sono verdi e l'alert contiene soltanto nomi e stati aggregati. Prima del rilascio restano obbligatori configurazione nel secret store/runtime, pianificazione e prova di consegna reale.
+
 ## Stato pre-deploy da registrare
 
 Registrare senza stampare configurazioni o segreti:

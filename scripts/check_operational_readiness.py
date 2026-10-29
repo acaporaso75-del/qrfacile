@@ -73,22 +73,37 @@ def execute_checks(checks: tuple[Check, ...], *, timeout: float) -> dict[str, st
     return results
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Esegue i probe operativi QRFacile senza esportarne contenuti o identificativi"
-    )
+def add_check_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--max-open-age-minutes", type=int, default=15)
     parser.add_argument("--max-open-count", type=int, default=10)
     parser.add_argument("--privacy-warning-days", type=int, default=7)
     parser.add_argument("--incident-assessment-hours", type=int, default=24)
     parser.add_argument("--max-unknown-environment-paid", type=int, default=0)
     parser.add_argument("--timeout-per-check", type=float, default=30.0)
-    args = parser.parse_args(argv)
 
+
+def validate_check_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
     if args.timeout_per_check <= 0 or args.timeout_per_check > 120:
         parser.error("--timeout-per-check deve essere maggiore di 0 e non superiore a 120")
     if args.max_unknown_environment_paid < 0:
         parser.error("--max-unknown-environment-paid non può essere negativo")
+
+
+def result_code(results: dict[str, str]) -> int:
+    if any(status == "error" for status in results.values()):
+        return 2
+    if any(status == "alert" for status in results.values()):
+        return 1
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Esegue i probe operativi QRFacile senza esportarne contenuti o identificativi"
+    )
+    add_check_arguments(parser)
+    args = parser.parse_args(argv)
+    validate_check_arguments(parser, args)
 
     results = execute_checks(build_checks(args), timeout=args.timeout_per_check)
     for name, status in results.items():
@@ -96,10 +111,11 @@ def main(argv: list[str] | None = None) -> int:
 
     errors = sorted(name for name, status in results.items() if status == "error")
     alerts = sorted(name for name, status in results.items() if status == "alert")
-    if errors:
+    outcome = result_code(results)
+    if outcome == 2:
         print(f"OPERATIONAL_READINESS_ERROR checks={','.join(errors)}", file=sys.stderr)
         return 2
-    if alerts:
+    if outcome == 1:
         print(f"OPERATIONAL_READINESS_ALERT checks={','.join(alerts)}", file=sys.stderr)
         return 1
     print(f"OPERATIONAL_READINESS_OK checks={len(results)}")
