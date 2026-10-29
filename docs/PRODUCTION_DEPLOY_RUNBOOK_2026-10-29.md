@@ -96,6 +96,7 @@ Un valore `not-versioned`, `unavailable`, ambiente errato, database non OK o SHA
 - [ ] `/healthz` restituisce ambiente e SHA corretti.
 - [ ] HTTPS e redirect canonicali funzionano.
 - [ ] Home, pricing, Termini, Privacy, robots e sitemap rispondono correttamente.
+- [ ] `python scripts/check_public_discoverability.py --base-url https://www.qrfacile.it` restituisce `PUBLIC_DISCOVERABILITY_OK`; prima della produzione lo stesso probe è verde sull’origine staging, mantenendo canonical verso `www.qrfacile.it`.
 - [ ] QR storici campionati restituiscono 200 in italiano e inglese.
 - [ ] Pagina QR pubblica non installa cookie o tracker non autorizzati.
 - [ ] Login/logout/reset password e rate limit rispondono correttamente.
