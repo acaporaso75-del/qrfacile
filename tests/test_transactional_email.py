@@ -70,6 +70,29 @@ def test_send_uses_starttls_and_redacts_delivery_errors(monkeypatch):
     assert "provider-sensitive" not in error
 
 
+def test_attachment_message_uses_central_sender_and_sanitizes_recipient_error(monkeypatch):
+    config = transactional_email.load_smtp_config(_environment())
+    client = _Client()
+    monkeypatch.setattr(transactional_email, "load_smtp_config", lambda: config)
+    monkeypatch.setattr(transactional_email.smtplib, "SMTP_SSL", lambda *_args, **_kwargs: client)
+    message = transactional_email.EmailMessage()
+    message["From"] = "untrusted@example.test"
+    message["To"] = "printer@example.test"
+    message["Subject"] = "QR"
+    message.set_content("Allegato")
+    message.add_attachment(b"png", maintype="image", subtype="png", filename="qr.png")
+
+    assert transactional_email.send_email_message(message) == (True, "")
+    assert client.message["From"] == "QRFACILE <mailer@example.test>"
+    assert list(client.message.iter_attachments())[0].get_filename() == "qr.png"
+
+    def refuse(*_args, **_kwargs):
+        raise transactional_email.smtplib.SMTPRecipientsRefused({})
+
+    monkeypatch.setattr(transactional_email.smtplib, "SMTP_SSL", refuse)
+    assert transactional_email.send_email_message(message) == (False, "smtp_recipient_refused")
+
+
 def test_preflight_reports_only_transport_and_port(monkeypatch, capsys):
     config = transactional_email.load_smtp_config(_environment())
     monkeypatch.setattr(check_transactional_email, "load_smtp_config", lambda: config)

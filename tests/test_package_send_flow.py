@@ -38,7 +38,7 @@ def send(monkeypatch):
         "wine_name": "Rosso", "lot": "L1", "slug": "rosso-l1",
     })
     monkeypatch.setattr(package_ui, "_build_zip_bundle", lambda *_args: b"zip")
-    monkeypatch.setattr(package_ui, "_smtp_send_zip", lambda *_args: None)
+    monkeypatch.setattr(package_ui, "_smtp_send_zip", lambda *_args: (True, ""))
     monkeypatch.setattr(package_ui, "audit_log", lambda *_args, **_kwargs: None)
     app = SimpleNamespace(state=SimpleNamespace(app_base_url="https://staging.example.test"))
     request = Request({
@@ -80,6 +80,25 @@ def test_valid_email_sends_package(send):
     status, body = send({"to_email": "destinatario@example.it"})
     assert status == 200
     assert body == {"ok": True, "message": "Pacchetti inviati correttamente"}
+
+
+def test_recipient_and_transport_failures_are_sanitized(send, monkeypatch):
+    monkeypatch.setattr(
+        package_ui,
+        "_smtp_send_zip",
+        lambda *_args: (False, "smtp_recipient_refused"),
+    )
+    status, body = send({"to_email": "missing@example.it"})
+    assert status == 404 and body["message"] == "Destinatario non trovato"
+
+    package_ui._recent_sends.clear()
+    monkeypatch.setattr(
+        package_ui,
+        "_smtp_send_zip",
+        lambda *_args: (False, "smtp_delivery_failed"),
+    )
+    status, body = send({"to_email": "valid@example.it"})
+    assert status == 503 and body["message"] == "Invio non riuscito. Riprova."
 
 
 def test_unauthorized_user_is_rejected(send, monkeypatch):

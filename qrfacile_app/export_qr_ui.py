@@ -1,8 +1,6 @@
 import io
-import os
 import re
 import zipfile
-import smtplib
 from email.utils import parseaddr
 from email.message import EmailMessage
 from threading import Lock
@@ -30,6 +28,7 @@ except Exception:
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
+from qrfacile_app.services.transactional_email import send_email_message
 from qrfacile_app.ui_shell import page, top_actions, esc
 from qrfacile_app.audit import audit_log
 
@@ -324,27 +323,12 @@ def _build_zip_bundle(url: str, base_name: str) -> bytes:
 
 
 def _smtp_send_zip(to_email: str, subject: str, body: str, zip_bytes: bytes, zip_name: str):
-    host = os.getenv("SMTP_HOST", "").strip()
-    port = int(os.getenv("SMTP_PORT", "465").strip() or "465")
-    user = os.getenv("SMTP_USER", "").strip()
-    pw = os.getenv("SMTP_PASS", "").strip()
-    from_email = (os.getenv("FROM_EMAIL", "") or user).strip()
-
-    if not host or not from_email:
-        raise HTTPException(500, "SMTP non configurato (SMTP_HOST/FROM_EMAIL)")
-    if not user or not pw:
-        raise HTTPException(500, "SMTP non configurato (SMTP_USER/SMTP_PASS)")
-
     msg = EmailMessage()
-    msg["From"] = from_email
     msg["To"] = to_email
     msg["Subject"] = subject
     msg.set_content(body)
     msg.add_attachment(zip_bytes, maintype="application", subtype="zip", filename=zip_name)
-
-    with smtplib.SMTP_SSL(host, port) as s:
-        s.login(user, pw)
-        s.send_message(msg)
+    return send_email_message(msg)
 
 
 # -------------------------
@@ -1040,15 +1024,12 @@ Slug: {w.get('slug')}
 Grazie.
 """
 
-    try:
-        _smtp_send_zip(to_email, subject, body, zip_bytes, zip_name)
-    except smtplib.SMTPRecipientsRefused:
+    sent, send_error = _smtp_send_zip(to_email, subject, body, zip_bytes, zip_name)
+    if not sent:
         with _send_guard:
             _recent_sends.pop(duplicate_key, None)
-        return _send_error("Destinatario non trovato", 404)
-    except Exception:
-        with _send_guard:
-            _recent_sends.pop(duplicate_key, None)
+        if send_error == "smtp_recipient_refused":
+            return _send_error("Destinatario non trovato", 404)
         return _send_error("Invio non riuscito. Riprova.", 503)
 
     audit_log(u, "export_send_email", "wine", int(wine_id),

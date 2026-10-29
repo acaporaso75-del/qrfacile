@@ -39,18 +39,18 @@ def load_smtp_config(environ: Mapping[str, str] | None = None) -> SmtpConfig | N
     return SmtpConfig(host, port, username, password, sender)
 
 
-def send_text_email(*, to_email: str, subject: str, body: str) -> tuple[bool, str]:
+def send_email_message(message: EmailMessage) -> tuple[bool, str]:
     config = load_smtp_config()
     if config is None:
         return False, "smtp_not_configured"
 
-    try:
-        message = EmailMessage()
-        message["From"] = config.sender
-        message["To"] = to_email
-        message["Subject"] = subject
-        message.set_content(body)
+    if not message.get("To") or not message.get("Subject"):
+        return False, "smtp_message_invalid"
+    if message.get("From"):
+        del message["From"]
+    message["From"] = config.sender
 
+    try:
         if config.port == 465:
             with smtplib.SMTP_SSL(config.host, config.port, timeout=25) as client:
                 client.login(config.username, config.password)
@@ -60,6 +60,16 @@ def send_text_email(*, to_email: str, subject: str, body: str) -> tuple[bool, st
                 client.starttls()
                 client.login(config.username, config.password)
                 client.send_message(message)
+    except smtplib.SMTPRecipientsRefused:
+        return False, "smtp_recipient_refused"
     except Exception:
         return False, "smtp_delivery_failed"
     return True, ""
+
+
+def send_text_email(*, to_email: str, subject: str, body: str) -> tuple[bool, str]:
+    message = EmailMessage()
+    message["To"] = to_email
+    message["Subject"] = subject
+    message.set_content(body)
+    return send_email_message(message)
