@@ -47,14 +47,17 @@ Sono implementati:
 4. deduplica su event ID, audit e hash del payload;
 5. riconciliazione della capture completata quando il cliente non torna al sito;
 6. stato `manual_review` per rimborsi, denial, reversal e dispute;
-7. migrazione additiva/idempotente del ledger, inclusa la tabella legacy già presente.
+7. migrazione additiva/idempotente del ledger, inclusa la tabella legacy già presente;
+8. vista amministrativa separata per presa in carico e chiusura manuale degli eventi `manual_review` e `failed`, senza azioni finanziarie automatiche e con audit dell’operatore.
+
+La migrazione del ledger e dei campi di revisione è stata applicata due volte su un restore isolato del backup produzione `20261029_164543-production-de0a4f1d848e` (SHA-256 verificato `443eed3afab38596226157f704e45fc87e9ee6e61da458770562413487049b8e`). Una riga nello schema legacy è stata preservata e convertita in `manual_review`; colonne, vincolo e indice parziale di revisione sono risultati presenti una sola volta. Il database temporaneo è stato eliminato dopo la prova. Questa evidenza valida la migrazione, non costituisce deploy in produzione.
 
 Restano da provare o completare prima di Live:
 
 1. registrazione del webhook nella REST app Sandbox;
 2. evento Sandbox firmato end-to-end;
 3. retry reale PayPal e replay dello stesso event ID;
-4. vista/alert operativo per gli eventi `manual_review` e `failed`;
+4. alert operativo esterno per gli eventi `manual_review` e `failed` (la vista amministrativa è implementata, ma non ancora installata né collaudata in ambiente);
 5. procedura approvata di rimborso, reversal, disputa e chargeback;
 6. registrazione del webhook nella REST app Live soltanto dopo tutti i gate.
 

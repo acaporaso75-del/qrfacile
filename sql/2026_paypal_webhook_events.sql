@@ -50,7 +50,11 @@ ALTER TABLE paypal_webhook_events
     ADD COLUMN IF NOT EXISTS payload_sha256 CHAR(64),
     ADD COLUMN IF NOT EXISTS failure_code TEXT,
     ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ,
-    ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ;
+    ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS reviewed_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS review_resolution TEXT,
+    ADD COLUMN IF NOT EXISTS review_notes TEXT;
 
 UPDATE paypal_webhook_events
    SET event_id = COALESCE(event_id, 'legacy-' || id::text),
@@ -110,6 +114,18 @@ BEGIN
             ADD CONSTRAINT paypal_webhook_payload_hash_check
             CHECK (payload_sha256 ~ '^[0-9a-f]{64}$');
     END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+         WHERE conname = 'paypal_webhook_review_resolution_check'
+           AND conrelid = 'public.paypal_webhook_events'::regclass
+    ) THEN
+        ALTER TABLE paypal_webhook_events
+            ADD CONSTRAINT paypal_webhook_review_resolution_check
+            CHECK (
+                review_resolution IS NULL
+                OR review_resolution IN ('acknowledged', 'resolved_external', 'false_positive')
+            );
+    END IF;
 END
 $migration$;
 
@@ -120,5 +136,8 @@ CREATE INDEX IF NOT EXISTS idx_paypal_webhook_review
     WHERE verification_status IN ('manual_review', 'failed');
 CREATE INDEX IF NOT EXISTS idx_paypal_webhook_paypal_order
     ON paypal_webhook_events (paypal_order_id, received_at DESC);
+CREATE INDEX IF NOT EXISTS idx_paypal_webhook_unreviewed
+    ON paypal_webhook_events (received_at DESC)
+    WHERE verification_status IN ('manual_review', 'failed') AND reviewed_at IS NULL;
 
 COMMIT;

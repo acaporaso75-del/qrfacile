@@ -183,6 +183,7 @@ def admin_home(request: Request, q: str = "", msg: str = "", err: str = ""):
     actions = top_actions(
         ("/app/start", "Menu"),
         ("/app/dashboard", "Dashboard"),
+        ("/admin/paypal-webhooks", "Eventi PayPal"),
         ("/logout", "Logout"),
     )
 

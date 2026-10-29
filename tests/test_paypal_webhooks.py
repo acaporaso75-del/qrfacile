@@ -106,3 +106,17 @@ def test_webhook_migration_is_transactional_idempotent_and_minimizes_payloads():
     assert "PAYMENT.CAPTURE.COMPLETED" in source
     assert "PAYMENT.CAPTURE.REFUNDED" in source
     assert "CUSTOMER.DISPUTE.CREATED" in source
+
+
+def test_admin_review_is_admin_only_post_and_audited():
+    source = (ROOT / "qrfacile_app" / "admin_paypal_webhooks_ui.py").read_text()
+    admin_home = (ROOT / "qrfacile_app" / "admin_home_ui.py").read_text()
+
+    assert '@router.get("/admin/paypal-webhooks"' in source
+    assert '@router.post("/admin/paypal-webhooks/{event_id}/review")' in source
+    assert 'require_any_role(request, ("admin",))' in source
+    assert "require_csrf_or_same_origin(request)" in source
+    assert "paypal_webhook_reviewed" in source
+    assert "reviewed_at IS NULL" in source
+    assert "maxlength=\"1000\"" in source
+    assert '("/admin/paypal-webhooks", "Eventi PayPal")' in admin_home
