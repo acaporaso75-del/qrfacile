@@ -426,7 +426,8 @@ def billing(request: Request, msg: str = "", err: str = ""):
           <div class="billingEyebrow">Crediti QR</div>
           <div class="h1">Billing</div>
           <div class="p">
-            Pacchetti Wine annuali a rinnovo manuale, IVA esclusa. Nessun addebito automatico. QR già creati conservati per la durata scelta.
+            Crediti Wine utilizzabili entro 12 mesi, IVA esclusa. Nessun abbonamento obbligatorio
+            e nessun rinnovo automatico. I QR già creati restano online per la durata scelta.
           </div>
         </div>
         <div class="billingHeroCards">
@@ -444,7 +445,8 @@ def billing(request: Request, msg: str = "", err: str = ""):
       </div>
 
       <div class="billingNotice">
-        <b>Regola principale:</b> 1 credito crea un QR vino da 10 anni. 2 crediti creano un QR vino da 25 anni.
+        <b>Paghi il QR una volta:</b> 1 credito crea un QR vino da 10 anni. 2 crediti creano
+        un QR vino da 25 anni. Non serve rinnovare il pacchetto per mantenerlo online.
       </div>
 
       {subscription_html}

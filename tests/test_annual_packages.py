@@ -107,9 +107,27 @@ def test_rendered_pricing_discloses_annual_tax_and_duration_terms():
         assert f'name="pack" value="{key}"' in html
     for key in ("start", "pro", "plus"):
         assert f'name="pack" value="{key}"' not in html
-    for text in ("120,78", "218,38", "364,78", "IVA esclusa", "senza addebiti automatici", "25 anni"):
+    for text in (
+        "120,78", "218,38", "364,78", "IVA esclusa",
+        "Nessun abbonamento obbligatorio", "nessun rinnovo automatico",
+        "anche senza nuovi acquisti", "25 anni",
+    ):
         assert text in html
     assert html.count('name="fiscal_confirmation"') == 3
+
+
+def test_public_offer_leads_with_no_mandatory_subscription():
+    from starlette.requests import Request
+    from qrfacile_app.landing_routes import home, wine_home
+
+    request = Request({"type":"http", "method":"GET", "path":"/", "headers":[], "query_string":b""})
+    home_html = home(request).body.decode()
+    wine_html = wine_home(request).body.decode()
+
+    assert "Wine Compliance · senza canone annuale" in home_html
+    assert "Nessun abbonamento obbligatorio" in wine_html
+    assert "nessun rinnovo automatico" in wine_html
+    assert "anche senza altri acquisti" in wine_html
 
 
 def test_expired_legacy_subscription_does_not_block_available_units():
