@@ -59,6 +59,20 @@ Registrare senza stampare configurazioni o segreti:
 6. Eseguire compilazione, import applicazione, audit sicurezza e SQL transaction check.
 7. Verificare che il nuovo runtime non punti a staging.
 
+Prima dello swap, con le variabili già montate nel processo e senza stamparle, eseguire:
+
+```text
+python scripts/check_release_preflight.py \
+  --candidate-root <CHECKOUT_CANDIDATO> \
+  --backup-path <BACKUP_FRESCO_VERIFICATO> \
+  --rollback-path /opt/qrfacile \
+  --expected-environment production \
+  --expected-release <SHA_MERGE_COMPLETO> \
+  --expected-paypal-mode <sandbox|live>
+```
+
+Il comando verifica identità del checkout e del runtime, configurazione senza mostrarla, SMTP, modalità PayPal, database produttivo, set delle 19 migrazioni, backup leggibile, percorso rollback e spazio disco. Qualunque esito diverso da `RELEASE_PREFLIGHT_OK` impedisce lo swap.
+
 ## Migrazioni
 
 Applicare, sotto il ruolo applicativo e nell’ordine registrato in `PRODUCTION_RELEASE_GATE_2026-10-29.md`, esclusivamente le migrazioni non ancora presenti nel database effettivo.
