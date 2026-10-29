@@ -2,9 +2,9 @@ name: Compliance CI
 
 on:
   pull_request:
-    branches: [staging, feature/legal-ai-compliance-2026]
+    branches: [main, staging, feature/legal-ai-compliance-2026]
   push:
-    branches: [staging, feature/legal-ai-compliance-2026]
+    branches: [main, staging, feature/legal-ai-compliance-2026]
 
 permissions:
   contents: read
