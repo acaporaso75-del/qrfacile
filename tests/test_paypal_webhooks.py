@@ -119,4 +119,7 @@ def test_admin_review_is_admin_only_post_and_audited():
     assert "paypal_webhook_reviewed" in source
     assert "reviewed_at IS NULL" in source
     assert "maxlength=\"1000\"" in source
+    assert '"acknowledged"' not in source
+    assert '_RESOLUTIONS = {"resolved_external", "false_positive"}' in source
+    assert "La revisione non esegue rimborsi" in source
     assert '("/admin/paypal-webhooks", "Eventi PayPal")' in admin_home

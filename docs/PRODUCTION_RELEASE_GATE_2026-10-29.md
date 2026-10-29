@@ -77,7 +77,7 @@ Post-migration evidence from the restored copy:
 | Requirement | Source and automated tests | Staging | Production | Residual risk / closing evidence |
 | --- | --- | --- | --- | --- |
 | Annual Wine packages and 25-year option | Implemented and covered by regression tests | Installed and exercised with the verified staging release | Not installed | Accounting and commercial approval of prices and tax treatment |
-| VAT-exclusive order calculation and fiscal snapshot | Implemented with frozen snapshots and aggregate reconciliation probe | Tested in staging flows | Not installed | Accountant approval, historical `unknown` classification, invoicing/reconciliation/refund operating procedure |
+| VAT-exclusive order calculation and fiscal snapshot | Implemented with frozen snapshots, aggregate reconciliation probe and fail-closed refund/dispute runbook | Tested in staging flows | Not installed | Accountant approval of `PAYMENT_REFUND_DISPUTE_RUNBOOK_2026-10-29.md`, historical `unknown` classification and invoicing rules |
 | Winery and Studio onboarding | Implemented and covered by regression tests | Main flows exercised | Legacy version only | Final acceptance run on the production SHA after deployment |
 | Studio single-label access | Fail-closed access controls and tests present | Verified in the staging release | Legacy version only | Post-deploy authorization smoke test with non-production test identities |
 | Checkout and PayPal idempotency | Return e webhook condividono fulfillment atomico; firma, ambiente, importo, valuta ed event ID verificati | Sandbox OAuth e creazione ordine verificati; prova provider webhook ancora richiesta | Sandbox-only configuration present | Secret store Live, evento webhook Sandbox firmato, alert revisione manuale e URL Live; nessun pagamento reale autorizzato |
@@ -123,3 +123,4 @@ Prepared operator documents:
 - `PAYPAL_LIVE_READINESS_2026-10-29.md`
 - `PRODUCTION_DEPLOY_RUNBOOK_2026-10-29.md`
 - `ACCESSIBILITY_ACCEPTANCE_2026-10-29.md`
+- `PAYMENT_REFUND_DISPUTE_RUNBOOK_2026-10-29.md`

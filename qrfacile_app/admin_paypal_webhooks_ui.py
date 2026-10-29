@@ -9,7 +9,7 @@ from qrfacile_app.ui_shell import esc, page, pill, top_actions
 
 
 router = APIRouter()
-_RESOLUTIONS = {"acknowledged", "resolved_external", "false_positive"}
+_RESOLUTIONS = {"resolved_external", "false_positive"}
 
 
 def _status(value: object, reviewed_at: object) -> str:
@@ -59,7 +59,6 @@ def paypal_webhooks_page(request: Request, view: str = "open"):
                   style="display:grid;gap:8px;margin-top:12px">
               <label>Esito revisione
                 <select name="resolution" required>
-                  <option value="acknowledged">Preso in carico</option>
                   <option value="resolved_external">Risolto sul provider</option>
                   <option value="false_positive">Falso positivo</option>
                 </select>
@@ -93,7 +92,15 @@ def paypal_webhooks_page(request: Request, view: str = "open"):
         ("/admin/paypal-webhooks?view=all", "Tutti"),
         ("/admin", "Admin"),
     )
-    body = "".join(cards) or '<div class="card"><p>Nessun evento in questa vista.</p></div>'
+    guidance = """
+    <div class="note" role="note">
+      La revisione non esegue rimborsi e non modifica ordini o crediti. Lasciare il caso aperto
+      finché la risoluzione sul provider o il falso positivo non sono documentati.
+    </div>
+    """
+    body = guidance + (
+        "".join(cards) or '<div class="card"><p>Nessun evento in questa vista.</p></div>'
+    )
     return HTMLResponse(page(
         title="QRFACILE · Eventi PayPal",
         subtitle="Riconciliazione webhook",

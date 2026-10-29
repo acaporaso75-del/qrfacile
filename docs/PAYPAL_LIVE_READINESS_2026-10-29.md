@@ -58,7 +58,7 @@ Restano da provare o completare prima di Live:
 2. evento Sandbox firmato end-to-end;
 3. retry reale PayPal e replay dello stesso event ID;
 4. consegna dell’alert operativo esterno per gli eventi `manual_review` e `failed`: la vista amministrativa e il probe aggregato fail-closed `scripts/check_paypal_webhook_queue.py` sono implementati, ma non ancora installati, collegati al monitor o collaudati in ambiente;
-5. procedura approvata di rimborso, reversal, disputa e chargeback;
+5. approvazione contabile e operativa di `PAYMENT_REFUND_DISPUTE_RUNBOOK_2026-10-29.md`, inclusi rimborso parziale, rettifica unità e documento fiscale;
 6. registrazione del webhook nella REST app Live soltanto dopo tutti i gate.
 
 Il probe `scripts/check_payment_reconciliation.py` verifica in sola lettura e senza stampare identificativi: capture mancanti o duplicate, timestamp/importi/valuta non validi, ambiente pagamento sconosciuto oltre la soglia approvata, accrediti orfani o associati all’utente/stato errato, condizioni commerciali non ricostruibili, unità accreditate incoerenti e rimborsi ancora aperti in revisione. Qualsiasi tolleranza per ordini storici con ambiente `unknown` deve essere documentata e approvata dalla contabilità; il probe non la inferisce e non modifica dati.
