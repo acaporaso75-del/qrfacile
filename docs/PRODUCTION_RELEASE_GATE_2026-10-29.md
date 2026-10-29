@@ -10,10 +10,11 @@ This document records technical evidence for the Wine B2B production release can
 - Preserved baseline tag: `production-baseline-de0a4f1-20261029`
 - Release branch: `codex/production-integration-20261029`
 - Release PR: `#12`, Draft, targeting `main`
-- Verified release-candidate SHA: `ca6581e949ccbbbc020183adab61441fc3fb0d0f`
-- Compliance CI: run `40905902204`, successful
+- Initial integrated release-candidate SHA: `ca6581e949ccbbbc020183adab61441fc3fb0d0f`
+- Initial integration Compliance CI: run `40905902204`, successful
 - Staging installed SHA: `59cf70a834dbdd300fc93af35898e7c455753f73`
 - Production remains unchanged at the baseline SHA.
+- The authoritative current candidate is always the live head of Draft PR `#12`; its exact SHA and latest Compliance CI must be read again before any gate decision.
 
 ## Verified backup and restore
 
@@ -69,13 +70,14 @@ Post-migration evidence from the restored copy:
 - only empty duplicate wine row 7 removed after exact fingerprint and relationship checks
 - duplicate-repair audit entries: 1 after two migration passes
 - current Terms version: `2026-10-29`; prior version preserved and retired
+- payment reconciliation after the candidate payment, annual-package and webhook migrations: 3 paid orders; 0 missing/duplicate captures, invalid paid amounts/currencies, missing paid timestamps, orphan/non-paid grants, user mismatches or open refund reviews; the same 3 historical paid orders remain `payment_environment='unknown'` and require an explicit accounting decision rather than automatic reclassification
 
 ## Verification matrix
 
 | Requirement | Source and automated tests | Staging | Production | Residual risk / closing evidence |
 | --- | --- | --- | --- | --- |
 | Annual Wine packages and 25-year option | Implemented and covered by regression tests | Installed and exercised with the verified staging release | Not installed | Accounting and commercial approval of prices and tax treatment |
-| VAT-exclusive order calculation and fiscal snapshot | Implemented with frozen commercial/fiscal order snapshots | Tested in staging flows | Not installed | Accountant approval, invoicing/reconciliation/refund operating procedure |
+| VAT-exclusive order calculation and fiscal snapshot | Implemented with frozen snapshots and aggregate reconciliation probe | Tested in staging flows | Not installed | Accountant approval, historical `unknown` classification, invoicing/reconciliation/refund operating procedure |
 | Winery and Studio onboarding | Implemented and covered by regression tests | Main flows exercised | Legacy version only | Final acceptance run on the production SHA after deployment |
 | Studio single-label access | Fail-closed access controls and tests present | Verified in the staging release | Legacy version only | Post-deploy authorization smoke test with non-production test identities |
 | Checkout and PayPal idempotency | Return e webhook condividono fulfillment atomico; firma, ambiente, importo, valuta ed event ID verificati | Sandbox OAuth e creazione ordine verificati; prova provider webhook ancora richiesta | Sandbox-only configuration present | Secret store Live, evento webhook Sandbox firmato, alert revisione manuale e URL Live; nessun pagamento reale autorizzato |
@@ -97,7 +99,7 @@ Post-migration evidence from the restored copy:
 - Python compilation/import checks: successful
 - SQL transaction-boundary check: successful
 - Production migration parse and isolated execution: successful
-- GitHub Compliance CI: run `40905902204`, successful on the exact release SHA
+- Initial GitHub Compliance CI: run `40905902204`, successful on the initial integrated SHA; use the live PR head for the current CI evidence
 
 ## Mandatory external gates
 

@@ -61,6 +61,8 @@ Restano da provare o completare prima di Live:
 5. procedura approvata di rimborso, reversal, disputa e chargeback;
 6. registrazione del webhook nella REST app Live soltanto dopo tutti i gate.
 
+Il probe `scripts/check_payment_reconciliation.py` verifica in sola lettura e senza stampare identificativi: capture mancanti o duplicate, timestamp/importi/valuta non validi, ambiente pagamento sconosciuto oltre la soglia approvata, accrediti orfani o associati all’utente/stato errato, condizioni commerciali non ricostruibili, unità accreditate incoerenti e rimborsi ancora aperti in revisione. Qualsiasi tolleranza per ordini storici con ambiente `unknown` deve essere documentata e approvata dalla contabilità; il probe non la inferisce e non modifica dati.
+
 Finché le prove Sandbox e i gate operativi non sono chiusi, `PAYPAL_MODE` deve restare `sandbox` e la vendita Live non deve essere abilitata.
 
 Riferimenti ufficiali:

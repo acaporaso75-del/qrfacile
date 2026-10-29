@@ -30,6 +30,7 @@ Prima del rilascio sostituire la release candidate con lo SHA di merge effettivo
 - [ ] `python scripts/check_transactional_email.py` restituisce `TRANSACTIONAL_EMAIL_CONFIG_OK` senza mostrare host, mittente, utente o password.
 - [ ] Il monitor esegue `scripts/check_paypal_webhook_queue.py` con il `DATABASE_URL` già montato nel runtime e consegna l’alert al responsabile operativo nominato.
 - [ ] Il monitor esegue `scripts/check_privacy_sla.py` senza esportare PII e consegna l’alert al responsabile privacy/incidenti nominato.
+- [ ] `scripts/check_payment_reconciliation.py` è verde con l’eventuale soglia degli ordini storici `unknown` approvata e registrata dalla contabilità.
 - [ ] PayPal resta Sandbox finché il relativo gate Live non è chiuso.
 
 ## Stato pre-deploy da registrare
@@ -106,6 +107,7 @@ Un valore `not-versioned`, `unavailable`, ambiente errato, database non OK o SHA
 - [ ] SMTP transazionale viene verificato con un destinatario interno autorizzato.
 - [ ] `python scripts/check_paypal_webhook_queue.py --max-open-age-minutes 15 --max-open-count 10` restituisce `PAYPAL_WEBHOOK_QUEUE_OK`; è provata anche la consegna di un alert sintetico senza payload, event ID o credenziali.
 - [ ] `python scripts/check_privacy_sla.py --privacy-warning-days 7 --incident-assessment-hours 24` restituisce `PRIVACY_SLA_OK`; è provata la consegna di un alert sintetico privo di PII.
+- [ ] `python scripts/check_payment_reconciliation.py` restituisce `PAYMENT_RECONCILIATION_OK`; eventuali ordini storici `unknown` sono riconciliati e la soglia esplicita è approvata dalla contabilità.
 - [ ] PayPal segue esclusivamente la modalità approvata.
 
 Non creare ordini pagati e non effettuare pagamenti reali durante lo smoke test.
