@@ -9,7 +9,8 @@ Regola commerciale definitiva:
 - Upgrade da 10 a 25 anni = 1 credito wine aggiuntivo.
 - I crediti servono per creare nuovi QR o fare upgrade.
 - I QR già creati restano online e modificabili per la durata scelta.
-- Pacchetti annuali a rinnovo manuale; unità non usate in scadenza a 12 mesi.
+- Pacchetti di crediti utilizzabili entro 12 mesi, senza abbonamento obbligatorio
+  o rinnovo automatico; unità non usate in scadenza a 12 mesi.
 - Nessuna scadenza retroattiva per i crediti storici.
 
 Importante:
@@ -88,8 +89,9 @@ QR_PACKS = {
         "annual": True, "highlight": key == "annual_winery",
         "features": [
             f"{qty} unità utilizzabili entro 12 mesi",
-            "Rinnovo manuale, nessun addebito automatico",
-            "QR già creati conservati per 10 o 25 anni",
+            "Nessun abbonamento o rinnovo automatico",
+            "QR già creati online per 10 o 25 anni, senza rinnovo",
+            "Lo stesso QR su tutte le bottiglie della referenza",
             "Prezzi IVA esclusa",
         ],
     }
@@ -263,7 +265,7 @@ def _qr_pack_payload(key: str, pack: dict) -> dict:
 
     return {
         "name": pack.get("label") or key,
-        "price": euro(pack.get("amount_cents")) + (" / anno · IVA esclusa" if pack.get("annual") else ""),
+        "price": euro(pack.get("amount_cents")) + (" / pacchetto · IVA esclusa" if pack.get("annual") else ""),
         "amount_cents": int(pack.get("amount_cents") or 0),
 
         "wine_credits":

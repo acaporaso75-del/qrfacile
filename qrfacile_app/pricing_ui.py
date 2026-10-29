@@ -110,7 +110,7 @@ def _qr_pack_card(request: Request, key: str, pack: dict) -> str:
         </div>
       </div>
 
-      <div class="priceValue">{price}<small> / anno</small></div>
+      <div class="priceValue">{price}<small> / pacchetto</small></div>
       <p>IVA esclusa · solo clienti professionali</p>
 
       <div class="priceFeatures">
@@ -164,10 +164,11 @@ def pricing_page(request: Request):
 
       <section class="pricingHero">
         <div class="pricingEyebrow">Prezzi QRFACILE</div>
-        <h1>Pacchetti annuali Wine per la tua cantina</h1>
+        <h1>Il QR del vino che paghi una volta</h1>
         <p>
-          Acquisti nuove etichette per 12 mesi, con rinnovo manuale e senza addebiti automatici.
-          I QR già creati restano consultabili per la durata scelta, anche senza rinnovo.
+          Nessun abbonamento obbligatorio e nessun rinnovo automatico. Acquisti crediti
+          utilizzabili entro 12 mesi; ogni QR creato resta online e modificabile per 10 o
+          25 anni, anche senza nuovi acquisti.
         </p>
       </section>
 
@@ -202,6 +203,9 @@ def pricing_page(request: Request):
       Le unità annuali non utilizzate scadono dopo 12 mesi dall'acquisto, senza proroga al rinnovo.
       Restano possibili le correzioni dei dati obbligatori delle etichette esistenti.
       I crediti acquistati con le precedenti offerte conservano le condizioni originarie.</p>
+      <p><b>Un solo QR per tutta la produzione della referenza:</b> puoi stampare lo stesso QR
+      su tutte le bottiglie dello stesso vino, annata e lotto. Un vino, un’annata o un lotto
+      differente richiede un nuovo QR e il relativo credito.</p>
       <p>Studi grafici, gestione multi-cantina e grandi volumi:
       <a href="/support">richiedi un preventivo</a>.</p>
       {paypal_checkout_script()}
@@ -677,7 +681,7 @@ def pricing_page(request: Request):
         title="Prezzi QRFACILE | QR code per etichetta digitale vino",
         subtitle="Prezzi",
         body_html=body,
-        description="QRFACILE Wine B2B: Start 99€, Cantina 179€, Business 299€ all'anno, IVA esclusa. Etichette conservate per 10 o 25 anni, rinnovo manuale.",
+        description="QRFACILE Wine B2B: crediti utilizzabili entro 12 mesi, senza abbonamento obbligatorio. QR online e modificabili per 10 o 25 anni. Prezzi IVA esclusa.",
         canonical_path="/pricing",
         structured_data={
             "@context": "https://schema.org",
