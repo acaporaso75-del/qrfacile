@@ -5,10 +5,34 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin','winery','studio','collaborator'));
 
-ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
-ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin','winery','studio','collaborator'));
+DO $migration$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+          FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'invites'
+           AND column_name = 'token'
+    ) AND NOT EXISTS (
+        SELECT 1
+          FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'invites'
+           AND column_name = 'legacy_token'
+    ) THEN
+        ALTER TABLE invites RENAME COLUMN token TO legacy_token;
+    ELSIF NOT EXISTS (
+        SELECT 1
+          FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'invites'
+           AND column_name = 'legacy_token'
+    ) THEN
+        RAISE EXCEPTION 'invites has neither token nor legacy_token';
+    END IF;
+END
+$migration$;
 
-ALTER TABLE invites RENAME COLUMN token TO legacy_token;
 ALTER TABLE invites ALTER COLUMN legacy_token DROP NOT NULL;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS invite_type TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS recipient_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL;
@@ -65,6 +89,9 @@ ALTER TABLE invites ALTER COLUMN invite_type SET NOT NULL;
 ALTER TABLE invites ALTER COLUMN token_hash SET NOT NULL;
 ALTER TABLE invites DROP CONSTRAINT IF EXISTS invites_token_key;
 ALTER TABLE invites DROP CONSTRAINT IF EXISTS invites_status_check;
+ALTER TABLE invites DROP CONSTRAINT IF EXISTS invites_type_check;
+ALTER TABLE invites DROP CONSTRAINT IF EXISTS invites_scope_check;
+ALTER TABLE invites DROP CONSTRAINT IF EXISTS invites_terminal_dates_check;
 ALTER TABLE invites ADD CONSTRAINT invites_status_check
  CHECK (status IN ('pending','accepted','rejected','expired','revoked'));
 ALTER TABLE invites ADD CONSTRAINT invites_type_check
@@ -104,10 +131,6 @@ CREATE TABLE IF NOT EXISTS invitation_grants (
 );
 CREATE INDEX IF NOT EXISTS idx_invitation_grants_access
  ON invitation_grants(user_id,scope_type,scope_id) WHERE active;
-CREATE UNIQUE INDEX IF NOT EXISTS uq_studio_clients_user_winery
- ON studio_clients(studio_user_id,winery_id);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_label_collaborators_active
- ON label_collaborators(wine_label_id,collaborator_user_id) WHERE active;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_studio_clients_user_winery
  ON studio_clients(studio_user_id,winery_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_label_collaborators_active

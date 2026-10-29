@@ -47,6 +47,21 @@ def test_unified_migration_is_hash_only_transactional_and_indexed():
         assert state in sql
 
 
+def test_unified_migration_can_be_reapplied_without_renaming_twice():
+    sql = (ROOT / "sql" / "2026_unified_invitations.sql").read_text()
+
+    assert "column_name = 'token'" in sql
+    assert "column_name = 'legacy_token'" in sql
+    assert "invites has neither token nor legacy_token" in sql
+    for constraint in (
+        "invites_status_check",
+        "invites_type_check",
+        "invites_scope_check",
+        "invites_terminal_dates_check",
+    ):
+        assert f"DROP CONSTRAINT IF EXISTS {constraint}" in sql
+
+
 def test_acceptance_uses_lock_transaction_and_post_csrf():
     service = (ROOT / "qrfacile_app" / "services" / "invitations.py").read_text()
     ui = (ROOT / "qrfacile_app" / "invitations_ui.py").read_text()

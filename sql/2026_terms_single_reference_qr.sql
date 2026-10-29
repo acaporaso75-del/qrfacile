@@ -1,6 +1,15 @@
 BEGIN;
 
 -- Additive legal version: preserve all prior acceptances and document hashes.
+UPDATE legal_documents
+   SET retired_at = TIMESTAMPTZ '2026-10-29 00:00:00+01'
+ WHERE document_key = 'terms'
+   AND version <> '2026-10-29'
+   AND (
+       retired_at IS NULL
+       OR retired_at > TIMESTAMPTZ '2026-10-29 00:00:00+01'
+   );
+
 INSERT INTO legal_documents (
     document_key, version, title, content_sha256, effective_at
 ) VALUES (

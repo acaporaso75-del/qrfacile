@@ -99,3 +99,14 @@ jobs:
               parse_sql(path.read_text(encoding="utf-8"))
               print(f"PARSE_OK {path}")
           PY
+
+      - name: Parse production safety SQL
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from pglast import parse_sql
+
+          path = Path("sql/2026_production_qr_wines_qr_item_unique.sql")
+          parse_sql(path.read_text(encoding="utf-8"))
+          print(f"PARSE_OK {path}")
+          PY

@@ -117,6 +117,9 @@ def test_qr_reference_terms_are_additive_and_preserve_acceptances():
     assert migration.startswith("BEGIN;") and migration.rstrip().endswith("COMMIT;")
     assert "'terms',\n    '2026-10-29'" in migration
     assert "ON CONFLICT (document_key, version) DO UPDATE" in migration
+    assert "UPDATE legal_documents" in migration
+    assert "version <> '2026-10-29'" in migration
+    assert "retired_at = TIMESTAMPTZ '2026-10-29 00:00:00+01'" in migration
     assert "DELETE FROM LEGAL_ACCEPTANCES" not in normalized
     assert "UPDATE LEGAL_ACCEPTANCES" not in normalized
 
