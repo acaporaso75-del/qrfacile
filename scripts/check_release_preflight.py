@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import re
 import shutil
@@ -63,15 +64,30 @@ def _origin(value: str) -> str:
     return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
 
 
-def _readable_backup_files(path: Path) -> int:
-    count = 0
-    for item in path.rglob("*"):
-        if not item.is_file() or item.stat().st_size <= 0:
+def _verified_backup_files(path: Path) -> int:
+    manifest = path / "SHA256SUMS"
+    if not manifest.is_file():
+        raise ValueError("manifest assente")
+    entries = 0
+    for raw_line in manifest.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line:
             continue
+        match = re.fullmatch(r"([0-9a-fA-F]{64})\s+[ *](.+)", line)
+        if not match:
+            raise ValueError("manifest non valido")
+        expected, relative = match.groups()
+        item = (path / relative).resolve(strict=False)
+        if path.resolve() not in item.parents or not item.is_file() or item.is_symlink():
+            raise ValueError("percorso backup non valido")
+        digest = hashlib.sha256()
         with item.open("rb") as handle:
-            handle.read(1)
-        count += 1
-    return count
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        if digest.hexdigest().lower() != expected.lower():
+            raise ValueError("checksum non valido")
+        entries += 1
+    return entries
 
 
 def evaluate_preflight(
@@ -159,10 +175,10 @@ def evaluate_preflight(
         errors.append("backup pre-deploy non disponibile")
     else:
         try:
-            if _readable_backup_files(backup_path) < 2:
-                errors.append("backup pre-deploy incompleto o non leggibile")
-        except OSError:
-            errors.append("backup pre-deploy incompleto o non leggibile")
+            if _verified_backup_files(backup_path) < 2:
+                errors.append("backup pre-deploy incompleto o non verificabile")
+        except (OSError, UnicodeError, ValueError):
+            errors.append("backup pre-deploy incompleto o non verificabile")
 
     if free_bytes < min_free_bytes:
         errors.append("spazio disco libero inferiore alla soglia")

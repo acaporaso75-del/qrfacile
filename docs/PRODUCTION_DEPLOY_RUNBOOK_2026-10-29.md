@@ -89,7 +89,7 @@ python scripts/check_release_preflight.py \
   --expected-pr 12
 ```
 
-Il comando verifica identità del checkout e del runtime, configurazione senza mostrarla, approvazioni esterne e accettazione accessibilità per lo SHA funzionale/PR esatti, SMTP, destinatario alert, modalità e configurazione webhook PayPal, database produttivo, set delle 19 migrazioni, backup leggibile, percorso rollback e spazio disco. Sono ammessi dopo lo SHA approvato soltanto commit che modificano i documenti di evidenza o gli esatti validatori/test di release elencati nell'allowlist; qualunque modifica successiva al runtime, alle migrazioni o alla configurazione invalida il gate. Qualunque esito diverso da `RELEASE_PREFLIGHT_OK` impedisce lo swap. I validatori stampano soltanto nomi di sezioni/campi mancanti, mai i contenuti compilati.
+Il comando verifica identità del checkout e del runtime, configurazione senza mostrarla, approvazioni esterne e accettazione accessibilità per lo SHA funzionale/PR esatti, SMTP, destinatario alert, modalità e configurazione webhook PayPal, database produttivo, set delle 19 migrazioni, backup con almeno due artefatti verificati dal relativo `SHA256SUMS`, percorso rollback e spazio disco. Sono ammessi dopo lo SHA approvato soltanto commit che modificano i documenti di evidenza o gli esatti validatori/test di release elencati nell'allowlist; qualunque modifica successiva al runtime, alle migrazioni o alla configurazione invalida il gate. Qualunque esito diverso da `RELEASE_PREFLIGHT_OK` impedisce lo swap. I validatori stampano soltanto nomi di sezioni/campi mancanti, mai i contenuti compilati.
 
 ## Migrazioni
 

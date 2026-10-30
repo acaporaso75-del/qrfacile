@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
+
+import pytest
 
 from qrfacile_app.runtime_config import load_runtime_config
 from scripts import check_release_preflight
@@ -46,6 +49,34 @@ def _release_tree(root: Path) -> None:
         (root / "sql" / name).write_text("BEGIN; COMMIT;\n", encoding="utf-8")
 
 
+def _verified_backup(root: Path) -> None:
+    root.mkdir()
+    files = {
+        "database.dump": b"database",
+        "filesystem.tar": b"filesystem",
+    }
+    manifest = []
+    for name, content in files.items():
+        (root / name).write_bytes(content)
+        manifest.append(f"{hashlib.sha256(content).hexdigest()}  {name}")
+    (root / "SHA256SUMS").write_text("\n".join(manifest) + "\n", encoding="utf-8")
+
+
+def test_backup_verification_rejects_checksum_mismatch_and_path_escape(tmp_path):
+    backup = tmp_path / "backup"
+    _verified_backup(backup)
+    (backup / "database.dump").write_bytes(b"tampered")
+    with pytest.raises(ValueError):
+        check_release_preflight._verified_backup_files(backup)
+
+    outside = tmp_path / "outside.dump"
+    outside.write_bytes(b"outside")
+    digest = hashlib.sha256(outside.read_bytes()).hexdigest()
+    (backup / "SHA256SUMS").write_text(f"{digest}  ../outside.dump\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        check_release_preflight._verified_backup_files(backup)
+
+
 def test_preflight_accepts_complete_production_candidate(tmp_path):
     runtime_root = tmp_path / "runtime"
     candidate = tmp_path / "candidate"
@@ -53,9 +84,7 @@ def test_preflight_accepts_complete_production_candidate(tmp_path):
     backup = tmp_path / "backup"
     _release_tree(candidate)
     _release_tree(rollback)
-    backup.mkdir()
-    (backup / "database.dump").write_bytes(b"database")
-    (backup / "filesystem.tar").write_bytes(b"filesystem")
+    _verified_backup(backup)
     source = _production_source(runtime_root)
 
     errors = check_release_preflight.evaluate_preflight(
@@ -118,9 +147,7 @@ def test_preflight_blocks_incomplete_external_approvals(tmp_path):
     backup = tmp_path / "backup"
     _release_tree(candidate)
     _release_tree(rollback)
-    backup.mkdir()
-    (backup / "database.dump").write_bytes(b"database")
-    (backup / "filesystem.tar").write_bytes(b"filesystem")
+    _verified_backup(backup)
     source = _production_source(runtime_root)
 
     errors = check_release_preflight.evaluate_preflight(
@@ -148,9 +175,7 @@ def test_preflight_blocks_incomplete_accessibility_acceptance(tmp_path):
     backup = tmp_path / "backup"
     _release_tree(candidate)
     _release_tree(rollback)
-    backup.mkdir()
-    (backup / "database.dump").write_bytes(b"database")
-    (backup / "filesystem.tar").write_bytes(b"filesystem")
+    _verified_backup(backup)
     source = _production_source(runtime_root)
 
     errors = check_release_preflight.evaluate_preflight(
@@ -178,9 +203,7 @@ def test_preflight_rejects_missing_runtime_directory_without_exposing_database_u
     backup = tmp_path / "backup"
     _release_tree(candidate)
     _release_tree(rollback)
-    backup.mkdir()
-    (backup / "database.dump").write_bytes(b"database")
-    (backup / "filesystem.tar").write_bytes(b"filesystem")
+    _verified_backup(backup)
     source = _production_source(runtime_root)
     (runtime_root / "uploads").rmdir()
 
