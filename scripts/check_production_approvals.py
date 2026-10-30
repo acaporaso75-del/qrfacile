@@ -87,7 +87,9 @@ EVIDENCE_ONLY_PATHS = {
     "docs/PRODUCTION_DEPLOY_RUNBOOK_2026-10-29.md",
     "docs/PRODUCTION_RELEASE_GATE_2026-10-29.md",
     "scripts/check_production_approvals.py",
+    "scripts/check_accessibility_acceptance.py",
     "scripts/check_release_preflight.py",
+    "tests/test_accessibility_acceptance.py",
     "tests/test_production_approvals.py",
     "tests/test_release_preflight.py",
 }
