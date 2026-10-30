@@ -30,6 +30,26 @@ La root locale della produzione sulla porta `8000` ha risposto HTTP `200`; non
 sono stati eseguiti ulteriori probe produttivi e l'account di audit non ha letto
 il checkout `/opt/qrfacile`.
 
+## Backup e rollback in sola lettura
+
+La verifica amministrativa è stata eseguita con la stessa chiave SSH già
+autorizzata, senza creare o modificare file:
+
+- spazio disponibile sul filesystem applicativo: circa `29 GB` (`17%` usato);
+- backup staging più recente disponibile:
+  `20261029_162239_staging_cd60fc338f57`;
+- tutti i file elencati in `SHA256SUMS`: `OK`;
+- archivio filesystem: test gzip superato;
+- dump PostgreSQL: indice `pg_restore` leggibile, `728` voci;
+- procedura di rollback presente;
+- i probe registrati nel riepilogo sanitizzato negano le connessioni incrociate
+  effettive fra utenze staging e produzione.
+
+Il backup è integro ma rappresenta lo SHA `cd60fc3`, precedente allo staging
+attuale `59cf70a`. Non viene quindi classificato come backup fresco del runtime
+corrente e non sostituisce il backup da acquisire e verificare immediatamente
+prima di un futuro deploy. In questa verifica non è stato eseguito un restore.
+
 ## Esito
 
 Lo staging esistente è raggiungibile e sano per il proprio SHA, ma non fornisce
