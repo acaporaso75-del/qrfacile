@@ -1,6 +1,6 @@
 # QRFacile — pacchetto approvazioni produzione
 
-Release candidate: `a2c8874276c0e256891483eccdf2d7533f4fe8af`
+Release candidate: `eb0278636dff8614498dfd29eac0ba6ee0e18b43`
 PR: `#12`, Draft verso `main`
 Data preparazione: 2026-10-29
 
@@ -33,16 +33,16 @@ Non pubblicare senza evidenza aggiornata affermazioni assolute quali “il servi
 
 ### Approvazione commerciale
 
-- Decisione: [ ] APPROVATO  [ ] APPROVATO CON CONDIZIONI  [ ] RESPINTO
-- Nome e cognome:
-- Ruolo:
-- Organizzazione:
-- Data e fuso orario:
-- Perimetro approvato:
-- Claim commerciali autorizzati:
-- Condizioni o modifiche richieste:
-- Riferimento documento/e-mail/verbale:
-- Firma o evidenza equivalente:
+- Decisione: [x] APPROVATO  [ ] APPROVATO CON CONDIZIONI  [ ] RESPINTO
+- Nome e cognome: Angelo Caporaso
+- Ruolo: CEO
+- Organizzazione: Enolab
+- Data e fuso orario: 2026-10-30, Europe/Rome
+- Perimetro approvato: offerta Wine B2B, pacchetti annuali, prezzi IVA esclusa e opzione QR 25 anni sul release candidate indicato
+- Claim commerciali autorizzati: formulazione commerciale proposta nel presente documento; esclusi claim assoluti sul primato di prezzo
+- Condizioni o modifiche richieste: nessuna
+- Riferimento documento/e-mail/verbale: autorizzazione esplicita nella chat QRFacile del 2026-10-30
+- Firma o evidenza equivalente: dichiarazione diretta di Angelo Caporaso nella chat QRFacile
 
 ## 2. Approvazione contabile e fiscale
 
