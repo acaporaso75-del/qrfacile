@@ -59,20 +59,35 @@ Confermare o correggere esplicitamente:
 
 ## Risposta da compilare
 
+Stato della bozza: **PRECOMPILATA — IN ATTESA DEL COMMERCIALISTA**.
+
 - Decisione: [ ] APPROVATO  [ ] APPROVATO CON CONDIZIONI  [ ] RESPINTO
-- Nome e cognome:
-- Qualifica e numero di iscrizione all'Albo:
-- Studio:
-- Data e fuso orario:
-- Paesi e regimi autorizzati al self-service:
-- Documento fiscale e momento di emissione:
-- Processo SDI/PEC e conservazione approvato:
-- Processo di riconciliazione approvato:
-- Processo di rimborso/chargeback approvato:
-- Decisione sugli ordini storici `unknown`:
-- Condizioni o modifiche richieste:
-- Riferimento del parere o verbale:
-- Firma o evidenza equivalente:
+- Nome e cognome: da indicare dal professionista
+- Qualifica e numero di iscrizione all'Albo: da indicare dal professionista
+- Studio: da indicare dal professionista
+- Data e fuso orario: da indicare dal professionista
+- Paesi e regimi autorizzati al self-service: proposta limitata a imprese
+  italiane in regime IVA ordinario al 22%; estero, esenzioni, reverse charge e
+  regimi speciali esclusi dal self-service e gestiti su preventivo
+- Documento fiscale e momento di emissione: proposta di fattura elettronica
+  B2B dopo conferma della capture PayPal; momento di emissione/esigibilità da
+  confermare secondo normativa e processo contabile Enolab
+- Processo SDI/PEC e conservazione approvato: proposta di invio tramite il
+  sistema di fatturazione autorizzato da Enolab, usando SDI/PEC del profilo
+  fiscale e conservazione a norma; fornitore e procedura da indicare
+- Processo di riconciliazione approvato: proposta di riconciliazione almeno
+  giornaliera fra ordine, capture, accredito PayPal, fattura e unità erogate;
+  anomalie bloccate e sottoposte a revisione manuale
+- Processo di rimborso/chargeback approvato: proposta di presa in carico
+  manuale; nessuna rettifica automatica di fatture, unità o dati storici;
+  eventuale nota di credito e rettifica unità solo dopo decisione contabile
+- Decisione sugli ordini storici `unknown`: proposta di conservarli invariati,
+  senza riclassificazione automatica, e riconciliarli manualmente con evidenza
+- Condizioni o modifiche richieste: confermare aliquota, esigibilità,
+  fatturazione, conservazione, rimborsi e trattamento dello storico prima del
+  GO
+- Riferimento del parere o verbale: da indicare dal professionista
+- Firma o evidenza equivalente: da apporre dal professionista
 
 In caso di approvazione condizionata, ogni condizione deve essere trasformata
 in una modifica o procedura verificabile prima del GO. Nessun dato fiscale o

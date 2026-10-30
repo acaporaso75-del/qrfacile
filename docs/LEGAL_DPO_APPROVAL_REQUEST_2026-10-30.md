@@ -59,21 +59,42 @@ operative.
 
 ## Risposta da compilare
 
+Stato della bozza: **PRECOMPILATA — IN ATTESA DEL LEGALE/DPO**.
+
 - Decisione: [ ] APPROVATO  [ ] APPROVATO CON CONDIZIONI  [ ] RESPINTO
-- Nome e cognome:
-- Ruolo e organizzazione:
-- Data e fuso orario:
-- Documenti e versioni esaminati:
-- Ruoli titolare/responsabile approvati:
-- DPA e fornitori/subresponsabili approvati:
-- Basi giuridiche, finalità e retention approvate:
-- Procedura diritti e SLA approvati:
-- Procedura incidenti/data breach e SLA approvati:
-- Usi AI e condizioni di attivazione approvati:
-- Cookie/ePrivacy approvati:
-- Condizioni o modifiche richieste:
-- Riferimento del parere o verbale:
-- Firma o evidenza equivalente:
+- Nome e cognome: da indicare dal professionista
+- Ruolo e organizzazione: da indicare dal professionista
+- Data e fuso orario: da indicare dal professionista
+- Documenti e versioni esaminati: proposta `Termini 2026-10-29`, `Privacy
+  2026-10-25`, DPA, cookie/ePrivacy, `DATA_RETENTION.md`, `AI_POLICY.md` e
+  `INCIDENT_RESPONSE.md`
+- Ruoli titolare/responsabile approvati: proposta da validare — Enolab titolare
+  per account, contratto, assistenza e fatturazione; cantina titolare dei
+  contenuti/dati pubblicati per i propri vini; Enolab responsabile quando tratta
+  tali dati per conto della cantina; Studio autorizzato esclusivamente nel
+  perimetro assegnato dalla cantina
+- DPA e fornitori/subresponsabili approvati: DPA Enolab-cantina da sottoscrivere;
+  elenco fornitori, localizzazione, trasferimenti, retention e misure da
+  completare e approvare prima dell'attivazione
+- Basi giuridiche, finalità e retention approvate: proposta di esecuzione del
+  contratto, obblighi legali e legittimo interesse ove documentato; retention
+  tecnica come in `DATA_RETENTION.md`, con durate fiscali e privacy definitive
+  da approvare
+- Procedura diritti e SLA approvati: proposta di presa in carico entro 2 giorni
+  lavorativi e risposta entro 30 giorni, salvo estensione motivata e registrata
+- Procedura incidenti/data breach e SLA approvati: proposta di presa in carico
+  immediata per criticità, valutazione privacy entro 24 ore e decisione/notifica
+  nei termini di legge, inclusa la soglia delle 72 ore quando applicabile
+- Usi AI e condizioni di attivazione approvati: nessuna autopubblicazione;
+  revisione umana obbligatoria; provider attivabile solo dopo scheda caso d'uso,
+  DPA, valutazione trasferimenti/retention/rischio e formazione AI literacy
+- Cookie/ePrivacy approvati: proposta di nessun cookie o tracciamento non
+  necessario sulle pagine QR pubbliche; consenso preventivo per eventuali
+  tecnologie non necessarie; verifica effettiva obbligatoria sul runtime
+- Condizioni o modifiche richieste: validare testi, ruoli, DPA, fornitori,
+  retention, SLA, cookie e classificazione AI prima del GO
+- Riferimento del parere o verbale: da indicare dal professionista
+- Firma o evidenza equivalente: da apporre dal professionista
 
 In caso di approvazione condizionata, ogni condizione deve diventare una
 modifica, una procedura o un'evidenza verificabile prima del GO. Nessuna
