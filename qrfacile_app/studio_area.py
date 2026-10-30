@@ -122,9 +122,9 @@ def _pack_label(value: str, compact: bool = False) -> str:
         }
     else:
         labels = {
-            "annual_start": "Start · 15 unità/anno · €99 + IVA",
-            "annual_winery": "Cantina · 50 unità/anno · €179 + IVA",
-            "annual_business": "Business · 100 unità/anno · €299 + IVA",
+            "annual_start": "Start · 15 unità/anno · €99 + IVA 22%",
+            "annual_winery": "Cantina · 50 unità/anno · €179 + IVA 22%",
+            "annual_business": "Business · 100 unità/anno · €299 + IVA 22%",
             "unlimited": "Non disponibile online",
         }
     return labels.get(value, "Da valutare" if compact else "-")
@@ -426,9 +426,9 @@ def studio_dashboard(request: Request, msg: str = "", err: str = ""):
 
             <select name="recommended_pack">
               <option value="" selected>Da valutare dopo registrazione</option>
-              <option value="annual_start">Suggerisci Start · 15 unità/anno · €99 + IVA</option>
-              <option value="annual_winery">Suggerisci Cantina · 50 unità/anno · €179 + IVA</option>
-              <option value="annual_business">Suggerisci Business · 100 unità/anno · €299 + IVA</option>
+              <option value="annual_start">Suggerisci Start · 15 unità/anno · €99 + IVA 22%</option>
+              <option value="annual_winery">Suggerisci Cantina · 50 unità/anno · €179 + IVA 22%</option>
+              <option value="annual_business">Suggerisci Business · 100 unità/anno · €299 + IVA 22%</option>
               <option value="unlimited">Suggerisci Non disponibile online</option>
             </select>
 
@@ -592,9 +592,9 @@ def studio_invite(
     invite_url = f"{base_url}{invite_path}" if base_url else invite_path
 
     pack_labels = {
-        "annual_start": "Start · 15 unità/anno · €99 + IVA",
-        "annual_winery": "Cantina · 50 unità/anno · €179 + IVA",
-        "annual_business": "Business · 100 unità/anno · €299 + IVA",
+        "annual_start": "Start · 15 unità/anno · €99 + IVA 22%",
+        "annual_winery": "Cantina · 50 unità/anno · €179 + IVA 22%",
+        "annual_business": "Business · 100 unità/anno · €299 + IVA 22%",
         "unlimited": "Non disponibile online",
     }
     recommended_label = pack_labels.get(recommended_pack, "-")
@@ -775,9 +775,9 @@ def studio_winery(request: Request, winery_id: int, msg: str = "", err: str = ""
 
     pack_labels = {
         "": "Da valutare",
-        "annual_start": "Start · 15 unità/anno · €99 + IVA",
-        "annual_winery": "Cantina · 50 unità/anno · €179 + IVA",
-        "annual_business": "Business · 100 unità/anno · €299 + IVA",
+        "annual_start": "Start · 15 unità/anno · €99 + IVA 22%",
+        "annual_winery": "Cantina · 50 unità/anno · €179 + IVA 22%",
+        "annual_business": "Business · 100 unità/anno · €299 + IVA 22%",
         "unlimited": "Non disponibile online",
     }
     current_pack = (perm.get("recommended_pack") or "").strip().lower()
@@ -823,9 +823,9 @@ def studio_winery(request: Request, winery_id: int, msg: str = "", err: str = ""
           <div class="studioPlanForm">
             <select name="recommended_pack">
               <option value="" {_sel_pack("")}>Da valutare</option>
-              <option value="annual_start" {_sel_pack("annual_start")}>Start · 15 unità/anno · €99 + IVA</option>
-              <option value="annual_winery" {_sel_pack("annual_winery")}>Cantina · 50 unità/anno · €179 + IVA</option>
-              <option value="annual_business" {_sel_pack("annual_business")}>Business · 100 unità/anno · €299 + IVA</option>
+              <option value="annual_start" {_sel_pack("annual_start")}>Start · 15 unità/anno · €99 + IVA 22%</option>
+              <option value="annual_winery" {_sel_pack("annual_winery")}>Cantina · 50 unità/anno · €179 + IVA 22%</option>
+              <option value="annual_business" {_sel_pack("annual_business")}>Business · 100 unità/anno · €299 + IVA 22%</option>
               <option value="unlimited" {_sel_pack("unlimited")}>Non disponibile online</option>
             </select>
             <button class="btn btn-primary" type="submit">Salva suggerimento</button>

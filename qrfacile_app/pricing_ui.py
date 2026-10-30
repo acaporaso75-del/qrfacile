@@ -111,7 +111,7 @@ def _qr_pack_card(request: Request, key: str, pack: dict) -> str:
       </div>
 
       <div class="priceValue">{price}<small> / pacchetto</small></div>
-      <p>IVA esclusa · solo clienti professionali</p>
+      <p><b>Prezzo netto + IVA 22%</b> · solo clienti professionali</p>
 
       <div class="priceFeatures">
         {_main_feature(pack)}
@@ -139,6 +139,7 @@ def _assisted_card(key: str, service: dict, icon: str) -> str:
       <div class="assistIcon">{icon}</div>
       <div class="assistTitle">{label}</div>
       <div class="assistPrice">{price}</div>
+      {f'<div class="assistTax">Prezzo netto + IVA 22%</div>' if amount_cents else ''}
       <div class="assistText">{subtitle}</div>
       <a class="assistBtn" href="/register-winery">Scopri di più</a>
     </article>
@@ -574,6 +575,13 @@ def pricing_page(request: Request):
         color:#0f9f8f;
         font-size:34px;
         font-weight:950;
+      }}
+
+      .assistTax {{
+        margin-top:4px;
+        color:#475569;
+        font-size:13px;
+        font-weight:850;
       }}
 
       .assistText {{

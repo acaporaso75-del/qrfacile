@@ -426,7 +426,7 @@ def billing(request: Request, msg: str = "", err: str = ""):
           <div class="billingEyebrow">Crediti QR</div>
           <div class="h1">Billing</div>
           <div class="p">
-            Crediti Wine utilizzabili entro 12 mesi, IVA esclusa. Nessun abbonamento obbligatorio
+            Crediti Wine utilizzabili entro 12 mesi. Prezzi netti + IVA 22%. Nessun abbonamento obbligatorio
             e nessun rinnovo automatico. I QR già creati restano online per la durata scelta.
           </div>
         </div>

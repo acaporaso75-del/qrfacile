@@ -28,7 +28,7 @@ def test_annual_catalogue_and_italian_quote(pack, units, net, gross):
     assert quote["vat_cents"] == gross-net
     assert quote["period_months"] == 12 and quote["renewal"] == "manual"
     assert quote["vat_number"] == "12345678903"
-    assert "IVA esclusa" in product["price"]
+    assert "+ IVA 22%" in product["price"]
 
 
 def test_old_products_are_not_on_sale_but_original_entitlements_are_retained():
@@ -108,13 +108,14 @@ def test_rendered_pricing_discloses_annual_tax_and_duration_terms():
     for key in ("start", "pro", "plus"):
         assert f'name="pack" value="{key}"' not in html
     for text in (
-        "120,78", "218,38", "364,78", "IVA esclusa",
+        "120,78", "218,38", "364,78", "Prezzo netto + IVA 22%",
         "Nessun abbonamento obbligatorio", "nessun rinnovo automatico",
         "anche senza nuovi acquisti", "/ pacchetto",
         "Un solo QR per tutta la produzione della referenza",
         "un lotto differente richiede un nuovo QR", "25 anni",
     ):
         assert text in html
+    assert html.count("Prezzo netto + IVA 22%") == 5
     assert html.count('name="fiscal_confirmation"') == 3
 
 
