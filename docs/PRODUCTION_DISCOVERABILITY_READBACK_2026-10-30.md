@@ -10,7 +10,7 @@ release candidate. Non certifica SEO, indicizzazione o disponibilità futura.
 - Baseline produzione dichiarata: `de0a4f1d848e68b5ea4113b3b80d2fa94cc23ffd`
 - Release candidate: non installato
 - Operazione: richieste HTTP in sola lettura, senza autenticazione
-- Runner: `scripts/check_public_discoverability.py`
+- Runner: `scripts/check_public_discoverability.py` e `scripts/verify_release_health.py`
 
 ## Esito
 
@@ -26,6 +26,15 @@ Questo risultato è coerente con la baseline legacy e non costituisce una
 regressione del release candidate, che non è stato distribuito. Dimostra però
 che la produzione corrente non soddisfa ancora il gate di discoverability.
 
+## Health readback
+
+`https://www.qrfacile.it/healthz` restituisce HTTP 500 tramite Caddy/Uvicorn,
+mentre `/` continua a restituire HTTP 200. Il runtime pubblico non espone quindi
+il JSON fail-closed richiesto con stato, database, ambiente e SHA. La causa
+interna non è stata inferita dal solo readback e non è stata eseguita alcuna
+mutazione del runtime. Anche questo esito riguarda la baseline legacy e deve
+essere risolto o sostituito dal candidato verificato prima del GO.
+
 ## Evidenza di chiusura richiesta
 
 Dopo un eventuale deploy autorizzato dello SHA esatto, eseguire nuovamente:
@@ -36,3 +45,9 @@ python scripts/check_public_discoverability.py --base-url https://www.qrfacile.i
 
 Il gate si chiude soltanto con `PUBLIC_DISCOVERABILITY_OK`, readback dello SHA
 installato e assenza di rollback o divergenze del runtime.
+
+Il gate di health si chiude soltanto con HTTP 200 e:
+
+```text
+python scripts/verify_release_health.py --url https://www.qrfacile.it/healthz --expected-environment production --expected-release <SHA_INSTALLATO>
+```
