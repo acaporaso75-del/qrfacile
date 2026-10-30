@@ -1,0 +1,43 @@
+# QRFacile — readback runtime staging
+
+Data: 2026-10-30, Europe/Rome.
+
+Verifica eseguita esclusivamente in lettura tramite l'account SSH `enolab` e la
+chiave di audit già autorizzata. Non sono stati modificati servizi, file,
+configurazioni, database, DNS, proxy o segreti.
+
+## Identità del runtime
+
+- host applicativo: `192.168.1.139`;
+- directory: `/opt/qrfacile-staging`;
+- servizio `qrfacile-staging.service`: `active`;
+- checkout: detached HEAD pulito;
+- SHA installato: `59cf70a834dbdd300fc93af35898e7c455753f73`;
+- lo SHA installato è un antenato del candidato della PR `#12`, non il
+  candidato corrente.
+
+## Health check
+
+Richiesta locale al runtime staging:
+
+```text
+GET http://127.0.0.1:8001/healthz
+HTTP 200
+{"status":"OK","environment":"staging","database":"OK","release":"59cf70a834dbdd300fc93af35898e7c455753f73"}
+```
+
+La root locale della produzione sulla porta `8000` ha risposto HTTP `200`; non
+sono stati eseguiti ulteriori probe produttivi e l'account di audit non ha letto
+il checkout `/opt/qrfacile`.
+
+## Esito
+
+Lo staging esistente è raggiungibile e sano per il proprio SHA, ma non fornisce
+evidenza runtime per le modifiche successive presenti nella PR `#12`, inclusi
+webhook PayPal firmato, alert, email transazionali, accessibilità e
+discoverability. Nessuno di questi gate viene quindi marcato come superato.
+
+Il prossimo collaudo utile richiede il deploy autorizzato dell'esatto SHA della
+PR nello staging canonico, preceduto da backup verificato e rollback pronto e
+seguito dai test non distruttivi previsti dal runbook. Questo documento non
+autorizza il deploy.
