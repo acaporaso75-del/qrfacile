@@ -198,6 +198,15 @@ def validate_runtime_config(
         if paypal_mode != "sandbox":
             errors.append("PAYPAL_MODE staging deve essere sandbox")
 
+    if config.environment in {"staging", "production"}:
+        csrf_secret = _clean(values.get("CSRF_SECRET")) or _clean(
+            values.get("SESSION_SECRET")
+        )
+        if not csrf_secret:
+            errors.append(
+                "CSRF_SECRET o SESSION_SECRET obbligatorio fuori dallo sviluppo"
+            )
+
     paypal_mode = _clean(values.get("PAYPAL_MODE")).lower()
     if paypal_mode == "live":
         required_live = (

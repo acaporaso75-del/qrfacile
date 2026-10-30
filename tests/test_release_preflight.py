@@ -20,6 +20,7 @@ def _production_source(root: Path) -> dict[str, str]:
         "STATIC_DIR": str(root / "static"),
         "APP_BASE_URL": "https://www.qrfacile.it",
         "DATABASE_URL": "postgresql://qrfacile_user:test-only@db/qrfacile_db",  # pragma: allowlist secret
+        "CSRF_SECRET": "test-only-csrf-secret",  # pragma: allowlist secret
         "PAYPAL_MODE": "sandbox",
         "QRFACILE_RELEASE_SHA": SHA,
         "SMTP_HOST": "smtp.example.test",

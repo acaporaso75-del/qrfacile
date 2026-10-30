@@ -4,7 +4,7 @@ import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from qrfacile_app.csrf_core import require_csrf_or_same_origin
+from qrfacile_app.csrf_core import _secret, require_csrf_or_same_origin
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -15,6 +15,13 @@ def test_csrf_core_binds_token_to_session():
     assert "session_token" in text or "COOKIE" in text
     assert "secrets.compare_digest" in text
     assert "require_csrf_or_same_origin" in text
+
+
+def test_csrf_secret_uses_trimmed_session_secret_fallback(monkeypatch):
+    monkeypatch.setenv("CSRF_SECRET", "   ")
+    monkeypatch.setenv("SESSION_SECRET", "session-secret")
+
+    assert _secret() == b"session-secret"
 
 
 def test_secure_publish_blocks_studio_role_and_audits():

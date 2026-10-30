@@ -50,6 +50,26 @@ attuale `59cf70a`. Non viene quindi classificato come backup fresco del runtime
 corrente e non sostituisce il backup da acquisire e verificare immediatamente
 prima di un futuro deploy. In questa verifica non è stato eseguito un restore.
 
+## Preflight configurazione senza esposizione di segreti
+
+Sono stati letti esclusivamente valori non sensibili e stato presente/assente
+delle variabili nell'ambiente effettivo del processo:
+
+- `APP_ENV=staging`;
+- `APP_BASE_URL=http://192.168.1.139:8001`;
+- `PAYPAL_MODE=sandbox`;
+- database, credenziali PayPal Sandbox e configurazione SMTP canonica: presenti;
+- `PAYPAL_WEBHOOK_ID`: assente;
+- `QRFACILE_OPERATIONAL_ALERT_TO`: assente;
+- `CSRF_SECRET` e `SESSION_SECRET`: entrambi assenti.
+
+Non è stato eseguito alcun invio email, webhook o pagamento. Il candidato è
+stato corretto affinché staging e produzione rifiutino l'avvio quando entrambi
+i segreti CSRF/sessione mancano; il runtime attuale non è stato modificato. Il
+webhook firmato e la consegna degli alert restano fail-closed finché i relativi
+parametri non vengono configurati nel secret store/runtime autorizzato e
+collaudati.
+
 ## Esito
 
 Lo staging esistente è raggiungibile e sano per il proprio SHA, ma non fornisce

@@ -30,6 +30,7 @@ jobs:
           --health-retries 10
 
     env:
+      APP_ENV: test
       QRFACILE_TEST_DATABASE_URL: postgresql://postgres:qrfacile_test_only@127.0.0.1:5432/qrfacile_test_pr2 # pragma: allowlist secret
 
     steps:

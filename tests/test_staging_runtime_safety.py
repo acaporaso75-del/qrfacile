@@ -22,6 +22,7 @@ def _safe_staging_env(tmp_path: Path) -> dict[str, str]:
             "postgresql://qrfacile_staging_user:never-print-this-secret"
             "@192.168.1.143:5432/qrfacile_staging_db"
         ),
+        "CSRF_SECRET": "test-only-csrf-secret",  # pragma: allowlist secret
         "PAYPAL_MODE": "sandbox",
     }
 
@@ -91,6 +92,22 @@ def test_staging_markers_require_explicit_environment(tmp_path):
         load_runtime_config(environ)
 
 
+def test_staging_rejects_missing_csrf_or_session_secret(tmp_path):
+    environ = _safe_staging_env(tmp_path)
+    del environ["CSRF_SECRET"]
+
+    with pytest.raises(RuntimeError, match="CSRF_SECRET o SESSION_SECRET"):
+        load_runtime_config(environ)
+
+
+def test_staging_accepts_session_secret_as_csrf_fallback(tmp_path):
+    environ = _safe_staging_env(tmp_path)
+    environ["CSRF_SECRET"] = "   "
+    environ["SESSION_SECRET"] = "test-only-session-secret"  # pragma: allowlist secret
+
+    load_runtime_config(environ)
+
+
 def test_staging_rejects_upload_directory_outside_app_root(tmp_path):
     environ = _safe_staging_env(tmp_path)
     outside = tmp_path / "shared-uploads"
@@ -133,6 +150,7 @@ def test_production_may_use_live_paypal_mode(tmp_path):
         "STATIC_DIR": str(root / "static"),
         "APP_BASE_URL": "https://www.qrfacile.it",
         "DATABASE_URL": "postgresql://app:secret@db.example.test/app",  # pragma: allowlist secret
+        "CSRF_SECRET": "test-only-csrf-secret",  # pragma: allowlist secret
         "PAYPAL_MODE": "live",
         "PAYPAL_CLIENT_ID": "configured-client-id",
         "PAYPAL_SECRET": "configured-secret",  # pragma: allowlist secret
@@ -153,6 +171,7 @@ def test_production_live_fails_closed_without_webhook_and_canonical_origin(tmp_p
         "STATIC_DIR": str(root / "static"),
         "APP_BASE_URL": "https://example.test",
         "DATABASE_URL": "postgresql://app:secret@db.example.test/app",  # pragma: allowlist secret
+        "CSRF_SECRET": "test-only-csrf-secret",  # pragma: allowlist secret
         "PAYPAL_MODE": "live",
         "PAYPAL_CLIENT_ID": "configured-client-id",
         "PAYPAL_SECRET": "configured-secret",  # pragma: allowlist secret

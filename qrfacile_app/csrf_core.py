@@ -14,7 +14,9 @@ CSRF_HEADER = "x-csrf-token"
 
 
 def _secret() -> bytes:
-    configured = (os.getenv("CSRF_SECRET") or os.getenv("SESSION_SECRET") or "").strip()
+    configured = (os.getenv("CSRF_SECRET") or "").strip() or (
+        os.getenv("SESSION_SECRET") or ""
+    ).strip()
     if not configured:
         configured = "qrfacile-development-csrf-secret-change-in-production"
     return configured.encode("utf-8")
