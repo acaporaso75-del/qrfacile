@@ -18,6 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from qrfacile_app.runtime_config import load_runtime_config
 from qrfacile_app.services.transactional_email import load_smtp_config
 from scripts.check_production_approvals import approved_release, evidence_only_changes, validate_approvals
+from scripts.run_operational_monitor import load_alert_recipient
 
 
 FULL_GIT_SHA = re.compile(r"[0-9a-f]{40}")
@@ -102,8 +103,13 @@ def evaluate_preflight(
     paypal_mode = (source.get("PAYPAL_MODE") or "").strip().lower()
     if paypal_mode != expected_paypal_mode:
         errors.append("PAYPAL_MODE non coincide con la modalità autorizzata")
+    paypal_webhook_fields = ("PAYPAL_CLIENT_ID", "PAYPAL_SECRET", "PAYPAL_WEBHOOK_ID")
+    if any(not (source.get(name) or "").strip() for name in paypal_webhook_fields):
+        errors.append("configurazione PayPal webhook incompleta")
     if load_smtp_config(source) is None:
         errors.append("configurazione SMTP transazionale incompleta")
+    if load_alert_recipient(source) is None:
+        errors.append("destinatario alert operativo mancante o non valido")
 
     runtime_directories = (
         config.app_root,

@@ -22,12 +22,16 @@ def _production_source(root: Path) -> dict[str, str]:
         "DATABASE_URL": "postgresql://qrfacile_user:test-only@db/qrfacile_db",  # pragma: allowlist secret
         "CSRF_SECRET": "test-only-csrf-secret",  # pragma: allowlist secret
         "PAYPAL_MODE": "sandbox",
+        "PAYPAL_CLIENT_ID": "test-only-client-id",
+        "PAYPAL_SECRET": "test-only-paypal-secret",  # pragma: allowlist secret
+        "PAYPAL_WEBHOOK_ID": "test-only-webhook-id",
         "QRFACILE_RELEASE_SHA": SHA,
         "SMTP_HOST": "smtp.example.test",
         "SMTP_PORT": "465",
         "SMTP_USER": "mailer@example.test",
         "SMTP_PASS": "test-only",  # pragma: allowlist secret
         "SMTP_FROM": "QRFacile <mailer@example.test>",
+        "QRFACILE_OPERATIONAL_ALERT_TO": "ops@example.test",
     }
 
 
@@ -78,7 +82,9 @@ def test_preflight_fails_closed_without_identity_backup_rollback_and_capacity(tm
     source = _production_source(runtime_root)
     source["QRFACILE_RELEASE_SHA"] = "b" * 40
     source["PAYPAL_MODE"] = "live"
+    source.pop("PAYPAL_WEBHOOK_ID")
     source.pop("SMTP_PASS")
+    source["QRFACILE_OPERATIONAL_ALERT_TO"] = "Ops <ops@example.test>"
 
     errors = check_release_preflight.evaluate_preflight(
         source=source,
@@ -97,7 +103,9 @@ def test_preflight_fails_closed_without_identity_backup_rollback_and_capacity(tm
     assert "QRFACILE_RELEASE_SHA non coincide con il candidato" in errors
     assert "HEAD del checkout candidato non coincide con lo SHA atteso" in errors
     assert "PAYPAL_MODE non coincide con la modalità autorizzata" in errors
+    assert "configurazione PayPal webhook incompleta" in errors
     assert "configurazione SMTP transazionale incompleta" in errors
+    assert "destinatario alert operativo mancante o non valido" in errors
     assert "percorso rollback assente o coincidente con il candidato" in errors
     assert "backup pre-deploy non disponibile" in errors
     assert "spazio disco libero inferiore alla soglia" in errors
