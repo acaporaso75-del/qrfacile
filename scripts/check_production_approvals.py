@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -78,6 +79,17 @@ FINAL_FIELDS = (
     "Ruolo",
     "Data e fuso orario",
 )
+EVIDENCE_ONLY_PATHS = {
+    "docs/ACCESSIBILITY_ACCEPTANCE_2026-10-29.md",
+    "docs/PAYMENT_REFUND_DISPUTE_RUNBOOK_2026-10-29.md",
+    "docs/PAYPAL_LIVE_READINESS_2026-10-29.md",
+    "docs/PRODUCTION_APPROVALS_2026-10-29.md",
+    "docs/PRODUCTION_RELEASE_GATE_2026-10-29.md",
+    "scripts/check_production_approvals.py",
+    "scripts/check_release_preflight.py",
+    "tests/test_production_approvals.py",
+    "tests/test_release_preflight.py",
+}
 
 
 def _section(text: str, heading: str) -> str:
@@ -119,11 +131,45 @@ def _checked_line(section: str, label: str) -> bool:
     )
 
 
-def validate_approvals(text: str, *, expected_release: str, expected_pr: int) -> list[str]:
+def approved_release(text: str) -> str | None:
+    match = re.search(r"^Release candidate:\s*`([0-9a-f]{40})`\s*$", text, re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def evidence_only_changes(repo_root: Path, approved: str, current: str) -> set[str]:
+    subprocess.run(
+        ["git", "-C", str(repo_root), "merge-base", "--is-ancestor", approved, current],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    completed = subprocess.run(
+        ["git", "-C", str(repo_root), "diff", "--name-only", f"{approved}..{current}", "--"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    return {line.strip().replace("\\", "/") for line in completed.stdout.splitlines() if line.strip()}
+
+
+def validate_approvals(
+    text: str,
+    *,
+    expected_release: str,
+    expected_pr: int,
+    post_approval_paths: set[str] | None = None,
+) -> list[str]:
     errors: list[str] = []
-    release_match = re.search(r"^Release candidate:\s*`([0-9a-f]{40})`\s*$", text, re.MULTILINE)
-    if not release_match or release_match.group(1) != expected_release:
+    approved = approved_release(text)
+    if not approved:
         errors.append("release candidate non coincide con lo SHA atteso")
+    elif approved != expected_release:
+        if post_approval_paths is None:
+            errors.append("release candidate non coincide con lo SHA atteso")
+        elif not post_approval_paths.issubset(EVIDENCE_ONLY_PATHS):
+            errors.append("il candidato contiene modifiche successive non limitate alle evidenze")
     pr_match = re.search(r"^PR:\s*`#(\d+)`", text, re.MULTILINE)
     if not pr_match or int(pr_match.group(1)) != expected_pr:
         errors.append("PR approvata non coincide con quella attesa")
@@ -181,6 +227,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--approvals-path", type=Path, required=True)
     parser.add_argument("--expected-release", required=True)
     parser.add_argument("--expected-pr", type=int, required=True)
+    parser.add_argument("--repo-root", type=Path, required=True)
     args = parser.parse_args(argv)
     release = args.expected_release.strip().lower()
     if not FULL_GIT_SHA.fullmatch(release):
@@ -189,10 +236,21 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--expected-pr deve essere positivo")
     try:
         text = args.approvals_path.read_text(encoding="utf-8")
-    except OSError:
+        approved = approved_release(text)
+        changed_paths = (
+            evidence_only_changes(args.repo_root.resolve(), approved, release)
+            if approved and approved != release
+            else set()
+        )
+    except (OSError, subprocess.SubprocessError):
         print("PRODUCTION_APPROVALS_ERROR document_unavailable", file=sys.stderr)
         return 2
-    errors = validate_approvals(text, expected_release=release, expected_pr=args.expected_pr)
+    errors = validate_approvals(
+        text,
+        expected_release=release,
+        expected_pr=args.expected_pr,
+        post_approval_paths=changed_paths,
+    )
     if errors:
         for error in errors:
             print(f"PRODUCTION_APPROVALS_INCOMPLETE {error}", file=sys.stderr)

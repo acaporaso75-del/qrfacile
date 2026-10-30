@@ -83,6 +83,29 @@ def test_rejected_approval_wrong_sha_and_incomplete_owner_table_fail_closed():
     assert "responsabilità operativa incompleta: Monitoraggio disponibilità" in errors
 
 
+def test_later_evidence_only_commit_preserves_approval_scope():
+    current = "b" * 40
+    assert check_production_approvals.validate_approvals(
+        _complete_document(),
+        expected_release=current,
+        expected_pr=12,
+        post_approval_paths={"docs/PRODUCTION_APPROVALS_2026-10-29.md"},
+    ) == []
+
+
+def test_later_code_change_invalidates_approved_candidate():
+    errors = check_production_approvals.validate_approvals(
+        _complete_document(),
+        expected_release="b" * 40,
+        expected_pr=12,
+        post_approval_paths={
+            "docs/PRODUCTION_APPROVALS_2026-10-29.md",
+            "qrfacile_app/paypal_ui.py",
+        },
+    )
+    assert "il candidato contiene modifiche successive non limitate alle evidenze" in errors
+
+
 def test_current_unapproved_template_is_blocked_without_exposing_values():
     path = Path(__file__).resolve().parents[1] / "docs" / "PRODUCTION_APPROVALS_2026-10-29.md"
     errors = check_production_approvals.validate_approvals(

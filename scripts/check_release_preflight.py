@@ -17,7 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from qrfacile_app.runtime_config import load_runtime_config
 from qrfacile_app.services.transactional_email import load_smtp_config
-from scripts.check_production_approvals import validate_approvals
+from scripts.check_production_approvals import approved_release, evidence_only_changes, validate_approvals
 
 
 FULL_GIT_SHA = re.compile(r"[0-9a-f]{40}")
@@ -190,6 +190,12 @@ def main(argv: list[str] | None = None) -> int:
         git_head = _git_head(candidate_root)
         free_bytes = shutil.disk_usage(candidate_root).free
         approvals_text = args.approvals_path.read_text(encoding="utf-8")
+        approved_sha = approved_release(approvals_text)
+        approval_paths = (
+            evidence_only_changes(candidate_root, approved_sha, expected_release)
+            if approved_sha and approved_sha != expected_release
+            else set()
+        )
     except (RuntimeError, OSError, subprocess.SubprocessError) as exc:
         print(f"RELEASE_PREFLIGHT_ERROR {type(exc).__name__}", file=sys.stderr)
         return 2
@@ -210,6 +216,7 @@ def main(argv: list[str] | None = None) -> int:
             approvals_text,
             expected_release=expected_release,
             expected_pr=args.expected_pr,
+            post_approval_paths=approval_paths,
         ),
     )
     if errors:
