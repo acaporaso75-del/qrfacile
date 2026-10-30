@@ -1,6 +1,6 @@
 # QRFacile — pacchetto approvazioni produzione
 
-Release candidate: `eb0278636dff8614498dfd29eac0ba6ee0e18b43`
+Release candidate: `f89c59ec520cc8e6463e978d6c2612cb8bbe124f`
 PR: `#12`, Draft verso `main`
 Data preparazione: 2026-10-29
 
@@ -16,7 +16,7 @@ Questo documento raccoglie decisioni esterne necessarie prima di rendere la PR R
 
 Condizioni implementate:
 
-- prezzi esposti IVA esclusa;
+- prezzi esposti come netti con dicitura esplicita `+ IVA 22%`;
 - vendita self-service limitata alle cantine italiane con profilo fiscale completo;
 - unità acquistate valide 12 mesi, con rinnovo manuale e nessun addebito automatico;
 - 1 unità per creare un QR Wine con durata 10 anni;
@@ -38,10 +38,10 @@ Non pubblicare senza evidenza aggiornata affermazioni assolute quali “il servi
 - Ruolo: CEO
 - Organizzazione: Enolab
 - Data e fuso orario: 2026-10-30, Europe/Rome
-- Perimetro approvato: offerta Wine B2B, pacchetti annuali, prezzi IVA esclusa e opzione QR 25 anni sul release candidate indicato
+- Perimetro approvato: offerta Wine B2B, pacchetti annuali, prezzi netti con dicitura esplicita `+ IVA 22%` e opzione QR 25 anni sul release candidate indicato
 - Claim commerciali autorizzati: formulazione commerciale proposta nel presente documento; esclusi claim assoluti sul primato di prezzo
 - Condizioni o modifiche richieste: nessuna
-- Riferimento documento/e-mail/verbale: autorizzazione esplicita nella chat QRFacile del 2026-10-30
+- Riferimento documento/e-mail/verbale: autorizzazioni esplicite nella chat QRFacile del 2026-10-30, inclusa la richiesta di mostrare `+ IVA 22%` nelle offerte
 - Firma o evidenza equivalente: dichiarazione diretta di Angelo Caporaso nella chat QRFacile
 
 ## 2. Approvazione contabile e fiscale
