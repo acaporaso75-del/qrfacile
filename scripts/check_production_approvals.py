@@ -84,6 +84,7 @@ EVIDENCE_ONLY_PATHS = {
     "docs/PAYMENT_REFUND_DISPUTE_RUNBOOK_2026-10-29.md",
     "docs/PAYPAL_LIVE_READINESS_2026-10-29.md",
     "docs/PRODUCTION_APPROVALS_2026-10-29.md",
+    "docs/PRODUCTION_DEPLOY_RUNBOOK_2026-10-29.md",
     "docs/PRODUCTION_RELEASE_GATE_2026-10-29.md",
     "scripts/check_production_approvals.py",
     "scripts/check_release_preflight.py",
