@@ -61,7 +61,13 @@ operative.
 
 Stato della bozza: **PRECOMPILATA — IN ATTESA DEL LEGALE/DPO**.
 
-- Decisione: [ ] APPROVATO  [ ] APPROVATO CON CONDIZIONI  [ ] RESPINTO
+Conferma aziendale: Angelo Caporaso, CEO Enolab, in data 2026-10-30
+(Europe/Rome), conferma il perimetro e le proposte organizzative del documento
+come indirizzo aziendale. Evidenza equivalente: dichiarazione diretta nella
+chat QRFacile «confermo tutti e tre». Questa conferma non attribuisce il ruolo
+di consulente legale o DPO e non sostituisce il relativo parere professionale.
+
+- Decisione del professionista: [ ] APPROVATO  [ ] APPROVATO CON CONDIZIONI  [ ] RESPINTO
 - Nome e cognome: da indicare dal professionista
 - Ruolo e organizzazione: da indicare dal professionista
 - Data e fuso orario: da indicare dal professionista

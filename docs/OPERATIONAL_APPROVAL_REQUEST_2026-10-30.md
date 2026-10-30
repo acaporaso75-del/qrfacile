@@ -42,33 +42,36 @@ dati personali.
 
 | Processo | Responsabile principale proposto | Sostituto | SLA proposto | Canale di escalation | Prova richiesta |
 | --- | --- | --- | --- | --- | --- |
-| Monitoraggio disponibilità | Angelo Caporaso, CEO Enolab, da confermare | da nominare | P1: presa in carico 30 min; P2: 4 ore lavorative | canale incidenti Enolab da indicare | test alert e reperibilità |
-| Alert applicazione e database | Angelo Caporaso, da confermare | da nominare | presa in carico entro 1 ora | canale incidenti Enolab da indicare | consegna alert reale senza PII |
-| Backup e restore | Angelo Caporaso, da confermare | da nominare | backup giornaliero; avvio restore entro 4 ore da P1 | canale incidenti Enolab da indicare | backup fresco e restore isolato |
+| Monitoraggio disponibilità | Angelo Caporaso, CEO Enolab | da nominare | P1: presa in carico 30 min; P2: 4 ore lavorative | canale incidenti Enolab da indicare | test alert e reperibilità |
+| Alert applicazione e database | Angelo Caporaso | da nominare | presa in carico entro 1 ora | canale incidenti Enolab da indicare | consegna alert reale senza PII |
+| Backup e restore | Angelo Caporaso | da nominare | backup giornaliero; avvio restore entro 4 ore da P1 | canale incidenti Enolab da indicare | backup fresco e restore isolato |
 | Richieste privacy | Angelo Caporaso come referente interno, con legale/DPO da nominare | da nominare | presa in carico 2 giorni lavorativi; risposta entro 30 giorni | canale privacy Enolab da indicare | prova workflow e registro SLA |
 | Incidenti di sicurezza | Angelo Caporaso come referente interno, con consulente/DPO da nominare | da nominare | P1 immediato; valutazione privacy entro 24 ore | canale incidenti Enolab da indicare | simulazione e registro incidente |
-| Revisione umana AI | Angelo Caporaso, da confermare | da nominare | sempre prima della pubblicazione; obiettivo 1 giorno lavorativo | coda revisione amministrativa | prova approvazione/rifiuto fail-closed |
-| Assistenza clienti | Angelo Caporaso, da confermare | da nominare | risposta iniziale entro 1 giorno lavorativo | canale assistenza Enolab da indicare | ticket di prova |
+| Revisione umana AI | Angelo Caporaso | da nominare | sempre prima della pubblicazione; obiettivo 1 giorno lavorativo | coda revisione amministrativa | prova approvazione/rifiuto fail-closed |
+| Assistenza clienti | Angelo Caporaso | da nominare | risposta iniziale entro 1 giorno lavorativo | canale assistenza Enolab da indicare | ticket di prova |
 | Fatturazione | Angelo Caporaso come referente, con commercialista da indicare | da nominare | secondo termine approvato dal commercialista | canale contabile Enolab da indicare | fattura di prova Sandbox/non fiscale |
-| Riconciliazione PayPal | Angelo Caporaso, da confermare | da nominare | controllo giornaliero; anomalie entro 1 giorno lavorativo | canale contabile Enolab da indicare | report di riconciliazione senza PII |
+| Riconciliazione PayPal | Angelo Caporaso | da nominare | controllo giornaliero; anomalie entro 1 giorno lavorativo | canale contabile Enolab da indicare | report di riconciliazione senza PII |
 | Rimborsi e chargeback | Angelo Caporaso con commercialista, da confermare | da nominare | presa in carico entro 1 giorno lavorativo; decisione entro 5 giorni lavorativi | canale contabile/incidenti da indicare | prova procedura manuale |
 
 ## Decisione di rilascio
 
-Stato della bozza: **PRECOMPILATA — NO-GO TECNICO TEMPORANEO**. Il NO-GO non
-respinge il progetto: impedisce soltanto il rilascio finché le evidenze elencate
-non sono completate.
+Stato: **RESPONSABILITÀ AZIENDALE CONFERMATA — NO-GO TECNICO TEMPORANEO**.
+Angelo Caporaso, CEO Enolab, ha confermato il 2026-10-30 (Europe/Rome) il
+documento e l'assunzione delle responsabilità proposte con dichiarazione
+diretta nella chat QRFacile «confermo tutti e tre». Il NO-GO non respinge il
+progetto: impedisce soltanto il rilascio finché le evidenze elencate non sono
+completate.
 
 - Decisione: [ ] GO  [ ] GO CON CONDIZIONI  [x] NO-GO
-- Nome e cognome del responsabile: Angelo Caporaso, da confermare
+- Nome e cognome del responsabile: Angelo Caporaso
 - Ruolo e organizzazione: CEO, Enolab
 - Data e fuso orario: 2026-10-30, Europe/Rome — bozza tecnica non firmata
 - SHA autorizzato: nessuno finché i gate restano aperti; candidato corrente da
   rileggere prima del GO
 - Finestra di rilascio: da concordare dopo chiusura gate, con presenza del
   responsabile del rilascio e del rollback
-- Responsabile del rilascio: Angelo Caporaso, proposto e da confermare
-- Responsabile del rollback: Angelo Caporaso, proposto; sostituto tecnico da
+- Responsabile del rilascio: Angelo Caporaso
+- Responsabile del rollback: Angelo Caporaso; sostituto tecnico da
   nominare prima del GO
 - Durata dell'osservazione post-deploy: proposta minima 2 ore con monitoraggio
   attivo, più verifica il primo giorno lavorativo
@@ -80,7 +83,8 @@ non sono completate.
   backup fresco, restore, preflight e smoke test sullo SHA esatto
 - Riferimento del verbale o ticket: chat QRFacile e PR `#12`; verbale operativo
   finale da creare
-- Firma o evidenza equivalente: da confermare esplicitamente da Angelo Caporaso
+- Firma o evidenza equivalente: dichiarazione diretta di Angelo Caporaso nella
+  chat QRFacile del 2026-10-30: «confermo tutti e tre»
 
 In caso di GO condizionato, ogni condizione deve diventare un'attività con
 responsabile, scadenza e prova verificabile. Se backup, rollback, health check

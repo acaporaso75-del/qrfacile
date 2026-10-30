@@ -60,6 +60,11 @@ Il professionista deve confermare almeno:
 
 ### Approvazione contabile
 
+Presa visione aziendale: Angelo Caporaso, CEO Enolab, conferma il 2026-10-30
+(Europe/Rome) il perimetro e le proposte della scheda contabile come indirizzo
+aziendale. Non sostituisce il parere del commercialista né attribuisce una
+qualifica professionale contabile.
+
 - Decisione: [ ] APPROVATO  [ ] APPROVATO CON CONDIZIONI  [ ] RESPINTO
 - Nome e cognome:
 - Qualifica/Albo:
@@ -90,6 +95,11 @@ Il legale/DPO deve esaminare almeno:
 
 ### Approvazione legale/DPO
 
+Presa visione aziendale: Angelo Caporaso, CEO Enolab, conferma il 2026-10-30
+(Europe/Rome) il perimetro e le proposte della scheda legale/DPO come indirizzo
+aziendale. Non sostituisce il parere del consulente legale/DPO né attribuisce
+tale ruolo professionale.
+
 - Decisione: [ ] APPROVATO  [ ] APPROVATO CON CONDIZIONI  [ ] RESPINTO
 - Nome e cognome:
 - Ruolo e organizzazione:
@@ -119,14 +129,15 @@ Il legale/DPO deve esaminare almeno:
 
 ### Approvazione operativa
 
-- Decisione: [ ] APPROVATO  [ ] APPROVATO CON CONDIZIONI  [ ] RESPINTO
-- Responsabile del rilascio:
-- Responsabile del rollback:
-- Finestra di rilascio autorizzata:
-- Durata osservazione post-deploy:
-- Canale incidenti:
-- Data e fuso orario:
-- Firma o evidenza equivalente:
+- Decisione: [ ] APPROVATO  [x] APPROVATO CON CONDIZIONI  [ ] RESPINTO
+- Responsabile del rilascio: Angelo Caporaso
+- Responsabile del rollback: Angelo Caporaso; sostituto tecnico da nominare
+- Finestra di rilascio autorizzata: da concordare dopo la chiusura di tutti i gate sullo SHA esatto
+- Durata osservazione post-deploy: minimo 2 ore con monitoraggio attivo e nuova verifica il primo giorno lavorativo
+- Canale incidenti: da indicare e collaudare prima del GO
+- Data e fuso orario: 2026-10-30, Europe/Rome
+- Firma o evidenza equivalente: dichiarazione diretta di Angelo Caporaso nella chat QRFacile «confermo tutti e tre»
+- Condizioni: nominare sostituti e specialisti; provare webhook Sandbox, SMTP/alert, accessibilità, secret store, backup fresco, preflight e smoke test. Finché restano aperte, l'esito tecnico è NO-GO.
 
 ## 5. Conferma tecnica finale
 
