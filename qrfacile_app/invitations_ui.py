@@ -18,7 +18,11 @@ RESUME_COOKIE = "invite_resume"
 
 
 def _resume_value(invite_id: int) -> str:
-    secret = (os.getenv("SESSION_SECRET") or os.getenv("CSRF_SECRET") or "dev").encode()
+    secret = (
+        (os.getenv("SESSION_SECRET") or "").strip()
+        or (os.getenv("CSRF_SECRET") or "").strip()
+        or "dev"
+    ).encode()
     value = str(int(invite_id))
     return value + "." + hmac.new(secret, value.encode(), hashlib.sha256).hexdigest()
 

@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from fastapi import HTTPException
 
+from qrfacile_app import invitations_ui
 from qrfacile_app.services.invitations import normalize_permissions, token_hash, validate_token
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,3 +80,15 @@ def test_resume_cookie_contains_only_signed_invite_id():
     assert "samesite=\"lax\"" in ui
     assert "_resume_value(invite[\"id\"])" in ui
     assert "raw_token" not in ui.split("def _resume_value", 1)[1].split("def _resume_id", 1)[0]
+
+
+def test_resume_cookie_uses_trimmed_csrf_secret_fallback(monkeypatch):
+    monkeypatch.setenv("SESSION_SECRET", "   ")
+    monkeypatch.setenv("CSRF_SECRET", "csrf-secret")
+
+    signed = invitations_ui._resume_value(17)
+
+    assert signed.startswith("17.")
+    monkeypatch.setenv("SESSION_SECRET", "csrf-secret")
+    monkeypatch.delenv("CSRF_SECRET")
+    assert invitations_ui._resume_value(17) == signed
