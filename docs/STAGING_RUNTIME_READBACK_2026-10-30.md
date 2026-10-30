@@ -23,7 +23,7 @@ Richiesta locale al runtime staging:
 ```text
 GET http://127.0.0.1:8001/healthz
 HTTP 200
-{"status":"OK","environment":"staging","database":"OK","release":"59cf70a834dbdd300fc93af35898e7c455753f73"}
+{"status":"OK","environment":"staging","database":"OK","release":"59cf70a834dbdd300fc93af35898e7c455753f73"} <!-- pragma: allowlist secret -->
 ```
 
 La root locale della produzione sulla porta `8000` ha risposto HTTP `200`; non
