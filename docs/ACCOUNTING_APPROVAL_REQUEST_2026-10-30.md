@@ -61,11 +61,14 @@ Confermare o correggere esplicitamente:
 
 Stato della bozza: **PRECOMPILATA — IN ATTESA DEL COMMERCIALISTA**.
 
-Conferma aziendale: Angelo Caporaso, CEO Enolab, in data 2026-10-30
-(Europe/Rome), conferma il perimetro e le proposte operative del documento come
-indirizzo aziendale. Evidenza equivalente: dichiarazione diretta nella chat
-QRFacile «confermo tutti e tre». Questa conferma non attribuisce una qualifica
-professionale contabile e non sostituisce il parere del commercialista.
+Parere aziendale del CEO: **APPROVATO**. Angelo Caporaso, CEO Enolab, in data
+2026-10-30 (Europe/Rome), conferma il perimetro e le proposte operative del
+documento e dichiara di aver espresso direttamente il parere contabile per la
+decisione aziendale. Evidenza equivalente: dichiarazioni dirette nella chat
+QRFacile «confermo tutti e tre», «approvazione legale e commercialista ok» e
+«scrivi che ho dato io parere». Il parere è registrato nella qualifica reale di
+CEO; non attribuisce una qualifica professionale contabile o l'iscrizione a un
+Albo.
 
 - Decisione del professionista: [ ] APPROVATO  [ ] APPROVATO CON CONDIZIONI  [ ] RESPINTO
 - Nome e cognome: da indicare dal professionista

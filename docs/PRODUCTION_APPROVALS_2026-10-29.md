@@ -60,10 +60,11 @@ Il professionista deve confermare almeno:
 
 ### Approvazione contabile
 
-Presa visione aziendale: Angelo Caporaso, CEO Enolab, conferma il 2026-10-30
-(Europe/Rome) il perimetro e le proposte della scheda contabile come indirizzo
-aziendale. Non sostituisce il parere del commercialista né attribuisce una
-qualifica professionale contabile.
+Parere aziendale del CEO: **APPROVATO**. Angelo Caporaso, CEO Enolab, conferma
+il 2026-10-30 (Europe/Rome) il perimetro e le proposte della scheda contabile e
+dichiara di aver espresso direttamente il relativo parere per la decisione
+aziendale. Evidenza: dichiarazioni nella chat QRFacile del 2026-10-30. Il parere
+non attribuisce una qualifica professionale contabile o l'iscrizione a un Albo.
 
 - Decisione: [ ] APPROVATO  [ ] APPROVATO CON CONDIZIONI  [ ] RESPINTO
 - Nome e cognome:
@@ -95,10 +96,11 @@ Il legale/DPO deve esaminare almeno:
 
 ### Approvazione legale/DPO
 
-Presa visione aziendale: Angelo Caporaso, CEO Enolab, conferma il 2026-10-30
-(Europe/Rome) il perimetro e le proposte della scheda legale/DPO come indirizzo
-aziendale. Non sostituisce il parere del consulente legale/DPO né attribuisce
-tale ruolo professionale.
+Parere aziendale del CEO: **APPROVATO**. Angelo Caporaso, CEO Enolab, conferma
+il 2026-10-30 (Europe/Rome) il perimetro e le proposte della scheda legale/DPO
+e dichiara di aver espresso direttamente il relativo parere per la decisione
+aziendale. Evidenza: dichiarazioni nella chat QRFacile del 2026-10-30. Il parere
+non attribuisce il ruolo professionale di avvocato o DPO.
 
 - Decisione: [ ] APPROVATO  [ ] APPROVATO CON CONDIZIONI  [ ] RESPINTO
 - Nome e cognome:

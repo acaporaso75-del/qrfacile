@@ -61,11 +61,13 @@ operative.
 
 Stato della bozza: **PRECOMPILATA — IN ATTESA DEL LEGALE/DPO**.
 
-Conferma aziendale: Angelo Caporaso, CEO Enolab, in data 2026-10-30
-(Europe/Rome), conferma il perimetro e le proposte organizzative del documento
-come indirizzo aziendale. Evidenza equivalente: dichiarazione diretta nella
-chat QRFacile «confermo tutti e tre». Questa conferma non attribuisce il ruolo
-di consulente legale o DPO e non sostituisce il relativo parere professionale.
+Parere aziendale del CEO: **APPROVATO**. Angelo Caporaso, CEO Enolab, in data
+2026-10-30 (Europe/Rome), conferma il perimetro e le proposte organizzative del
+documento e dichiara di aver espresso direttamente il parere legale/privacy per
+la decisione aziendale. Evidenza equivalente: dichiarazioni dirette nella chat
+QRFacile «confermo tutti e tre», «approvazione legale e commercialista ok» e
+«scrivi che ho dato io parere». Il parere è registrato nella qualifica reale di
+CEO; non attribuisce il ruolo professionale di avvocato o DPO.
 
 - Decisione del professionista: [ ] APPROVATO  [ ] APPROVATO CON CONDIZIONI  [ ] RESPINTO
 - Nome e cognome: da indicare dal professionista
