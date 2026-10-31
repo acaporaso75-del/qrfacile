@@ -77,6 +77,39 @@ def test_backup_verification_rejects_checksum_mismatch_and_path_escape(tmp_path)
         check_release_preflight._verified_backup_files(backup)
 
 
+def test_preflight_rejects_stale_or_future_dated_backup(tmp_path):
+    runtime_root = tmp_path / "runtime"
+    candidate = tmp_path / "candidate"
+    rollback = tmp_path / "rollback"
+    backup = tmp_path / "backup"
+    _release_tree(candidate)
+    _release_tree(rollback)
+    _verified_backup(backup)
+    source = _production_source(runtime_root)
+
+    common = dict(
+        source=source,
+        config=load_runtime_config(source),
+        candidate_root=candidate,
+        backup_path=backup,
+        rollback_path=rollback,
+        expected_environment="production",
+        expected_release=SHA,
+        expected_paypal_mode="sandbox",
+        git_head=SHA,
+        free_bytes=5 * 1024**3,
+        min_free_bytes=2 * 1024**3,
+        max_backup_age_seconds=24 * 60 * 60,
+    )
+    assert check_release_preflight.evaluate_preflight(
+        **common,
+        backup_age_seconds=25 * 60 * 60,
+    ) == ["backup pre-deploy non recente"]
+    assert check_release_preflight.evaluate_preflight(
+        **common,
+        backup_age_seconds=-301,
+    ) == ["backup pre-deploy non recente"]
+
 def test_preflight_accepts_complete_production_candidate(tmp_path):
     runtime_root = tmp_path / "runtime"
     candidate = tmp_path / "candidate"

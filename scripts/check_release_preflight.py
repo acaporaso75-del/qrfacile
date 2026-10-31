@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -90,6 +91,13 @@ def _verified_backup_files(path: Path) -> int:
     return entries
 
 
+def _backup_age_seconds(path: Path) -> float | None:
+    manifest = path / "SHA256SUMS"
+    if not manifest.is_file():
+        return None
+    return time.time() - manifest.stat().st_mtime
+
+
 def evaluate_preflight(
     *,
     source: dict[str, str],
@@ -103,6 +111,8 @@ def evaluate_preflight(
     git_head: str,
     free_bytes: int,
     min_free_bytes: int,
+    backup_age_seconds: float | None = 0.0,
+    max_backup_age_seconds: float = 24 * 60 * 60,
     approval_errors: list[str] | None = None,
     accessibility_errors: list[str] | None = None,
 ) -> list[str]:
@@ -177,6 +187,12 @@ def evaluate_preflight(
         try:
             if _verified_backup_files(backup_path) < 2:
                 errors.append("backup pre-deploy incompleto o non verificabile")
+            elif (
+                backup_age_seconds is None
+                or backup_age_seconds < -300
+                or backup_age_seconds > max_backup_age_seconds
+            ):
+                errors.append("backup pre-deploy non recente")
         except (OSError, UnicodeError, ValueError):
             errors.append("backup pre-deploy incompleto o non verificabile")
 
@@ -199,6 +215,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--accessibility-path", type=Path, required=True)
     parser.add_argument("--expected-pr", type=int, required=True)
     parser.add_argument("--min-free-gb", type=float, default=2.0)
+    parser.add_argument("--max-backup-age-hours", type=float, default=24.0)
     args = parser.parse_args(argv)
 
     expected_release = args.expected_release.strip().lower()
@@ -206,6 +223,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--expected-release deve essere uno SHA Git completo")
     if args.min_free_gb <= 0:
         parser.error("--min-free-gb deve essere maggiore di zero")
+    if args.max_backup_age_hours <= 0:
+        parser.error("--max-backup-age-hours deve essere maggiore di zero")
     if args.expected_pr <= 0:
         parser.error("--expected-pr deve essere positivo")
 
@@ -240,6 +259,8 @@ def main(argv: list[str] | None = None) -> int:
         git_head=git_head,
         free_bytes=free_bytes,
         min_free_bytes=int(args.min_free_gb * 1024**3),
+        backup_age_seconds=_backup_age_seconds(backup_path),
+        max_backup_age_seconds=args.max_backup_age_hours * 60 * 60,
         approval_errors=validate_approvals(
             approvals_text,
             expected_release=expected_release,
