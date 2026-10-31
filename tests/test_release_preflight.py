@@ -285,6 +285,34 @@ def test_preflight_blocks_incomplete_operational_acceptance(tmp_path):
     assert errors == ["accettazione SMTP/alert incompleta o incoerente"]
 
 
+def test_preflight_blocks_incomplete_paypal_sandbox_acceptance(tmp_path):
+    runtime_root = tmp_path / "runtime"
+    candidate = tmp_path / "candidate"
+    rollback = tmp_path / "rollback"
+    backup = tmp_path / "backup"
+    _release_tree(candidate)
+    _release_tree(rollback)
+    _verified_backup(backup)
+    source = _production_source(runtime_root)
+
+    errors = check_release_preflight.evaluate_preflight(
+        source=source,
+        config=load_runtime_config(source),
+        candidate_root=candidate,
+        backup_path=backup,
+        rollback_path=rollback,
+        expected_environment="production",
+        expected_release=SHA,
+        expected_paypal_mode="sandbox",
+        git_head=SHA,
+        free_bytes=5 * 1024**3,
+        min_free_bytes=2 * 1024**3,
+        paypal_sandbox_errors=["firma non verificata"],
+    )
+
+    assert errors == ["accettazione webhook PayPal Sandbox incompleta o incoerente"]
+
+
 def test_preflight_rejects_missing_runtime_directory_without_exposing_database_url(tmp_path):
     runtime_root = tmp_path / "runtime"
     candidate = tmp_path / "candidate"
@@ -330,6 +358,7 @@ def test_preflight_never_reports_sensitive_configuration(tmp_path, monkeypatch, 
         "--approvals-path", str(tmp_path / "missing-approvals.md"),
         "--accessibility-path", str(tmp_path / "missing-accessibility.md"),
         "--operational-acceptance-path", str(tmp_path / "missing-operational.md"),
+        "--paypal-sandbox-acceptance-path", str(tmp_path / "missing-paypal-sandbox.md"),
         "--restore-acceptance-path", str(tmp_path / "missing-restore.md"),
         "--expected-pr", "12",
     ]) == 2

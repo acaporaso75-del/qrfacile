@@ -87,12 +87,13 @@ python scripts/check_release_preflight.py \
   --approvals-path docs/PRODUCTION_APPROVALS_2026-10-29.md \
   --accessibility-path docs/ACCESSIBILITY_ACCEPTANCE_2026-10-29.md \
   --operational-acceptance-path docs/OPERATIONAL_ACCEPTANCE_2026-10-31.md \
+  --paypal-sandbox-acceptance-path docs/PAYPAL_SANDBOX_ACCEPTANCE_2026-10-31.md \
   --restore-acceptance-path docs/RESTORE_ACCEPTANCE_2026-10-31.md \
   --expected-pr 12 \
   --max-backup-age-hours 24
 ```
 
-Il comando verifica identità del checkout e del runtime, configurazione senza mostrarla, approvazioni esterne, accettazione accessibilità, prova reale SMTP/alert e prova di restore isolata per lo SHA funzionale/PR e il backup esatti, destinatario alert, modalità e configurazione webhook PayPal, database produttivo, set delle 19 migrazioni, backup recente (massimo 24 ore) con almeno due artefatti verificati dal relativo `SHA256SUMS`, percorso rollback e spazio disco. Sono ammessi dopo lo SHA approvato soltanto commit che modificano i documenti di evidenza o gli esatti validatori/test di release elencati nell'allowlist; qualunque modifica successiva al runtime, alle migrazioni o alla configurazione invalida il gate. Qualunque esito diverso da `RELEASE_PREFLIGHT_OK` impedisce lo swap. I validatori stampano soltanto nomi di sezioni/campi mancanti, mai i contenuti compilati.
+Il comando verifica identità del checkout e del runtime, configurazione senza mostrarla, approvazioni esterne, accettazione accessibilità, prova reale SMTP/alert, collaudo webhook PayPal Sandbox firmato e prova di restore isolata per lo SHA funzionale/PR e il backup esatti, destinatario alert, modalità e configurazione webhook PayPal, database produttivo, set delle 19 migrazioni, backup recente (massimo 24 ore) con almeno due artefatti verificati dal relativo `SHA256SUMS`, percorso rollback e spazio disco. Sono ammessi dopo lo SHA approvato soltanto commit che modificano i documenti di evidenza o gli esatti validatori/test di release elencati nell'allowlist; qualunque modifica successiva al runtime, alle migrazioni o alla configurazione invalida il gate. Qualunque esito diverso da `RELEASE_PREFLIGHT_OK` impedisce lo swap. I validatori stampano soltanto nomi di sezioni/campi mancanti, mai i contenuti compilati.
 
 ## Migrazioni
 

@@ -21,6 +21,7 @@ from qrfacile_app.runtime_config import load_runtime_config
 from qrfacile_app.services.transactional_email import load_smtp_config
 from scripts.check_accessibility_acceptance import validate_accessibility_acceptance
 from scripts.check_operational_acceptance import validate_operational_acceptance
+from scripts.check_paypal_sandbox_acceptance import validate_paypal_sandbox_acceptance
 from scripts.check_production_approvals import approved_release, evidence_only_changes, validate_approvals
 from scripts.check_restore_acceptance import validate_restore_acceptance
 from scripts.run_operational_monitor import load_alert_recipient
@@ -118,6 +119,7 @@ def evaluate_preflight(
     approval_errors: list[str] | None = None,
     accessibility_errors: list[str] | None = None,
     operational_errors: list[str] | None = None,
+    paypal_sandbox_errors: list[str] | None = None,
     restore_errors: list[str] | None = None,
 ) -> list[str]:
     errors: list[str] = []
@@ -127,6 +129,8 @@ def evaluate_preflight(
         errors.append("accettazione accessibilità incompleta o incoerente")
     if operational_errors:
         errors.append("accettazione SMTP/alert incompleta o incoerente")
+    if paypal_sandbox_errors:
+        errors.append("accettazione webhook PayPal Sandbox incompleta o incoerente")
     if restore_errors:
         errors.append("accettazione restore incompleta o incoerente")
     if not config.environment_explicit:
@@ -222,6 +226,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--approvals-path", type=Path, required=True)
     parser.add_argument("--accessibility-path", type=Path, required=True)
     parser.add_argument("--operational-acceptance-path", type=Path, required=True)
+    parser.add_argument("--paypal-sandbox-acceptance-path", type=Path, required=True)
     parser.add_argument("--restore-acceptance-path", type=Path, required=True)
     parser.add_argument("--expected-pr", type=int, required=True)
     parser.add_argument("--min-free-gb", type=float, default=2.0)
@@ -248,6 +253,7 @@ def main(argv: list[str] | None = None) -> int:
         approvals_text = args.approvals_path.read_text(encoding="utf-8")
         accessibility_text = args.accessibility_path.read_text(encoding="utf-8")
         operational_text = args.operational_acceptance_path.read_text(encoding="utf-8")
+        paypal_sandbox_text = args.paypal_sandbox_acceptance_path.read_text(encoding="utf-8")
         restore_text = args.restore_acceptance_path.read_text(encoding="utf-8")
         approved_sha = approved_release(approvals_text)
         approval_paths = (
@@ -286,6 +292,11 @@ def main(argv: list[str] | None = None) -> int:
         ),
         operational_errors=validate_operational_acceptance(
             operational_text,
+            expected_release=expected_release,
+            expected_environment=args.expected_environment,
+        ),
+        paypal_sandbox_errors=validate_paypal_sandbox_acceptance(
+            paypal_sandbox_text,
             expected_release=expected_release,
             expected_environment=args.expected_environment,
         ),
