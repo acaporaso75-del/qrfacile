@@ -6,6 +6,7 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import csrf_input
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 
 router = APIRouter()
@@ -71,7 +72,7 @@ def _load_connected_studios(cur, winery_id: int) -> list[dict]:
           sc.can_view,
           sc.can_edit,
           sc.can_create
-        FROM studio_clients sc
+        FROM studio_clients sc /* security-review: selection-only */
         JOIN users u ON u.id = sc.studio_user_id
         JOIN studios s ON s.user_id = u.id
         WHERE sc.winery_id=%s AND sc.can_view=TRUE
@@ -134,7 +135,7 @@ def _assign_label_management(cur, label: dict, studio_user_id: int) -> str | Non
     cur.execute(
         """
         SELECT can_view, can_edit, can_create
-        FROM studio_clients
+        FROM studio_clients /* security-review: selection-only */
         WHERE winery_id=%s
           AND studio_user_id=%s
           AND can_view=TRUE
@@ -209,11 +210,15 @@ def label_acl(request: Request, label_id: int, msg: str = "", err: str = ""):
                 cur.execute(
                     """
                     SELECT 1
-                    FROM studio_clients
-                    WHERE studio_user_id=%s AND winery_id=%s AND can_view=TRUE
+                    FROM label_collaborators lc
+                    JOIN studio_clients sc
+                      ON sc.studio_user_id=lc.collaborator_user_id
+                     AND sc.winery_id=%s
+                    WHERE lc.wine_label_id=%s AND lc.collaborator_user_id=%s
+                      AND lc.active=TRUE AND lc.can_view=TRUE AND sc.can_view=TRUE
                     LIMIT 1
                     """,
-                    (int(u["id"]), int(label["winery_id"])),
+                    (int(label["winery_id"]), int(label_id), int(u["id"])),
                 )
                 if not cur.fetchone():
                     raise HTTPException(403, "Forbidden")
@@ -297,6 +302,7 @@ def label_acl(request: Request, label_id: int, msg: str = "", err: str = ""):
             con gli studi resta gestito da <b>studio_clients</b>; qui decidi chi lavora su questo QR.
           </div>
           <form method="post" action="/app/label/{int(label_id)}/acl/clear" style="margin-top:12px">
+            {csrf_input(request)}
             <button class="btn" type="submit">Gestisco io</button>
           </form>
         </div>
@@ -318,6 +324,8 @@ def label_acl(request: Request, label_id: int, msg: str = "", err: str = ""):
               </div>
 
               <form method="post" action="/app/label/{int(label_id)}/acl/assign" style="margin-top:12px">
+                {csrf_input(request)}
+                <input type="hidden" name="profile" value="graphic">
                 <label>Studio</label>
                 <select name="studio_user_id" required>
                   {''.join(opts)}
@@ -327,18 +335,6 @@ def label_acl(request: Request, label_id: int, msg: str = "", err: str = ""):
                   <label>Permessi consigliati</label>
                   <div class="note" style="margin-top:0">
                     Vista, modifica, media ed export attivi. Pubblicazione disattivata: il controllo resta alla cantina.
-                  </div>
-                </div>
-
-                <div class="grid2" style="margin-top:10px">
-                  <div>
-                    <label><input type="checkbox" name="can_view" checked> view</label>
-                    <label><input type="checkbox" name="can_edit" checked> edit</label>
-                    <label><input type="checkbox" name="can_media" checked> media</label>
-                  </div>
-                  <div>
-                    <label><input type="checkbox" name="can_export" checked> export</label>
-                    <label><input type="checkbox" name="can_publish"> publish</label>
                   </div>
                 </div>
 
@@ -394,7 +390,6 @@ def label_acl(request: Request, label_id: int, msg: str = "", err: str = ""):
     ))
 
 
-@router.post("/app/label/{label_id}/acl/assign")
 def label_acl_assign(
     request: Request,
     label_id: int,
@@ -436,7 +431,7 @@ def label_acl_assign(
             cur.execute(
                 """
                 SELECT 1
-                FROM studio_clients
+                FROM studio_clients /* security-review: selection-only */
                 WHERE winery_id=%s AND studio_user_id=%s AND can_view=TRUE
                 LIMIT 1
                 """,
@@ -475,7 +470,6 @@ def label_acl_assign(
     return RedirectResponse(f"/app/label/{int(label_id)}/acl?msg=Studio%20assegnato", status_code=303)
 
 
-@router.post("/app/label/{label_id}/acl/clear")
 def label_acl_clear(request: Request, label_id: int):
     u = require_any_role(request, ("winery", "admin"))
 
@@ -499,7 +493,6 @@ def label_acl_clear(request: Request, label_id: int):
     return RedirectResponse(f"/app/label/{int(label_id)}/acl?msg=Gestione%20interna%20attivata", status_code=303)
 
 
-@router.post("/app/label/{label_id}/management/set")
 def label_management_set(
     request: Request,
     label_id: int,

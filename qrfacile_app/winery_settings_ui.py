@@ -4,7 +4,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import csrf_input, require_csrf
 from qrfacile_app.db import pg
+from qrfacile_app.fiscal_profile import normalized_italian_fiscal_profile
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 
 router = APIRouter()
@@ -229,7 +231,7 @@ def _load_rows(cur, winery_id: int | None, role: str) -> list[dict]:
     return cur.fetchall() or []
 
 
-def _row_card(r: dict) -> str:
+def _row_card(r: dict, csrf_html: str) -> str:
     preset = _preset_name(bool(r["can_view"]), bool(r["can_edit"]), bool(r["can_create"]))
     access_mode = _access_mode(bool(r["can_view"]), bool(r["can_edit"]), bool(r["can_create"]))
     created = _fmt_ts(int(r.get("created_at") or 0))
@@ -305,6 +307,7 @@ def _row_card(r: dict) -> str:
 
       <div class="wineryStudioActions">
         <form method="post" action="/app/settings/studios/set" class="wineryPresetForm">
+          {csrf_html}
           <input type="hidden" name="sc_id" value="{sc_id}">
           <label>Gestisci permessi</label>
           <select name="preset">
@@ -316,6 +319,7 @@ def _row_card(r: dict) -> str:
         </form>
 
         <form method="post" action="/app/settings/studios/revoke" onsubmit="return confirm('Revocare il collegamento operativo a questo studio?');">
+          {csrf_html}
           <input type="hidden" name="sc_id" value="{sc_id}">
           <button class="btn wineryRevokeBtn" type="submit">Revoca accesso</button>
         </form>
@@ -324,7 +328,7 @@ def _row_card(r: dict) -> str:
     """
 
 
-def _page_impl(request: Request, msg: str = "") -> HTMLResponse:
+def _page_impl(request: Request, msg: str = "", err: str = "") -> HTMLResponse:
     user = require_any_role(request, ("winery", "admin"))
     uid = int(user.get("id") or user.get("user_id"))
     role = (user.get("role") or "").lower().strip()
@@ -333,10 +337,12 @@ def _page_impl(request: Request, msg: str = "") -> HTMLResponse:
         with conn.cursor(row_factory=dict_row) as cur:
             winery_id = None
             winery_name = ""
+            winery_profile = {}
             if role != "admin":
                 winery_id = _get_winery_id_for_user(cur, uid)
-                cur.execute("SELECT name FROM wineries WHERE id=%s LIMIT 1", (int(winery_id),))
+                cur.execute("SELECT * FROM wineries WHERE id=%s LIMIT 1", (int(winery_id),))
                 wr = cur.fetchone() or {}
+                winery_profile = wr
                 winery_name = (wr.get("name") or "").strip()
 
             rows = _load_rows(cur, winery_id, role)
@@ -386,7 +392,7 @@ def _page_impl(request: Request, msg: str = "") -> HTMLResponse:
         """
 
     if rows:
-        cards = "".join(_row_card(r) for r in rows)
+        cards = "".join(_row_card(r, csrf_input(request)) for r in rows)
     else:
         cards = """
         <div class="card wineryEmptyCard">
@@ -435,6 +441,32 @@ def _page_impl(request: Request, msg: str = "") -> HTMLResponse:
         </div>
         """
 
+    fiscal_box = ""
+    if role != "admin":
+        fiscal_box = f"""
+        <div class="card" id="profilo-fiscale" style="margin-top:14px">
+          <div class="wineryStudioKicker">Acquisti annuali e fatturazione</div>
+          <div class="h2">Profilo fiscale</div>
+          <div class="p" style="margin-top:8px">
+            Questi dati vengono salvati nell'ordine al momento dell'acquisto. La verifica formale
+            non sostituisce il controllo ufficiale della posizione fiscale.
+          </div>
+          <form method="post" action="/app/winery/settings/fiscal" class="wineryFiscalForm" style="margin-top:14px">
+            {csrf_input(request)}
+            <label>Ragione sociale<input class="input" name="name" autocomplete="organization" required value="{esc(winery_profile.get('name') or '')}"></label>
+            <label>Partita IVA<input class="input" name="vat" inputmode="numeric" required value="{esc(winery_profile.get('vat') or '')}"></label>
+            <label>Codice SDI<input class="input" name="sdi" maxlength="7" value="{esc(winery_profile.get('sdi') or '')}"></label>
+            <label>PEC<input class="input" name="pec" type="email" autocomplete="email" value="{esc(winery_profile.get('pec') or '')}"></label>
+            <label class="wide">Indirizzo di fatturazione<input class="input" name="billing_address" autocomplete="street-address" required value="{esc(winery_profile.get('billing_address') or '')}"></label>
+            <label>Città<input class="input" name="city" autocomplete="address-level2" required value="{esc(winery_profile.get('city') or '')}"></label>
+            <label>CAP<input class="input" name="billing_cap" inputmode="numeric" autocomplete="postal-code" maxlength="5" required value="{esc(winery_profile.get('billing_cap') or '')}"></label>
+            <label>Provincia<input class="input" name="province" autocomplete="address-level1" maxlength="2" required value="{esc(winery_profile.get('province') or '')}"></label>
+            <label>Paese<input class="input" value="Italia" disabled><input type="hidden" name="billing_country" value="IT"></label>
+            <div class="wide"><button class="btn btn-primary" type="submit">Salva profilo fiscale</button></div>
+          </form>
+        </div>
+        """
+
     body = f"""
     <section class="wineryStudioWrap">
       <div class="card wineryStudioHero">
@@ -460,6 +492,8 @@ def _page_impl(request: Request, msg: str = "") -> HTMLResponse:
         <div class="wineryStudioKicker">Avanzamento</div>
         {timeline_html}
       </div>
+
+      {fiscal_box}
 
       <div class="wineryControlGrid">
         <div class="note">
@@ -512,6 +546,9 @@ def _page_impl(request: Request, msg: str = "") -> HTMLResponse:
       .wineryTimelineStep.active {{ border-color:rgba(15,118,110,.32); background:rgba(240,253,250,.82); }}
       .wineryControlGrid {{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:14px; }}
       .wineryInviteBox, .winerySectionHead, .wineryPendingList {{ margin-top:14px; }}
+      .wineryFiscalForm {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }}
+      .wineryFiscalForm label {{ display:grid; gap:6px; color:#334155; font-size:13px; font-weight:900; }}
+      .wineryFiscalForm .wide {{ grid-column:1/-1; }}
       .wineryInviteForm {{ display:grid; grid-template-columns:minmax(220px,1fr) 260px auto; gap:10px; align-items:end; margin-top:14px; }}
       .wineryInviteForm label {{ display:block; margin-bottom:6px; color:#64748b; font-size:12px; font-weight:950; }}
       .wineryInvitePending {{ display:flex; justify-content:space-between; gap:14px; align-items:center; margin-top:8px; }}
@@ -544,7 +581,7 @@ def _page_impl(request: Request, msg: str = "") -> HTMLResponse:
       .wineryPresetForm label {{ width:100%; margin:0; color:#64748b; font-size:12px; font-weight:950; }}
       .wineryRevokeBtn {{ border-color:rgba(239,68,68,.22); color:#b91c1c; background:rgba(254,242,242,.78); }}
       .wineryEmptyCard {{ margin-top:12px; }}
-      @media(max-width:980px) {{ .wineryStudioHero, .wineryStudioBody, .wineryControlGrid, .wineryInviteForm, .wineryTimeline {{ grid-template-columns:1fr; }} .wineryStudioStatus, .wineryInvitePendingMeta {{ justify-items:start; }} }}
+      @media(max-width:980px) {{ .wineryStudioHero, .wineryStudioBody, .wineryControlGrid, .wineryInviteForm, .wineryTimeline, .wineryFiscalForm {{ grid-template-columns:1fr; }} .wineryFiscalForm .wide {{ grid-column:auto; }} .wineryStudioStatus, .wineryInvitePendingMeta {{ justify-items:start; }} }}
       @media(max-width:620px) {{ .wineryPermGrid {{ grid-template-columns:1fr; }} .wineryPresetForm .btn, .wineryPresetForm select, .wineryStudioActions form, .wineryRevokeBtn, .wineryInviteForm .btn, .wineryHeroActions .btn, .wineryInviteActions .btn {{ width:100%; }} .wineryInvitePending {{ align-items:flex-start; flex-direction:column; }} .wineryInviteActions, .wineryInvitePendingMeta {{ width:100%; justify-items:stretch; justify-content:stretch; }} }}
     </style>
     <script>
@@ -581,7 +618,7 @@ def _page_impl(request: Request, msg: str = "") -> HTMLResponse:
         body_html=body,
         actions_html=actions,
         msg=msg_arg,
-        err="",
+        err=err,
         user_email=user.get("email", ""),
         role=role,
         credits=None,
@@ -595,65 +632,45 @@ def studios_settings_redirect(msg: str = ""):
 
 
 @router.get("/app/winery/settings", response_class=HTMLResponse)
-def winery_settings_page(request: Request, msg: str = ""):
-    return _page_impl(request, msg=msg)
+def winery_settings_page(request: Request, msg: str = "", err: str = ""):
+    return _page_impl(request, msg=msg, err=err)
 
 
-@router.post("/app/settings/studios/set")
-def studios_set_preset(request: Request, sc_id: int = Form(...), preset: str = Form(...)):
-    user = require_any_role(request, ("winery", "admin"))
-    uid = int(user.get("id") or user.get("user_id"))
-    role = (user.get("role") or "").lower().strip()
-
-    preset = (preset or "").strip().lower()
-    if preset == "full":
-        can_view, can_edit, can_create = True, True, True
-    elif preset == "graphic":
-        can_view, can_edit, can_create = True, True, False
-    elif preset == "view":
-        can_view, can_edit, can_create = True, False, False
-    else:
-        raise HTTPException(400, "Preset non valido")
-
+@router.post("/app/winery/settings/fiscal")
+def winery_fiscal_settings_save(
+    request: Request,
+    name: str = Form(...),
+    vat: str = Form(...),
+    sdi: str = Form(""),
+    pec: str = Form(""),
+    billing_address: str = Form(...),
+    city: str = Form(...),
+    billing_cap: str = Form(...),
+    province: str = Form(...),
+    billing_country: str = Form("IT"),
+    csrf_token: str = Form(""),
+):
+    user = require_any_role(request, ("winery",))
+    require_csrf(request, csrf_token)
+    profile = normalized_italian_fiscal_profile({
+        "name": name, "vat": vat, "sdi": sdi, "pec": pec,
+        "billing_address": billing_address, "city": city,
+        "billing_cap": billing_cap, "province": province,
+        "billing_country": billing_country,
+    })
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
-            if role != "admin":
-                winery_id = _get_winery_id_for_user(cur, uid)
-                cur.execute("SELECT winery_id FROM studio_clients WHERE id=%s LIMIT 1", (int(sc_id),))
-                r = cur.fetchone()
-                if not r or int(r["winery_id"]) != int(winery_id):
-                    raise HTTPException(403, "Non autorizzato")
-
+            winery_id = _get_winery_id_for_user(cur, int(user["id"]))
             cur.execute(
-                """
-                UPDATE studio_clients
-                SET can_view=%s, can_edit=%s, can_create=%s
-                WHERE id=%s
-                """,
-                (can_view, can_edit, can_create, int(sc_id)),
+                """UPDATE wineries
+                   SET name=%s, vat=%s, sdi=%s, pec=%s, billing_address=%s,
+                       city=%s, billing_cap=%s, province=%s, billing_country=%s
+                   WHERE id=%s""",
+                (
+                    profile["name"], profile["vat"], profile["sdi"], profile["pec"],
+                    profile["billing_address"], profile["city"], profile["billing_cap"],
+                    profile["province"], profile["billing_country"], winery_id,
+                ),
             )
             conn.commit()
-
-    return RedirectResponse("/app/winery/settings?msg=Permessi%20aggiornati", status_code=303)
-
-
-@router.post("/app/settings/studios/revoke")
-def studios_revoke(request: Request, sc_id: int = Form(...)):
-    user = require_any_role(request, ("winery", "admin"))
-    uid = int(user.get("id") or user.get("user_id"))
-    role = (user.get("role") or "").lower().strip()
-
-    with pg() as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            if role != "admin":
-                winery_id = _get_winery_id_for_user(cur, uid)
-                cur.execute("SELECT winery_id FROM studio_clients WHERE id=%s LIMIT 1", (int(sc_id),))
-                r = cur.fetchone()
-                if not r or int(r["winery_id"]) != int(winery_id):
-                    raise HTTPException(403, "Non autorizzato")
-
-            cur.execute("DELETE FROM studio_clients WHERE id=%s", (int(sc_id),))
-            conn.commit()
-
-    return RedirectResponse("/app/winery/settings?msg=Collegamento%20revocato", status_code=303)
-
+    return RedirectResponse("/app/winery/settings?msg=Profilo%20fiscale%20aggiornato", status_code=303)

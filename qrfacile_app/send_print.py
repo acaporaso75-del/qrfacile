@@ -1,7 +1,5 @@
-import os
 import io
 import re
-import smtplib
 from email.message import EmailMessage
 
 from fastapi import APIRouter, Request, Form, HTTPException
@@ -9,7 +7,11 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
+from qrfacile_app.navigation_security import safe_local_path
+from qrfacile_app.ui_shell import esc
 from qrfacile_app.db import pg
+from qrfacile_app.services.transactional_email import send_email_message
 from qrfacile_app import ui
 
 import qrcode
@@ -65,38 +67,15 @@ def _qr_svg(url: str) -> bytes:
     return bio.getvalue()
 
 
-def _smtp_cfg():
-    host = os.getenv("SMTP_HOST", "")
-    port = int(os.getenv("SMTP_PORT", "465"))
-    user = os.getenv("SMTP_USER", "")
-    pwd = os.getenv("SMTP_PASS", "")
-    from_email = os.getenv("SMTP_FROM", "") or user
-    if not host or not user or not pwd or not from_email:
-        raise HTTPException(500, "SMTP non configurato in /opt/qrfacile/.env")
-    return host, port, user, pwd, from_email
-
-
 def _send_mail(to_email: str, subject: str, body: str, filename: str, data: bytes, mime: str):
-    host, port, user, pwd, from_email = _smtp_cfg()
-
     msg = EmailMessage()
-    msg["From"] = from_email
     msg["To"] = to_email
     msg["Subject"] = subject
     msg.set_content(body)
 
     maintype, subtype = mime.split("/", 1)
     msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=filename)
-
-    if port == 465:
-        with smtplib.SMTP_SSL(host, port) as s:
-            s.login(user, pwd)
-            s.send_message(msg)
-    else:
-        with smtplib.SMTP(host, port) as s:
-            s.starttls()
-            s.login(user, pwd)
-            s.send_message(msg)
+    return send_email_message(msg)
 
 
 def _check_access(cur, user: dict, slug: str) -> dict:
@@ -149,6 +128,7 @@ def _check_access(cur, user: dict, slug: str) -> dict:
 def send_form(request: Request, slug: str = "", back: str = "/app/dashboard"):
     user, conn = require_any_role(request, ["winery", "studio", "admin"])
     conn.close()
+    back = safe_local_path(back)
 
     header = ui.header(
         "Invio tipografia",
@@ -162,9 +142,9 @@ def send_form(request: Request, slug: str = "", back: str = "/app/dashboard"):
     body = header + f"""
 <div class="card">
   <form method="post" action="/app/print/send">
-    <input type="hidden" name="back" value="{back}">
+    <input type="hidden" name="back" value="{esc(back)}">
     <label>Slug</label>
-    <input name="slug" value="{slug}" readonly>
+    <input name="slug" value="{esc(slug)}" readonly>
 
     <div class="grid2">
       <div>
@@ -202,6 +182,7 @@ def send_post(
     note: str = Form(""),
     back: str = Form("/app/dashboard"),
 ):
+    require_csrf_or_same_origin(request)
     user, conn = require_any_role(request, ["winery", "studio", "admin"])
     try:
         fmt = (fmt or "png").lower().strip()
@@ -243,7 +224,11 @@ Slug: {slug}
 Note: {note}
 """
 
-        _send_mail(to_email, subject, body, filename, data, mime)
-        return RedirectResponse(back, status_code=303)
+        sent, send_error = _send_mail(to_email, subject, body, filename, data, mime)
+        if not sent:
+            if send_error == "smtp_recipient_refused":
+                raise HTTPException(404, "Destinatario non trovato")
+            raise HTTPException(503, "Invio non riuscito. Riprova.")
+        return RedirectResponse(safe_local_path(back), status_code=303)
     finally:
         conn.close()

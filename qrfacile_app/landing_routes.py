@@ -82,9 +82,9 @@ def home(request: Request):
         <article class="moduleCard active">
           <div class="moduleCardTop">
             <span class="moduleStatus active">Attivo</span>
-            <b>Wine Compliance</b>
+            <b>Wine Compliance · senza canone annuale</b>
           </div>
-          <p>Etichette digitali vino, compliance e QR per stampa.</p>
+          <p>Acquisti crediti quando servono; i QR restano online 10 o 25 anni senza rinnovi obbligatori.</p>
           <a class="btn btn-primary" href="/wine">Vai al modulo</a>
         </article>
 
@@ -421,6 +421,17 @@ def home(request: Request):
         subtitle="Home",
         body_html=body,
         actions_html=actions,
+        description="QRFACILE è la piattaforma Enolab per QR dinamici. Il modulo Wine gestisce etichette digitali vino, dati obbligatori e file QR per la stampa.",
+        canonical_path="/",
+        structured_data={
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "Enolab S.r.l.",
+            "brand": {"@type": "Brand", "name": "QRFACILE"},
+            "url": "https://www.qrfacile.it/",
+            "email": "info@enolab.it",
+            "vatID": "IT01413300623",
+        },
     ))
 
 
@@ -513,10 +524,13 @@ def wine_home(request: Request):
       <section class="winePlans">
         <div class="moduleCatalogHead">
           <div class="moduleEyebrow">Piani QRFACILE Wine</div>
-          <h2>Pricing del modulo Wine.</h2>
+          <h2>Paghi i QR quando ti servono, senza canone annuale.</h2>
           <p>
-            I piani e i crediti reali restano nel contesto Wine. Gli altri moduli
-            sono in arrivo e non hanno ancora pricing pubblico.
+            Acquisti crediti utilizzabili entro 12 mesi. Nessun abbonamento obbligatorio,
+            nessun rinnovo automatico: ogni QR creato resta online e modificabile per
+            i 10 o 25 anni scelti, anche senza altri acquisti.
+            Lo stesso QR può essere stampato su tutte le bottiglie della medesima referenza;
+            un vino, un’annata o un lotto differente richiede un nuovo QR.
           </p>
         </div>
 
@@ -527,15 +541,15 @@ def wine_home(request: Request):
           </div>
           <div class="winePlan">
             <b>QR vino 10 anni</b>
-            <span>1 credito Wine per un QR vino standard.</span>
+            <span>1 credito Wine per una referenza, su tutte le sue bottiglie.</span>
           </div>
           <div class="winePlan">
             <b>QR vino 25 anni</b>
-            <span>2 crediti Wine per un QR vino esteso.</span>
+            <span>2 crediti Wine per una referenza, su tutte le sue bottiglie.</span>
           </div>
           <div class="winePlan">
             <b>Pacchetti crediti</b>
-            <span>Acquisto di crediti Wine e servizi opzionali dalla pagina prezzi.</span>
+            <span>Crediti validi 12 mesi per creare nuovi QR; nessun canone sui QR già creati.</span>
           </div>
         </div>
 
@@ -846,6 +860,18 @@ def wine_home(request: Request):
         subtitle="Wine",
         body_html=body,
         actions_html=actions,
+        description="Etichetta digitale vino per cantine e studi grafici: ingredienti, allergeni, valori nutrizionali, riciclo, QR dinamico ed export per tipografia.",
+        canonical_path="/wine",
+        structured_data={
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            "name": "QRFACILE Wine",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "url": "https://www.qrfacile.it/wine",
+            "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR", "description": "3 crediti iniziali gratuiti"},
+            "provider": {"@type": "Organization", "name": "Enolab S.r.l."},
+        },
     ))
 
 
@@ -2039,11 +2065,11 @@ body {
     <div class="heroText">
       <div class="eyebrow">QRFACILE · Etichetta digitale vino</div>
 
-      <h1>Il QR del vino,<br>fatto semplice.<br><span>Senza abbonamento obbligatorio.</span></h1>
+      <h1>Il QR del vino,<br>fatto semplice.<br><span>Lo paghi una volta. Nessun canone annuale.</span></h1>
 
       <p>
-        Crea QR vino per l’etichetta digitale, gestisci lotti, ingredienti,
-        allergeni, valori nutrizionali, riciclo ed export per la stampa.
+        Acquista crediti soltanto quando ti servono. Ogni QR resta online e modificabile
+        per 10 o 25 anni, anche senza rinnovi o nuovi acquisti.
       </p>
 
       <div class="credit-strip" style="margin-top:18px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
@@ -2057,7 +2083,7 @@ body {
         </div>
         <div style="border:1px solid rgba(2,8,23,.10);background:rgba(255,255,255,.82);border-radius:18px;padding:12px">
           <b style="display:block;font-size:18px">+1 credito</b>
-          <span style="display:block;margin-top:4px;color:#64748b;font-size:12px;font-weight:850">upgrade 10 → 25 anni</span>
+          <span style="display:block;margin-top:4px;color:#64748b;font-size:12px;font-weight:850">upgrade 10 → 25 anni su richiesta al supporto</span>
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 # /opt/qrfacile/qrfacile_app/ui_shell.py
 import html
+import json
 
 
 def esc(s: str) -> str:
@@ -10,10 +11,10 @@ def banner(msg: str = "", err: str = "") -> str:
     out = []
 
     if msg:
-        out.append(f"<div class='note note-ok'><b>OK:</b> {esc(msg)}</div>")
+        out.append(f"<div class='note note-ok' role='status' aria-live='polite'><b>OK:</b> {esc(msg)}</div>")
 
     if err:
-        out.append(f"<div class='note note-err'><b>Errore:</b> {esc(err)}</div>")
+        out.append(f"<div class='note note-err' role='alert'><b>Errore:</b> {esc(err)}</div>")
 
     return "\n".join(out)
 
@@ -340,10 +341,11 @@ def page_app(
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
+<a class="skipLink" href="#main-content">Vai al contenuto principale</a>
 <div class="shell">
   {_sidebar(role=role, user_email=user_email, credits=credits)}
 
-  <main class="content">
+  <main class="content" id="main-content" tabindex="-1">
     {header}
     {banner(msg, err)}
     {body_html}
@@ -360,6 +362,10 @@ def page_public(
     actions_html: str = "",
     msg: str = "",
     err: str = "",
+    description: str = "",
+    canonical_path: str = "",
+    robots: str = "index,follow",
+    structured_data: dict | list[dict] | None = None,
 ) -> str:
     if not actions_html:
         actions_html = (
@@ -370,19 +376,63 @@ def page_public(
 
     header = _public_topbar(actions_html=actions_html)
 
+    description = (
+        description.strip()
+        or "QRFACILE aiuta cantine e studi grafici a creare etichette digitali vino, QR dinamici e file pronti per la stampa."
+    )
+    canonical_url = ""
+    if canonical_path:
+        safe_path = canonical_path if canonical_path.startswith("/") else f"/{canonical_path}"
+        canonical_url = f"https://www.qrfacile.it{safe_path}"
+
+    canonical_html = (
+        f'<link rel="canonical" href="{esc(canonical_url)}">'
+        if canonical_url
+        else ""
+    )
+    social_url_html = (
+        f'<meta property="og:url" content="{esc(canonical_url)}">'
+        if canonical_url
+        else ""
+    )
+    structured_html = ""
+    if structured_data:
+        payloads = structured_data if isinstance(structured_data, list) else [structured_data]
+        structured_html = "\n".join(
+            '<script type="application/ld+json">'
+            + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+            .replace("</", "<\\/")
+            + "</script>"
+            for payload in payloads
+        )
+
     return f"""<!doctype html>
 <html lang="it">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{esc(title)}</title>
+<meta name="description" content="{esc(description)}">
+<meta name="robots" content="{esc(robots)}">
+{canonical_html}
+<meta property="og:locale" content="it_IT">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="QRFACILE">
+<meta property="og:title" content="{esc(title)}">
+<meta property="og:description" content="{esc(description)}">
+{social_url_html}
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{esc(title)}">
+<meta name="twitter:description" content="{esc(description)}">
+{structured_html}
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
+<a class="skipLink" href="#main-content">Vai al contenuto principale</a>
 <div class="publicWrap">
   {header}
 
-  <main class="publicMain">
+  <main class="publicMain" id="main-content" tabindex="-1">
     {banner(msg, err)}
     {body_html}
   </main>

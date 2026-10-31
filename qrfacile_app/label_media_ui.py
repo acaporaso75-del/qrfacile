@@ -1,4 +1,3 @@
-import os
 import time
 from fastapi import APIRouter, Request, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -6,12 +5,11 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
 from qrfacile_app.auth import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app import ui
 from qrfacile_app.media_labels import process_label_image
 
 router = APIRouter()
-
-UPLOAD_ROOT = "/opt/qrfacile/uploads"
 
 
 def _fmt_ts(ts: int | None) -> str:
@@ -201,6 +199,7 @@ def label_image_page(request: Request, label_id: int, msg: str = ""):
 
 @router.post("/app/label/{label_id}/image")
 def label_image_upload(request: Request, label_id: int, image: UploadFile = File(...)):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery", "studio", "admin"))
 
     with pg() as conn:

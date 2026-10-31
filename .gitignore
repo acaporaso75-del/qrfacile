@@ -1,89 +1,9 @@
-# Segreti e configurazioni locali
 .env
-.env.*
-!.env.example
-*.pem
-*.key
-*.crt
-secrets/
-credentials/
-
-# Ambiente Python
 venv/
 .venv/
-env/
 __pycache__/
 *.py[cod]
-*$py.class
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-
-# Dati runtime e clienti
 uploads/
-media/
-storage/
-tmp/
-temp/
-invoices/
-qr/
-*.pid
-*.sock
-
-# Log
-*.log
 logs/
-
-# Backup e versioni storiche
-*.backup
-*.backup.*
-*.bak
-*.save
-*.save.*
-*.old
-*.orig
-*.pre
-*.pre_*
-*.pre-*
-*.deprecated*
-*.final_refactor*
-*.secure_upload*
-*~
-backup/
-backups/
-_deprecated/
-
-# Report locali
-_codex_reports/
-
-# Database e dump
-*.sql
-*.dump
-*.sqlite
-*.sqlite3
-
-# Test manuali non destinati alla produzione
-stress_test.py
-stress_test2.py
-
-# File accidentali
-nano
-
-# IDE e sistema operativo
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-
-# Build
-build/
-dist/
-*.egg-info/
-
-# Runtime Gunicorn
-gunicorn.ctl
-
-*.backup_*
-*.backup-*
+*.log
+*.backup*

@@ -4,11 +4,12 @@ from fastapi import APIRouter, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from app.db.conn import db
+from qrfacile_app.services.storage import get_templates_dir
 
 router = APIRouter()
 
 templates = Environment(
-    loader=FileSystemLoader("/opt/qrfacile/templates"),
+    loader=FileSystemLoader(str(get_templates_dir())),
     autoescape=select_autoescape(["html"])
 )
 
@@ -16,7 +17,7 @@ def now_epoch() -> int:
     return int(datetime.now(timezone.utc).timestamp())
 
 def new_slug(n=8):
-    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # pragma: allowlist secret
     return "".join(secrets.choice(alphabet) for _ in range(n))
 
 def get_default_user_id(cur) -> int:

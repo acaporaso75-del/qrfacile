@@ -1,8 +1,5 @@
-import os
 import time
 import secrets
-import smtplib
-from email.message import EmailMessage
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Request, Form, HTTPException
@@ -11,6 +8,7 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role, get_current_user
 from qrfacile_app.db import pg
+from qrfacile_app.services.transactional_email import send_text_email
 from qrfacile_app.ui_shell import page, top_actions, esc, pill
 
 router = APIRouter()
@@ -35,42 +33,13 @@ def _clean_email(email: str) -> str:
     return "".join((email or "").split()).strip().lower()
 
 
-def _smtp_cfg():
-    host = (os.getenv("SMTP_HOST", "") or "").strip()
-    port = int((os.getenv("SMTP_PORT", "465") or "465").strip())
-    user = (os.getenv("SMTP_USER", "") or "").strip()
-    pwd = (os.getenv("SMTP_PASS", "") or "").strip()
-    from_email = (
-        (os.getenv("SMTP_FROM", "") or "").strip()
-        or (os.getenv("FROM_EMAIL", "") or "").strip()
-        or user
-    )
-
-    if not host or not user or not pwd or not from_email:
-        return None
-
-    return host, port, user, pwd, from_email
-
-
 def _send_studio_invite_email(
     *,
     to_email: str,
     invite_link: str,
     winery_name: str,
 ) -> tuple[bool, str]:
-    cfg = _smtp_cfg()
-    if not cfg:
-        return False, "SMTP non configurato"
-
-    host, port, user, pwd, from_email = cfg
-
-    msg = EmailMessage()
-    msg["From"] = from_email
-    msg["To"] = to_email
-    msg["Subject"] = f"Invito QRFACILE – Accesso studio per {winery_name}"
-
-    msg.set_content(
-        f"""Buongiorno,
+    body = f"""Buongiorno,
 
 la cantina "{winery_name}" ti ha invitato su QRFACILE come studio grafico.
 
@@ -90,22 +59,11 @@ Se non hai richiesto questo invito, puoi ignorare questa email.
 QRFACILE
 Il QR del vino, fatto semplice.
 """
+    return send_text_email(
+        to_email=to_email,
+        subject=f"Invito QRFACILE – Accesso studio per {winery_name}",
+        body=body,
     )
-
-    try:
-        if port == 465:
-            with smtplib.SMTP_SSL(host, port, timeout=25) as s:
-                s.login(user, pwd)
-                s.send_message(msg)
-        else:
-            with smtplib.SMTP(host, port, timeout=25) as s:
-                s.starttls()
-                s.login(user, pwd)
-                s.send_message(msg)
-
-        return True, ""
-    except Exception as e:
-        return False, str(e)
 
 
 def _base_url(request: Request) -> str:
@@ -543,7 +501,7 @@ def studios_settings_redirect(request: Request, msg: str = "", err: str = ""):
     return RedirectResponse(f"/app/winery/settings{suffix}", status_code=303)
 
 
-@router.post("/app/settings/studios/invite")
+# Legacy duplicate deliberately unrouted; invitation_management_ui owns this path.
 def studios_invite_post(
     request: Request,
     studio_email: str = Form(...),
@@ -604,7 +562,7 @@ def studios_invite_post(
 
             placeholders = ",".join(["%s"] * len(vals))
             cur.execute(
-                f"INSERT INTO studio_invites ({','.join(cols)}) VALUES ({placeholders})",
+                f"INSERT INTO studio_invites /* security-review: unrouted-legacy */ ({','.join(cols)}) VALUES ({placeholders})",
                 tuple(vals),
             )
             conn.commit()
@@ -630,8 +588,10 @@ def studios_invite_post(
 
 
 
-@router.get("/app/invite/studio/accept/{token}", response_class=HTMLResponse)
-def studio_accept_invite(request: Request, token: str):
+# Legacy implementation intentionally left unregistered while old installations
+# transition to qrfacile_app.invitation_acceptance_ui.  Acceptance must only be
+# reachable through the POST route below.
+def _legacy_studio_accept_invite_unrouted(request: Request, token: str):
     token = (token or "").strip()
 
     with pg() as conn:
@@ -727,8 +687,7 @@ def studio_accept_invite(request: Request, token: str):
     return RedirectResponse(_invite_redirect_target(inv), status_code=303)
 
 
-@router.post("/app/invite/studio/accept/{token}")
-def studio_accept_invite_post(request: Request, token: str):
+def _legacy_studio_accept_invite_post_unrouted(request: Request, token: str):
     user = require_any_role(request, ("studio", "admin"))
     role = (user.get("role") or "").lower().strip()
 
