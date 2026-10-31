@@ -81,6 +81,7 @@ FINAL_FIELDS = (
 )
 EVIDENCE_ONLY_PATHS = {
     "docs/ACCESSIBILITY_ACCEPTANCE_2026-10-29.md",
+    "docs/OPERATIONAL_ACCEPTANCE_2026-10-31.md",
     "docs/PAYMENT_REFUND_DISPUTE_RUNBOOK_2026-10-29.md",
     "docs/PAYPAL_LIVE_READINESS_2026-10-29.md",
     "docs/PRODUCTION_APPROVALS_2026-10-29.md",
@@ -89,9 +90,11 @@ EVIDENCE_ONLY_PATHS = {
     "docs/RESTORE_ACCEPTANCE_2026-10-31.md",
     "scripts/check_production_approvals.py",
     "scripts/check_accessibility_acceptance.py",
+    "scripts/check_operational_acceptance.py",
     "scripts/check_release_preflight.py",
     "scripts/check_restore_acceptance.py",
     "tests/test_accessibility_acceptance.py",
+    "tests/test_operational_acceptance.py",
     "tests/test_production_approvals.py",
     "tests/test_release_preflight.py",
     "tests/test_restore_acceptance.py",

@@ -20,6 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from qrfacile_app.runtime_config import load_runtime_config
 from qrfacile_app.services.transactional_email import load_smtp_config
 from scripts.check_accessibility_acceptance import validate_accessibility_acceptance
+from scripts.check_operational_acceptance import validate_operational_acceptance
 from scripts.check_production_approvals import approved_release, evidence_only_changes, validate_approvals
 from scripts.check_restore_acceptance import validate_restore_acceptance
 from scripts.run_operational_monitor import load_alert_recipient
@@ -116,6 +117,7 @@ def evaluate_preflight(
     max_backup_age_seconds: float = 24 * 60 * 60,
     approval_errors: list[str] | None = None,
     accessibility_errors: list[str] | None = None,
+    operational_errors: list[str] | None = None,
     restore_errors: list[str] | None = None,
 ) -> list[str]:
     errors: list[str] = []
@@ -123,6 +125,8 @@ def evaluate_preflight(
         errors.append("approvazioni produzione incomplete o incoerenti")
     if accessibility_errors:
         errors.append("accettazione accessibilità incompleta o incoerente")
+    if operational_errors:
+        errors.append("accettazione SMTP/alert incompleta o incoerente")
     if restore_errors:
         errors.append("accettazione restore incompleta o incoerente")
     if not config.environment_explicit:
@@ -217,6 +221,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-paypal-mode", choices=("sandbox", "live"), required=True)
     parser.add_argument("--approvals-path", type=Path, required=True)
     parser.add_argument("--accessibility-path", type=Path, required=True)
+    parser.add_argument("--operational-acceptance-path", type=Path, required=True)
     parser.add_argument("--restore-acceptance-path", type=Path, required=True)
     parser.add_argument("--expected-pr", type=int, required=True)
     parser.add_argument("--min-free-gb", type=float, default=2.0)
@@ -242,6 +247,7 @@ def main(argv: list[str] | None = None) -> int:
         free_bytes = shutil.disk_usage(candidate_root).free
         approvals_text = args.approvals_path.read_text(encoding="utf-8")
         accessibility_text = args.accessibility_path.read_text(encoding="utf-8")
+        operational_text = args.operational_acceptance_path.read_text(encoding="utf-8")
         restore_text = args.restore_acceptance_path.read_text(encoding="utf-8")
         approved_sha = approved_release(approvals_text)
         approval_paths = (
@@ -275,6 +281,11 @@ def main(argv: list[str] | None = None) -> int:
         ),
         accessibility_errors=validate_accessibility_acceptance(
             accessibility_text,
+            expected_release=expected_release,
+            expected_environment=args.expected_environment,
+        ),
+        operational_errors=validate_operational_acceptance(
+            operational_text,
             expected_release=expected_release,
             expected_environment=args.expected_environment,
         ),
