@@ -103,4 +103,3 @@ Riferimenti ufficiali:
 - https://developer.paypal.com/api/rest/webhooks/rest/
 - https://developer.paypal.com/api/rest/webhooks/simulator/
 - https://developer.paypal.com/api/webhooks/v1/simulate-event-post/
-
