@@ -63,7 +63,7 @@ jobs:
 
       - name: Compile all Python modules
         run: |
-          python -m compileall -q qrfacile_app app scripts tests main.py
+          python -m compileall -q qrfacile_app scripts tests main.py
 
       - name: Import application with Python warnings as errors
         run: |
