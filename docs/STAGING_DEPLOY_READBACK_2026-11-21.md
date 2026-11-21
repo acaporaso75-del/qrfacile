@@ -509,3 +509,34 @@ Il test Danea è **sospeso: pagamento Sandbox da completare con il titolare al
 PC**. L'unico ordine predisposto resta non pagato; capture, email `.DefXml`, UI
 Admin, idempotenza e import Easyfatt restano `NOT_VERIFIED`. Nessuna operazione
 ha interessato produzione, database produzione, PayPal Live, Caddy o DNS.
+
+## Configurazione e prova alert operativo — 2026-11-21
+
+Solo su staging è stato configurato il nome
+`QRFACILE_OPERATIONAL_ALERT_TO`, senza stampare il valore. Il file `.env` ha
+mantenuto proprietario applicativo e modo `0600`. Prima della modifica è stata
+creata e verificata la copia con checksum:
+
+```text
+/opt/qrfacile-backups/staging/20261121_224437_pre_operational_alert_0afb234327b6
+```
+
+Il servizio `qrfacile-staging.service` è stato riavviato; stato finale
+`active`, `/healthz` `OK`, ambiente `staging`, release `0afb234`.
+
+Il wrapper `scripts/run_operational_monitor.py` è stato eseguito in modalità di
+prova con soglia contabile prudenziale pari a zero. Esito aggregato:
+
+```text
+transactional_email=ok
+paypal_webhook_queue=ok
+privacy_sla=ok
+payment_reconciliation=alert
+OPERATIONAL_MONITOR_ALERT_SENT checks=4
+```
+
+È stato inviato un solo alert sintetico contenente esclusivamente nomi e stati
+aggregati, senza payload, identificativi o dati personali. Il titolare ne ha
+confermato la ricezione nella chat QRFacile il 2026-11-21: **PASS** per la
+consegna dell'alert staging. Nessuna modifica è stata eseguita su database,
+produzione o PayPal.

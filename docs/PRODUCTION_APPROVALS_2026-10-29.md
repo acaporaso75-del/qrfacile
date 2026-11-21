@@ -1,6 +1,6 @@
 # QRFacile — pacchetto approvazioni produzione
 
-Release candidate: `f89c59ec520cc8e6463e978d6c2612cb8bbe124f`
+Release candidate: `0afb234327b66ad3a91e47402c9ba26a88f0aede`
 PR: `#12`, Draft verso `main`
 Data preparazione: 2026-10-29
 
@@ -60,23 +60,20 @@ Il professionista deve confermare almeno:
 
 ### Approvazione contabile
 
-Parere aziendale del CEO: **APPROVATO**. Angelo Caporaso, CEO Enolab, conferma
-il 2026-10-30 (Europe/Rome) il perimetro e le proposte della scheda contabile e
-dichiara di aver espresso direttamente il relativo parere per la decisione
-aziendale. Evidenza: dichiarazioni nella chat QRFacile del 2026-10-30. Il parere
-non attribuisce una qualifica professionale contabile o l'iscrizione a un Albo.
+Parere aziendale del CEO, non professionale e senza attribuzione di qualifica
+contabile o iscrizione a un Albo.
 
-- Decisione: [ ] APPROVATO  [ ] APPROVATO CON CONDIZIONI  [ ] RESPINTO
-- Nome e cognome:
-- Qualifica/Albo:
-- Studio:
-- Data e fuso orario:
-- Paesi e regimi fiscali autorizzati al self-service:
-- Processo di fatturazione approvato:
-- Processo di riconciliazione/rimborso approvato:
-- Condizioni o modifiche richieste:
-- Riferimento parere/verbale:
-- Firma o evidenza equivalente:
+- Decisione: [ ] APPROVATO  [x] APPROVATO CON CONDIZIONI  [ ] RESPINTO
+- Nome e cognome: Angelo Caporaso
+- Qualifica/Albo: CEO Enolab S.r.l.; parere aziendale non professionale; nessun Albo dichiarato
+- Studio: Enolab S.r.l.
+- Data e fuso orario: 2026-11-21, Europe/Rome
+- Paesi e regimi fiscali autorizzati al self-service: Italia, regime IVA ordinario, clienti B2B con P.IVA; esteri, esenti e reverse charge solo su preventivo
+- Processo di fatturazione approvato: fattura elettronica emessa internamente con Danea Easyfatt; per ogni ordine pagato QRFacile invia una mail a fatturazione tramite `QRFACILE_INVOICE_TO`, con copia tramite `QRFACILE_INVOICE_CC`, contenente i dati e il file Easyfatt-Xml, rintracciabile in `/admin/invoices`
+- Processo di riconciliazione/rimborso approvato: riconciliazione su PayPal e `/admin/invoices`; rimborsi e chargeback gestiti da Angelo Caporaso, sostituto Luigi, secondo `PAYMENT_REFUND_DISPUTE_RUNBOOK_2026-10-29.md`, con nota di credito in Danea
+- Condizioni o modifiche richieste: chiusura del test Danea end-to-end registrato in `DANEA_HANDOFF_ACCEPTANCE_2026-11-21.md`
+- Riferimento parere/verbale: decisione del titolare nella chat QRFacile del 2026-11-21
+- Firma o evidenza equivalente: dichiarazione diretta di Angelo Caporaso nella chat QRFacile del 2026-11-21
 
 ## 3. Approvazione legale, privacy e AI
 
@@ -96,50 +93,49 @@ Il legale/DPO deve esaminare almeno:
 
 ### Approvazione legale/DPO
 
-Parere aziendale del CEO: **APPROVATO**. Angelo Caporaso, CEO Enolab, conferma
-il 2026-10-30 (Europe/Rome) il perimetro e le proposte della scheda legale/DPO
-e dichiara di aver espresso direttamente il relativo parere per la decisione
-aziendale. Evidenza: dichiarazioni nella chat QRFacile del 2026-10-30. Il parere
-non attribuisce il ruolo professionale di avvocato o DPO.
+Parere aziendale del CEO; nessun DPO nominato, ritenuto non obbligatorio per il
+profilo di trattamento dichiarato. Il parere non attribuisce il ruolo
+professionale di avvocato o DPO.
 
-- Decisione: [ ] APPROVATO  [ ] APPROVATO CON CONDIZIONI  [ ] RESPINTO
-- Nome e cognome:
-- Ruolo e organizzazione:
-- Data e fuso orario:
-- Documenti/versioni approvati:
-- Trattamenti e casi d’uso AI approvati:
-- SLA diritti interessati:
-- SLA incidenti:
-- Condizioni o modifiche richieste:
-- Riferimento parere/verbale:
-- Firma o evidenza equivalente:
+- Decisione: [ ] APPROVATO  [x] APPROVATO CON CONDIZIONI  [ ] RESPINTO
+- Nome e cognome: Angelo Caporaso
+- Ruolo e organizzazione: CEO Enolab S.r.l.; parere aziendale; nessun DPO nominato
+- Data e fuso orario: 2026-11-21, Europe/Rome
+- Documenti/versioni approvati: Termini 2026-10-29, Privacy 2026-10-25, DPA template
+- Trattamenti e casi d’uso AI approvati: nessun provider AI attivo in produzione; registro e revisione umana restano fail-closed
+- SLA diritti interessati: risposta entro 30 giorni ai sensi dell'art. 12 GDPR
+- SLA incidenti: valutazione entro 24 ore; notifica al Garante entro 72 ore se dovuta ai sensi dell'art. 33 GDPR
+- Condizioni o modifiche richieste: revisione legale esterna raccomandata, non bloccante; mantenere aggiornato il registro dei trattamenti ai sensi dell'art. 30 GDPR
+- Riferimento parere/verbale: decisione del titolare nella chat QRFacile del 2026-11-21
+- Firma o evidenza equivalente: dichiarazione diretta di Angelo Caporaso nella chat QRFacile del 2026-11-21
 
 ## 4. Responsabilità operative
 
 | Processo | Responsabile primario | Sostituto | SLA | Canale di escalation | Evidenza prova |
 | --- | --- | --- | --- | --- | --- |
-| Monitoraggio disponibilità |  |  |  |  |  |
-| Alert applicativi/database |  |  |  |  |  |
-| Backup e restore |  |  |  |  |  |
-| Richieste privacy |  |  |  |  |  |
-| Incidenti sicurezza |  |  |  |  |  |
-| Revisione umana AI |  |  |  |  |  |
-| Supporto clienti |  |  |  |  |  |
-| Fatturazione |  |  |  |  |  |
-| Riconciliazione PayPal |  |  |  |  |  |
-| Rimborsi/chargeback |  |  |  |  |  |
+| Monitoraggio disponibilità | Angelo Caporaso | Luigi | presa in carico entro 4 ore lavorative | email a angelo.caporaso@enolab.it, in copia luigi@enolab.it | da provare al GO |
+| Alert applicativi/database | Angelo Caporaso | Luigi | presa in carico entro 4 ore lavorative | email a angelo.caporaso@enolab.it, in copia luigi@enolab.it | alert sintetico staging inviato e ricevuto dal titolare il 2026-11-21 |
+| Backup e restore | Angelo Caporaso | Luigi | verifica mensile | email a angelo.caporaso@enolab.it, in copia luigi@enolab.it | da provare al GO |
+| Richieste privacy | Angelo Caporaso | Luigi | risposta entro 30 giorni | email a angelo.caporaso@enolab.it, in copia luigi@enolab.it | da provare al GO |
+| Incidenti sicurezza | Angelo Caporaso | Luigi | valutazione entro 24 ore; notifica entro 72 ore se dovuta | email a angelo.caporaso@enolab.it, in copia luigi@enolab.it | da provare al GO |
+| Revisione umana AI | Angelo Caporaso | Luigi | non applicabile: nessun AI attivo | email a angelo.caporaso@enolab.it, in copia luigi@enolab.it | nessun AI attivo; gate fail-closed |
+| Supporto clienti | Angelo Caporaso | Luigi | risposta entro 1 giorno lavorativo | email a angelo.caporaso@enolab.it, in copia luigi@enolab.it | da provare al GO |
+| Fatturazione | Angelo Caporaso | Luigi | entro 2 giorni lavorativi dal pagamento | email a angelo.caporaso@enolab.it, in copia luigi@enolab.it | test Danea end-to-end da chiudere |
+| Riconciliazione PayPal | Angelo Caporaso | Luigi | settimanale | email a angelo.caporaso@enolab.it, in copia luigi@enolab.it | da provare al GO |
+| Rimborsi/chargeback | Angelo Caporaso | Luigi | entro 5 giorni lavorativi | email a angelo.caporaso@enolab.it, in copia luigi@enolab.it | da provare al GO |
 
 ### Approvazione operativa
 
 - Decisione: [ ] APPROVATO  [x] APPROVATO CON CONDIZIONI  [ ] RESPINTO
 - Responsabile del rilascio: Angelo Caporaso
-- Responsabile del rollback: Angelo Caporaso; sostituto tecnico da nominare
+- Responsabile del rollback: Angelo Caporaso
+- Sostituto tecnico: Luigi
 - Finestra di rilascio autorizzata: da concordare dopo la chiusura di tutti i gate sullo SHA esatto
 - Durata osservazione post-deploy: minimo 2 ore con monitoraggio attivo e nuova verifica il primo giorno lavorativo
-- Canale incidenti: da indicare e collaudare prima del GO
-- Data e fuso orario: 2026-10-30, Europe/Rome
+- Canale incidenti: email angelo.caporaso@enolab.it + luigi@enolab.it
+- Data e fuso orario: 2026-11-21, Europe/Rome
 - Firma o evidenza equivalente: dichiarazione diretta di Angelo Caporaso nella chat QRFacile «confermo tutti e tre»
-- Condizioni: nominare sostituti e specialisti; provare webhook Sandbox, SMTP/alert, accessibilità, secret store, backup fresco, preflight e smoke test. Finché restano aperte, l'esito tecnico è NO-GO.
+- Condizioni: chiudere test Danea end-to-end, webhook Sandbox, accessibilità, percorso autorizzato dei segreti Live, backup fresco/restore, preflight e smoke test. Finché restano aperte, l'esito tecnico è NO-GO.
 
 ## 5. Conferma tecnica finale
 
@@ -149,9 +145,9 @@ non attribuisce il ruolo professionale di avvocato o DPO.
 - [ ] Backup, baseline, PR, SHA e CI coincidono ancora con il release gate.
 - [ ] La PR #12 può essere convertita da Draft a Ready.
 
-Esito finale: [ ] GO  [ ] NO-GO
+Esito finale: [ ] GO  [x] NO-GO
 
-- Nome responsabile GO/NO-GO:
-- Ruolo:
-- Data e fuso orario:
-- Note:
+- Nome responsabile GO/NO-GO: Angelo Caporaso
+- Ruolo: CEO Enolab S.r.l.
+- Data e fuso orario: 2026-11-21, Europe/Rome
+- Note: NO-GO fino alla chiusura documentata delle condizioni, incluso il test Danea end-to-end, la ricezione dell'alert operativo, i gate PayPal Live e le verifiche tecniche finali.

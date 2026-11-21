@@ -2,6 +2,43 @@
 
 Questo documento prepara l’attivazione senza contenere segreti e senza autorizzare pagamenti reali.
 
+## Decisione del titolare del 2026-11-21
+
+Decisione: **Live al primo deploy di produzione**, subordinatamente al GO
+documentato e al superamento di tutti i gate tecnici. Questa decisione non
+autorizza un deploy anticipato, un pagamento Live o una capture reale.
+
+Al momento del deploy il titolare deve fornire e inserire personalmente,
+direttamente nel file `.env` di produzione già protetto:
+
+- il Client ID Live dell'app REST del conto business PayPal Enolab;
+- il Secret Live della stessa app REST.
+
+I valori non devono essere inseriti in chat, repository, ticket, documenti,
+output di comandi o log. L'operatore tecnico verifica esclusivamente la presenza
+dei nomi delle variabili e la modalità `live`, senza leggerne o stamparne i
+valori.
+
+Il titolare deve inoltre registrare nella REST app Live il webhook:
+
+```text
+https://www.qrfacile.it/paypal/webhook
+```
+
+con gli stessi sei eventi usati in Sandbox:
+
+1. `PAYMENT.CAPTURE.COMPLETED`;
+2. `PAYMENT.CAPTURE.DENIED`;
+3. `PAYMENT.CAPTURE.PENDING`;
+4. `PAYMENT.CAPTURE.REFUNDED`;
+5. `CHECKOUT.PAYMENT-APPROVAL.REVERSED`;
+6. `CUSTOMER.DISPUTE.CREATED`.
+
+L'identificativo del webhook Live viene inserito dal titolare come
+`PAYPAL_WEBHOOK_ID` nello stesso `.env` protetto, senza comunicarne il valore.
+La registrazione e la presenza delle chiavi vanno provate al GO; non si creano
+né si richiedono credenziali durante la preparazione documentale.
+
 ## Configurazione usata dall’applicazione
 
 Variabili richieste dal runtime:
@@ -11,7 +48,10 @@ Variabili richieste dal runtime:
 - `PAYPAL_SECRET`
 - `APP_BASE_URL=https://www.qrfacile.it`
 
-Le credenziali devono già esistere nel secret store autorizzato. Non devono essere copiate nel repository, nella chat, nei log, nella cronologia shell o in un nuovo `.env` creato autonomamente.
+Le credenziali devono essere inserite dal titolare direttamente nel file `.env`
+di produzione al momento del deploy autorizzato, mantenendo proprietà e modo
+protetto esistenti. Non devono essere copiate nel repository, nella chat, nei
+log, nella cronologia shell o in un nuovo `.env` creato autonomamente.
 
 ## Conferma secret store
 

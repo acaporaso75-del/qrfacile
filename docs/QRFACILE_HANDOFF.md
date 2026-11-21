@@ -107,6 +107,11 @@ credenziali, token o segreti.
   `docs/DANEA_HANDOFF_ACCEPTANCE_2026-11-21.md`.
   Stato corrente: **sospeso, pagamento Sandbox da completare con il titolare
   al PC**; nessun pagamento reale eseguito.
+- Alert operativo staging: `QRFACILE_OPERATIONAL_ALERT_TO` configurato senza
+  esporne il valore; `.env` `0600`, backup verificato
+  `/opt/qrfacile-backups/staging/20261121_224437_pre_operational_alert_0afb234327b6`;
+  restart e health `OK`. Un singolo alert sintetico aggregato è stato inviato;
+  ricezione confermata dal titolare nella chat QRFacile il 2026-11-21: **PASS**.
 - Origin pubblico dedicato, DNS e reverse proxy staging: `NOT_VERIFIED`; il
   collaudo attuale usa `http://192.168.1.139:8001`.
 - Database privilege isolation: la revoca esplicita di `CONNECT` dall'utente
