@@ -1,7 +1,9 @@
 # QRFacile — accettazione hand-off Danea su staging
 
-Data del collaudo: 2026-11-21, 21:05–21:11 CET (Europe/Rome)  
-Runtime: solo staging, `192.168.1.139:8001`  
+Data del collaudo: 2026-11-21, 21:05–21:11 CET (Europe/Rome)
+
+Runtime: solo staging, `192.168.1.139:8001`
+
 Release installata: `10fda8c56e6ab9c1dcc89a00938f30a028743704`
 
 ## Perimetro e criterio di evidenza
@@ -106,4 +108,3 @@ allo SDI o eliminata da Easyfatt.
 Non è stato osservato un errore applicativo. Il limite è operativo: il conto
 acquirente Sandbox richiedeva l'interazione del titolare, che non era al PC.
 L'ordine è rimasto non pagato e non è una prova end-to-end dell'hand-off Danea.
-
