@@ -9,8 +9,8 @@ router = APIRouter()
 @router.get("/", response_class=HTMLResponse)
 def home(request: Request):
     actions = """
-    <a class="btn" href="#moduli">Moduli e piani</a>
-    <a class="btn btn-primary" href="/wine">Vai a QRFACILE Wine</a>
+    <a class="btn" href="/wine">Etichetta vino</a>
+    <a class="btn btn-primary" href="/register-winery">Prova gratis</a>
     <a class="btn" href="/login">Login</a>
     """
 
@@ -21,12 +21,13 @@ def home(request: Request):
           <div class="moduleEyebrow">Piattaforma QR modulare</div>
           <h1>QRFACILE</h1>
           <p>
-            Una piattaforma generale per creare QR dinamici verticali. Ogni modulo
-            avra il proprio flusso, le proprie pagine pubbliche e i propri piani.
+            Etichetta digitale del vino pronta in pochi minuti: ingredienti,
+            valori nutrizionali, allergeni e riciclo in un QR che stampi una volta
+            e aggiorni quando vuoi. Nessun abbonamento: 3 QR vino gratuiti per iniziare.
           </p>
           <div class="moduleHeroActions">
-            <a class="btn btn-primary" href="/wine">Vai a QRFACILE Wine</a>
-            <a class="btn" href="/login">Login</a>
+            <a class="btn btn-primary" href="/register-winery">Inizia gratis, 3 QR inclusi</a>
+            <a class="btn" href="/wine">Come funziona</a>
           </div>
           <div class="moduleHeroBadges">
             <span>Moduli attivabili</span>
@@ -43,7 +44,7 @@ def home(request: Request):
           <h2>QR dinamici per esigenze diverse.</h2>
           <p>
             Un'unica piattaforma per creare QR dinamici, contenuti aggiornabili
-            e pagine dedicate. Parti dal modulo piu adatto e attiva nuovi usi QR
+            e pagine dedicate. Parti dal modulo più adatto e attiva nuovi usi QR
             quando ti servono.
           </p>
         </div>
@@ -57,7 +58,7 @@ def home(request: Request):
         </div>
         <div class="moduleFeature">
           <b>Pagine pubbliche</b>
-          <span>Esperienze verticali per consultazione, informazione, raccolta dati o operativita.</span>
+          <span>Esperienze verticali per consultazione, informazione, raccolta dati o operatività.</span>
         </div>
         <div class="moduleFeature">
           <b>Console riservata</b>
@@ -65,13 +66,13 @@ def home(request: Request):
         </div>
         <div class="moduleFeature">
           <b>Piani chiari</b>
-          <span>Scegli il percorso piu adatto al tuo uso, dal primo progetto alla crescita.</span>
+          <span>Scegli il percorso più adatto al tuo uso, dal primo progetto alla crescita.</span>
         </div>
       </section>
 
       <section class="moduleCatalogHead" id="moduli">
         <div class="moduleEyebrow">Roadmap modulare</div>
-        <h2>Una base, piu moduli verticali.</h2>
+        <h2>Una base, più moduli verticali.</h2>
         <p>
           QRFACILE nasce come piattaforma generale: ogni modulo mantiene lo stesso
           approccio operativo, con QR dinamici, pagine pubbliche e pannello di gestione.
@@ -138,12 +139,12 @@ def home(request: Request):
         <div>
           <div class="moduleEyebrow">Moduli e piani</div>
           <h2>Trova il modulo giusto per il tuo prossimo QR.</h2>
-          <p>Inizia da un uso concreto e aggiungi nuove esperienze QR quando la tua attivita cresce.</p>
+          <p>Inizia da un uso concreto e aggiungi nuove esperienze QR quando la tua attività cresce.</p>
         </div>
         <div class="moduleFinalActions">
-          <a class="btn btn-primary" href="/wine">Vai a QRFACILE Wine</a>
+          <a class="btn btn-primary" href="/register-winery">Prova gratis QRFACILE Wine</a>
+          <a class="btn" href="/wine">Scopri il modulo Wine</a>
           <a class="btn" href="/login">Login</a>
-          <a class="btn" href="#moduli">Esplora i moduli</a>
         </div>
       </section>
 
@@ -1170,7 +1171,7 @@ def _coming_soon_module_page(
           <p>
             Questo modulo non ha ancora pricing reale, crediti dedicati o un
             onboarding pubblico specifico. Puoi richiedere informazioni per
-            valutare il caso d'uso piu adatto.
+            valutare il caso d'uso più adatto.
           </p>
         </div>
         <div class="futureActions">
@@ -1450,7 +1451,7 @@ def events_home(request: Request):
         examples=[
             ("Programmi", "Agenda, orari e informazioni sempre aggiornabili."),
             ("Votazioni", "Raccolta preferenze e scelte dal pubblico."),
-            ("Feedback", "Questionari rapidi dopo sessioni o attivita."),
+            ("Feedback", "Questionari rapidi dopo sessioni o attività."),
             ("Mappe", "Indicazioni, sale, stand e punti di interesse."),
             ("Accessi rapidi", "Link utili per partecipanti e organizzatori."),
             ("Campagne evento", "Contenuti temporanei collegati a materiali stampati."),

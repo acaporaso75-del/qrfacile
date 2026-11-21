@@ -152,3 +152,15 @@ def test_form_requires_only_trial_fields_and_keeps_billing_optional():
     assert required == {"email", "password", "password_confirm", "name", "terms_accepted", "privacy_acknowledged"}
     assert "<details" in form and "facoltativi" in form
     assert 'name="contact_name"' not in form
+
+
+def test_home_hero_leads_to_free_signup_without_future_tense():
+    from starlette.requests import Request
+    from qrfacile_app.landing_routes import home
+
+    request = Request({"type": "http", "method": "GET", "path": "/", "headers": [], "query_string": b""})
+    html = home(request).body.decode()
+    hero = html[html.index('class="moduleHero"'):html.index('class="moduleIntro"')]
+    assert 'href="/register-winery"' in hero
+    assert "3 QR" in hero
+    assert "avra il proprio flusso" not in html
