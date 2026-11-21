@@ -168,6 +168,7 @@ produzione o PayPal Live.
 
 1. **FAIL bloccante:** verifica email incompatibile con il tipo storico
    `integer` della colonna `users.email_verified`.
+   **Risolto in `32cf797`, vedi Ridistribuzione.**
 2. Checkout Sandbox e flusso vino completo restano `NOT_VERIFIED`.
 3. Shellcheck non è disponibile sulla workstation; `bash -n` e il test LF sono
    stati eseguiti.
@@ -321,9 +322,10 @@ Sandbox pending e un vino pubblicato, quindi occorre preservare le relazioni.
 
 ### Limiti residui
 
-1. La copia versionata di `scripts/deploy_staging.sh` deve essere resa
-   indipendente dalla proprietà Git eseguendo clone/checkout come utente del
-   repository; la correzione operativa non è stata committata.
+1. **Risolto in `5f88b0f`:** `scripts/deploy_staging.sh` esegue Git come
+   proprietario del checkout. La correzione è coperta dal test dedicato e da
+   ShellCheck nella Compliance CI; la validazione sull'host avverrà al prossimo
+   deploy staging autorizzato.
 2. Non sono stati eseguiti login PayPal, approvazioni, capture o pagamenti.
 3. Produzione, `.env`, Caddy, DNS, PayPal Live e database produzione non sono
    stati modificati.
