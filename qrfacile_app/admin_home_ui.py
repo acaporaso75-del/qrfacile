@@ -184,6 +184,7 @@ def admin_home(request: Request, q: str = "", msg: str = "", err: str = ""):
         ("/app/start", "Menu"),
         ("/app/dashboard", "Dashboard"),
         ("/admin/paypal-webhooks", "Eventi PayPal"),
+        ("/admin/invoices", "Fatturazione"),
         ("/logout", "Logout"),
     )
 

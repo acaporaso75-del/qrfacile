@@ -49,6 +49,7 @@ REQUIRED_MIGRATIONS = (
     "2026_login_rate_limit.sql",
     "2026_terms_single_reference_qr.sql",
     "2026_paypal_webhook_events.sql",
+    "2026_order_invoice_handoff.sql",
 )
 
 

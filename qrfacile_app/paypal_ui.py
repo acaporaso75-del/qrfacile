@@ -12,12 +12,14 @@ from urllib.parse import quote_plus, urlsplit
 from fastapi import APIRouter, Request, HTTPException, Form
 from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 from psycopg.rows import dict_row
+from starlette.background import BackgroundTask
 
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.csrf_core import require_csrf
 from qrfacile_app.db import pg
 from qrfacile_app.annual_packages import annual_quote, grant_annual_units, load_order_product, validate_capture
 from qrfacile_app.fiscal_profile import normalized_italian_fiscal_profile
+from qrfacile_app.services.invoice_handoff import handoff_after_payment
 
 from qrfacile_app.pricing_config import (
     get_purchase_pack,
@@ -468,7 +470,12 @@ async def paypal_webhook(request: Request):
                 (order_id, event_id, event_type, PAYPAL_MODE, status, failure_code),
             )
             conn.commit()
-    return JSONResponse({"ok": True, "status": status})
+    response = JSONResponse({"ok": True, "status": status})
+    if status == "processed" and order_id:
+        # After commit and after the response: billing hand-off never delays
+        # or reverses the PayPal acknowledgement.
+        response.background = BackgroundTask(handoff_after_payment, order_id)
+    return response
 
 
 @router.post("/paypal/start")
@@ -784,6 +791,7 @@ def paypal_return(
     return RedirectResponse(
         "/app/billing?msg=Pagamento%20completato%2C%20crediti%20caricati",
         status_code=303,
+        background=BackgroundTask(handoff_after_payment, int(locked_order["id"])),
     )
 
 
