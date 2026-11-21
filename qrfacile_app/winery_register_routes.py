@@ -74,6 +74,23 @@ def _invite_is_valid(inv: dict) -> tuple[bool, str]:
     return True, ""
 
 
+FISCAL_REGISTRATION_FIELDS = ("vat", "sdi", "pec", "billing_address", "city", "billing_cap", "province")
+
+
+def registration_fiscal_fields(*, name: str, billing_country: str = "IT", **fields: str) -> dict:
+    """Fiscal data is optional at sign-up and enforced again at checkout.
+
+    All fields empty: the account is created with an empty billing profile and
+    the paid checkout redirects to the settings page to complete it. Any field
+    filled: the whole profile is validated now, so stored data is coherent.
+    """
+    values = {key: (fields.get(key) or "").strip() for key in FISCAL_REGISTRATION_FIELDS}
+    country = (billing_country or "IT").strip().upper() or "IT"
+    if not any(values.values()):
+        return {"name": name.strip(), **values, "billing_country": country}
+    return normalized_italian_fiscal_profile({"name": name, **values, "billing_country": country})
+
+
 def _input(name: str, type_: str, placeholder: str, value: str = "", required: bool = False) -> str:
     req = "required" if required else ""
     labels = {
@@ -232,8 +249,8 @@ def register_winery_get(request: Request, invite: str = "", err: str = "", msg: 
               </div>
 
               <div class="p" style="font-size:16px;margin-top:10px;line-height:1.6">
-                Crea l’account della cantina per gestire lotti, etichette digitali,
-                QR dinamici, dati fiscali ed esportazioni.
+                Bastano email, password e nome della cantina: in un minuto hai
+                3 QR vino gratuiti per provare. I dati di fatturazione servono solo per acquistare.
               </div>
             </div>
 
@@ -267,19 +284,7 @@ def register_winery_get(request: Request, invite: str = "", err: str = "", msg: 
                 </div>
               </div>
 
-              <div class="grid2 register-form-grid" style="margin-top:14px">
-                <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">P.IVA</label>
-                  {_input("vat", "text", "IT12345678901", "", True)}
-                </div>
-
-                <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">SDI</label>
-                  {_input("sdi", "text", "XXXXXXX", "", True)}
-                </div>
-              </div>
-
-              <fieldset style="margin-top:20px;padding:16px;border:1px solid rgba(15,23,42,.14);border-radius:14px">
+              <fieldset style="margin-top:18px;padding:16px;border:1px solid rgba(15,23,42,.14);border-radius:14px">
                 <legend style="font-weight:800;padding:0 6px">Condizioni e privacy</legend>
                 <label style="display:flex;gap:10px;align-items:flex-start;line-height:1.45">
                   <input type="checkbox" name="terms_accepted" value="yes" required style="margin-top:4px">
@@ -291,53 +296,63 @@ def register_winery_get(request: Request, invite: str = "", err: str = "", msg: 
                 </label>
               </fieldset>
 
+              <details class="register-fiscal" style="margin-top:16px;padding:14px 16px;border:1px dashed rgba(15,23,42,.18);border-radius:14px;background:rgba(255,255,255,.6)">
+                <summary style="cursor:pointer;font-weight:800;color:#334155">
+                  Dati di fatturazione (facoltativi ora)
+                </summary>
+                <p class="p" style="margin:8px 0 0;font-size:14px;line-height:1.5">
+                  Servono solo quando acquisti crediti: puoi inserirli adesso oppure
+                  più tardi da Impostazioni cantina. I 3 QR gratuiti non li richiedono.
+                </p>
               <div class="grid2 register-form-grid" style="margin-top:14px">
                 <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">PEC opzionale</label>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">P.IVA</label>
+                  {_input("vat", "text", "IT12345678901")}
+                </div>
+
+                <div>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Codice SDI</label>
+                  {_input("sdi", "text", "XXXXXXX")}
+                </div>
+              </div>
+
+                <div class="grid2 register-form-grid" style="margin-top:14px">
+                <div>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">PEC (in alternativa allo SDI)</label>
                   {_input("pec", "text", "pec@cantinapec.it")}
                 </div>
 
                 <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Telefono opzionale</label>
+                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Telefono</label>
                   {_input("phone", "text", "+39 0824 ...")}
                 </div>
               </div>
 
-              <div class="grid2 register-form-grid" style="margin-top:14px">
-                <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Referente</label>
-                  {_input("contact_name", "text", "Nome Cognome", "", True)}
-                </div>
-
-                <div>
-                  <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Cellulare referente</label>
-                  {_input("contact_phone", "text", "+39 333 ...", "", True)}
-                </div>
-              </div>
-
-              <div class="grid2 register-form-grid" style="margin-top:14px">
+                <div class="grid2 register-form-grid" style="margin-top:14px">
                 <div>
                   <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Indirizzo di fatturazione</label>
-                  {_input("billing_address", "text", "Via..., n°", "", True)}
+                  {_input("billing_address", "text", "Via..., n°")}
                 </div>
 
                 <div>
                   <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Città</label>
-                  {_input("city", "text", "Benevento", "", True)}
+                  {_input("city", "text", "Benevento")}
                 </div>
               </div>
 
-              <div class="grid2 register-form-grid" style="margin-top:14px">
+                <div class="grid2 register-form-grid" style="margin-top:14px">
                 <div>
                   <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">CAP</label>
-                  {_input("billing_cap", "text", "82100", "", True)}
+                  {_input("billing_cap", "text", "82100")}
                 </div>
 
                 <div>
                   <label style="display:block;margin-bottom:7px;font-weight:700;color:#334155">Provincia</label>
-                  {_input("province", "text", "BN", "", True)}
+                  {_input("province", "text", "BN")}
                 </div>
               </div>
+              </details>
+
               <input type="hidden" name="billing_country" value="IT">
 
               <div class="register-actions" style="
@@ -476,16 +491,16 @@ def register_winery_post(
     password: str = Form(...),
     password_confirm: str = Form(...),
     name: str = Form(...),
-    vat: str = Form(...),
-    sdi: str = Form(...),
+    vat: str = Form(""),
+    sdi: str = Form(""),
     pec: str = Form(""),
     phone: str = Form(""),
-    contact_name: str = Form(...),
-    contact_phone: str = Form(...),
-    billing_address: str = Form(...),
-    city: str = Form(...),
-    billing_cap: str = Form(...),
-    province: str = Form(...),
+    contact_name: str = Form(""),
+    contact_phone: str = Form(""),
+    billing_address: str = Form(""),
+    city: str = Form(""),
+    billing_cap: str = Form(""),
+    province: str = Form(""),
     billing_country: str = Form("IT"),
     terms_accepted: str = Form(""),
     privacy_acknowledged: str = Form(""),
@@ -511,18 +526,22 @@ def register_winery_post(
             status_code=303,
         )
 
+    name = (name or "").strip()
+    if not name:
+        return RedirectResponse("/register-winery?err=Indica%20il%20nome%20della%20cantina", status_code=303)
+
     try:
-        fiscal = normalized_italian_fiscal_profile({
-            "name": name,
-            "vat": vat,
-            "sdi": sdi,
-            "pec": pec,
-            "billing_address": billing_address,
-            "city": city,
-            "billing_cap": billing_cap,
-            "province": province,
-            "billing_country": billing_country,
-        })
+        fiscal = registration_fiscal_fields(
+            name=name,
+            vat=vat,
+            sdi=sdi,
+            pec=pec,
+            billing_address=billing_address,
+            city=city,
+            billing_cap=billing_cap,
+            province=province,
+            billing_country=billing_country,
+        )
     except HTTPException as exc:
         message = quote_plus(str(exc.detail))
         return RedirectResponse(f"/register-winery?err={message}", status_code=303)
