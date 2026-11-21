@@ -57,18 +57,14 @@ credenziali, token o segreti.
 - Host applicativo: `192.168.1.139`.
 - Directory: `/opt/qrfacile-staging`.
 - Servizio: `qrfacile-staging.service`, verificato `active` il 2026-11-21;
-  processo osservato avviato il 2026-11-15 20:34:10 CET.
+  ultimo avvio riuscito 2026-11-21 11:47:14 CET.
 - Runtime: Gunicorn con worker Uvicorn, porta `8001` in ascolto.
-- Commit distribuito osservato: detached HEAD a
-  `ed7f0b0663f620d8c35afb58adc5f446073e0285`.
-- Target Fase 2 `3da7d35654ed2bc9b74cc8865c11cf293d70473f`:
-  **non installato** al readback del 2026-11-21; data deploy `NOT_VERIFIED`.
-- Ultimo backup disponibile e verificato in lettura:
-  `/opt/qrfacile-backups/staging/20261102_075131_staging_59cf70a834db`;
-  non è un backup del target Fase 2.
-- Ultimo rollback conservato:
-  `/opt/qrfacile-staging.rollback-20261102_075344-59cf70a834db`;
-  rollback specifico del target Fase 2 `NOT_VERIFIED`.
+- Commit distribuito: detached HEAD a
+  `3da7d35654ed2bc9b74cc8865c11cf293d70473f`.
+- Backup fresco verificato:
+  `/opt/qrfacile-backups/staging/20261121_114411_staging_ed7f0b0663f6`.
+- Rollback dedicato conservato:
+  `/opt/qrfacile-staging.rollback-20261121_114522-ed7f0b0663f6`.
 - Readback completo:
   `docs/STAGING_DEPLOY_READBACK_2026-11-21.md`.
 - Database: PostgreSQL su `192.168.1.143:5432`, database
@@ -79,6 +75,10 @@ credenziali, token o segreti.
 - PayPal: staging verificato in modalità Sandbox. La CSP live espone
   `form-action 'self' https://www.sandbox.paypal.com`; un click reale da Billing
   ha raggiunto la pagina di accesso Sandbox. Nessun pagamento completato.
+- SMTP reale: messaggio ricevuto sulla casella controllata; il click è
+  bloccato da un `DatatypeMismatch` tra la colonna storica
+  `users.email_verified` (`integer`) e il booleano usato dal codice. Nessun
+  account è stato marcato verificato via SQL.
 - Origin pubblico dedicato, DNS e reverse proxy staging: `NOT_VERIFIED`; il
   collaudo attuale usa `http://192.168.1.139:8001`.
 - Database privilege isolation: la revoca esplicita di `CONNECT` dall'utente
