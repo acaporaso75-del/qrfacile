@@ -56,10 +56,21 @@ credenziali, token o segreti.
 
 - Host applicativo: `192.168.1.139`.
 - Directory: `/opt/qrfacile-staging`.
-- Servizio: `qrfacile-staging.service`, verificato `active` il 2026-08-07.
+- Servizio: `qrfacile-staging.service`, verificato `active` il 2026-11-21;
+  processo osservato avviato il 2026-11-15 20:34:10 CET.
 - Runtime: Gunicorn con worker Uvicorn, porta `8001` in ascolto.
-- Commit distribuito: detached HEAD pulito a
-  `2f29c3c0edb58873de1b374d386d42cc89bdc961`.
+- Commit distribuito osservato: detached HEAD a
+  `ed7f0b0663f620d8c35afb58adc5f446073e0285`.
+- Target Fase 2 `3da7d35654ed2bc9b74cc8865c11cf293d70473f`:
+  **non installato** al readback del 2026-11-21; data deploy `NOT_VERIFIED`.
+- Ultimo backup disponibile e verificato in lettura:
+  `/opt/qrfacile-backups/staging/20261102_075131_staging_59cf70a834db`;
+  non è un backup del target Fase 2.
+- Ultimo rollback conservato:
+  `/opt/qrfacile-staging.rollback-20261102_075344-59cf70a834db`;
+  rollback specifico del target Fase 2 `NOT_VERIFIED`.
+- Readback completo:
+  `docs/STAGING_DEPLOY_READBACK_2026-11-21.md`.
 - Database: PostgreSQL su `192.168.1.143:5432`, database
   `qrfacile_staging_db`, utente `qrfacile_staging_user`.
 - Percorsi configurati e verificati in precedenza: `APP_ROOT` sotto
