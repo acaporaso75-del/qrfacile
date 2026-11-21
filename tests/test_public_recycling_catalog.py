@@ -13,10 +13,12 @@ def test_public_recycling_middleware_targets_public_and_preview_labels():
     assert "CATALOG_SOURCE" in text
 
 
-def test_public_recycling_widget_marks_known_and_custom_codes():
+def test_public_recycling_widget_adds_collection_without_editor_warnings():
     text = (ROOT / "qrfacile_app" / "public_recycling_catalog_middleware.py").read_text(encoding="utf-8")
-    assert "Codice verificato nel catalogo" in text
-    assert "Codice personalizzato da verificare" in text
+    # Catalog checks belong to the winery editor; consumers never see them.
+    assert "Codice personalizzato da verificare" not in text
+    assert "Codice verificato nel catalogo" not in text
+    assert "qrfPublicRecycleCollection" in text
     assert "Le modalità di raccolta vanno verificate" in text
     assert ".recycleItem" in text
     assert ".materialCode" in text

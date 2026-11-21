@@ -1,4 +1,5 @@
 import time
+from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse
@@ -6,7 +7,7 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.db import pg
-from qrfacile_app.services.recycling_catalog import normalize_recycling_items
+from qrfacile_app.services.recycling_catalog import canonical_recycling_code, normalize_recycling_items
 from qrfacile_app.services.storage import versioned_upload_url
 from qrfacile_app.services.wine_compliance_explainability import run_explainable_wine_compliance
 from qrfacile_app import ui
@@ -355,8 +356,20 @@ def _fmt(x):
     return "—" if x is None or x == "" else str(x)
 
 
-def _num(x):
-    return ui.esc(_fmt(x))
+def _num(x, locale: str = "it"):
+    """Readable nutrition value: 0.000 -> 0, 2.600 -> 2,6 (IT) / 2.6 (EN)."""
+    if x is None or x == "":
+        return ui.esc(_fmt(x))
+    try:
+        value = Decimal(str(x))
+    except (InvalidOperation, ValueError):
+        return ui.esc(_fmt(x))
+    text = format(value.quantize(Decimal("0.01")).normalize(), "f")
+    if text in {"-0", ""}:
+        text = "0"
+    if locale == "it":
+        text = text.replace(".", ",")
+    return ui.esc(text)
 
 
 COMP_ICON = {
@@ -757,7 +770,7 @@ def _render_label_page(
             continue
 
         product = (r.get("product") or "").strip()
-        code = (r.get("code") or "").strip()
+        code = canonical_recycling_code(r.get("code"))
         extra = (r.get("extra_code") or "").strip()
         note = (r.get("note") or "").strip()
         codes = ", ".join([c for c in [code, extra] if c])
@@ -790,13 +803,13 @@ def _render_label_page(
 
     recycle_html = "".join(rec_cards) if rec_cards else f"<span class='empty'>{ui.esc(tr(locale, 'no_data'))}</span>"
 
-    n_energy = f"{_num(nut.get('energy_kj'))} kJ / {_num(nut.get('energy_kcal'))} kcal"
-    n_fat = _num(nut.get("fat"))
-    n_sat = _num(nut.get("saturates"))
-    n_carbs = _num(nut.get("carbs"))
-    n_sug = _num(nut.get("sugars"))
-    n_prot = _num(nut.get("protein"))
-    n_salt = _num(nut.get("salt"))
+    n_energy = f"{_num(nut.get('energy_kj'), locale)} kJ / {_num(nut.get('energy_kcal'), locale)} kcal"
+    n_fat = _num(nut.get("fat"), locale)
+    n_sat = _num(nut.get("saturates"), locale)
+    n_carbs = _num(nut.get("carbs"), locale)
+    n_sug = _num(nut.get("sugars"), locale)
+    n_prot = _num(nut.get("protein"), locale)
+    n_salt = _num(nut.get("salt"), locale)
 
     warning_html = ""
     qr_definitive_notice = ""

@@ -9,7 +9,7 @@ from qrfacile_app.db import pg
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.csrf_core import csrf_input, require_csrf_or_same_origin
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
-from qrfacile_app.guided_flow import render_guided_stepper
+from qrfacile_app.guided_flow import completed_steps, render_guided_stepper
 
 router = APIRouter()
 
@@ -397,7 +397,7 @@ def _recycle_rows(recycle: dict) -> str:
               <label>Codice</label>
               <input class="input mono" name="rec_{key}_code"
                      value="{esc(_val(r.get('code')))}"
-                     placeholder="es. GL71">
+                     placeholder="es. GL 71">
             </div>
 
             <div>
@@ -510,7 +510,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
         <div class="complianceHeroCard"><div class="complianceHeroCardTitle">Percorso guidato</div><p>Salva ogni sezione e continua fino al controllo finale.</p></div>
       </div>
 
-      {render_guided_stepper(int(wine_id), "ingredients", {"wine"})}
+      {render_guided_stepper(int(wine_id), "ingredients", completed_steps(int(wine_id)))}
 
       <div class="complianceTabs">
         <a class="complianceTab" href="/app/wine/{int(wine_id)}">Overview</a>

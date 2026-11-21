@@ -178,16 +178,54 @@ def _role_label(role: str) -> str:
     return role or "-"
 
 
+def _credits_for_email(user_email: str) -> dict | None:
+    """Real balances for pages that did not load them; None when unavailable."""
+    if not (user_email or "").strip():
+        return None
+    try:
+        from psycopg.rows import dict_row
+
+        from qrfacile_app.db import pg
+
+        with pg() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """
+                    SELECT l.credit_type, COALESCE(SUM(l.delta),0) AS bal
+                    FROM available_credit_ledger l
+                    JOIN users u ON u.id = l.user_id
+                    WHERE lower(u.email) = lower(%s)
+                    GROUP BY l.credit_type
+                    """,
+                    (user_email.strip(),),
+                )
+                out = {"wine": 0, "generic": 0}
+                for row in cur.fetchall() or []:
+                    out[str(row.get("credit_type") or "").strip().lower()] = int(row.get("bal") or 0)
+                return out
+    except Exception:
+        return None
+
+
+def _credit_value(credits: dict | None, key: str) -> str:
+    if not credits:
+        return "—"
+    return str(int(credits.get(key, 0) or 0))
+
+
 def _sidebar(role: str, user_email: str, credits: dict | None) -> str:
     role = (role or "").lower().strip()
-    credits = credits or {"wine": 0, "generic": 0}
+    # Several pages pass None or {} instead of the balance: showing 0 made
+    # customers think their QR credits were gone. Load the real value instead.
+    if not credits:
+        credits = _credits_for_email(user_email)
 
     nav = [
         ("/app/start", "🏠", "Menu", "Area operativa"),
         ("/app/dashboard", "📋", "Dashboard", "Etichette e lotti"),
         ("/app/new-wine-master", "🍷", "Nuova etichetta", "Prodotto"),
-        ("/app/new-wine", "🍾", "Nuovo lotto", "Scala 1 wine"),
-        ("/app/new-external", "🔗", "QR Link", "3 gratis + generic"),
+        ("/app/new-wine", "🍾", "Nuovo lotto", "Usa 1 QR vino"),
+        ("/app/new-external", "🔗", "QR Link", "3 gratuiti"),
         ("/app/billing", "💳", "Crediti", "Pacchetti"),
     ]
 
@@ -221,17 +259,17 @@ def _sidebar(role: str, user_email: str, credits: dict | None) -> str:
     footer = f"""
     <div class="sidebarFooter">
       <div class="sidebarCreditBox">
-        <div class="sidebarCreditTitle">Crediti</div>
+        <div class="sidebarCreditTitle">QR disponibili</div>
 
         <div class="sidebarCredits">
           <div class="sidebarCreditItem sidebarCreditWine">
-            <span>wine</span>
-            <b>{int(credits.get('wine', 0))}</b>
+            <span>QR vino</span>
+            <b>{_credit_value(credits, 'wine')}</b>
           </div>
 
           <div class="sidebarCreditItem sidebarCreditGeneric">
-            <span>generic</span>
-            <b>{int(credits.get('generic', 0))}</b>
+            <span>QR link</span>
+            <b>{_credit_value(credits, 'generic')}</b>
           </div>
         </div>
       </div>

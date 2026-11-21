@@ -14,6 +14,79 @@ STEPS = (
 )
 
 
+def completion_from_counts(
+    *,
+    wine_name: str,
+    lot: str,
+    has_front_image: bool,
+    ingredients: int,
+    allergens: int,
+    has_energy: bool,
+    recycling: int,
+    published: bool,
+) -> set[str]:
+    """Steps that are really complete, from saved data only."""
+    done = {
+        key
+        for key, ok in (
+            ("wine", bool(str(wine_name or "").strip() and str(lot or "").strip())),
+            ("images", bool(has_front_image)),
+            ("ingredients", ingredients > 0 and allergens > 0),
+            ("nutrition", bool(has_energy)),
+            ("recycling", recycling > 0),
+        )
+        if ok
+    }
+    if {"wine", "images", "ingredients", "nutrition", "recycling"} <= done:
+        done.add("review")
+    if published:
+        done.add("publish")
+    return done
+
+
+def completed_steps(wine_id: int) -> set[str]:
+    """Load the real step state of a wine; empty set if it cannot be read."""
+    try:
+        from psycopg.rows import dict_row
+
+        from qrfacile_app.db import pg
+
+        with pg() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """
+                    SELECT qw.wine_name, qw.lot, COALESCE(qi.status, '') AS status,
+                      (SELECT COUNT(*) FROM wine_assets a WHERE a.wine_id=qw.id AND a.kind='front')::int AS fronts,
+                      (SELECT COUNT(*) FROM wine_ingredients i WHERE i.wine_id=qw.id)::int AS ingredients,
+                      (SELECT COUNT(*) FROM wine_allergens al WHERE al.wine_id=qw.id)::int AS allergens,
+                      (SELECT COUNT(*) FROM wine_nutrition n WHERE n.wine_id=qw.id
+                          AND n.energy_kj IS NOT NULL AND n.energy_kcal IS NOT NULL)::int AS nutrition,
+                      (SELECT COUNT(*) FROM wine_recycle_items r WHERE r.wine_id=qw.id
+                          AND COALESCE(NULLIF(BTRIM(r.code), ''), '-') <> '-')::int AS recycling
+                    FROM qr_wines qw
+                    LEFT JOIN qr_items qi ON qi.id = qw.qr_item_id
+                    WHERE qw.id=%s
+                    LIMIT 1
+                    """,
+                    (int(wine_id),),
+                )
+                row = cur.fetchone()
+    except Exception:
+        return set()
+    if not row:
+        return set()
+    return completion_from_counts(
+        wine_name=row.get("wine_name") or "",
+        lot=row.get("lot") or "",
+        has_front_image=int(row.get("fronts") or 0) > 0,
+        ingredients=int(row.get("ingredients") or 0),
+        allergens=int(row.get("allergens") or 0),
+        has_energy=int(row.get("nutrition") or 0) > 0,
+        recycling=int(row.get("recycling") or 0),
+        published=str(row.get("status") or "").lower() == "attiva",
+    )
+
+
 def render_guided_stepper(wine_id: int, active: str, completed: set[str] | None = None) -> str:
     done = completed or set()
     links = {

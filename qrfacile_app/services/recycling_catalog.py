@@ -105,12 +105,35 @@ def normalize_recycling_items(
     }
 
 
-_BY_CODE = {normalize(item["code"]): item for item in RECYCLING_CATALOG if item.get("code")}
+def compact_code(value: Any) -> str:
+    """Spacing and case do not change a packaging code: "GL71" == "gl 71"."""
+    return "".join(str(value or "").split()).upper()
+
+
+_BY_CODE = {compact_code(item["code"]): item for item in RECYCLING_CATALOG if item.get("code")}
 _BY_MATERIAL = {normalize(item["material"]): item for item in RECYCLING_CATALOG}
 
 
+def canonical_recycling_code(code: Any) -> str:
+    """Return the catalog spelling of a code, repairing typed duplicates.
+
+    The editor pre-fills "GL 71" from the selected material; typing "GL71"
+    after it produced "GL 71GL71", which was then shown to consumers as an
+    unverified custom code. A value made of the same catalog code repeated
+    is reduced to that code. Unknown codes are returned trimmed, unchanged.
+    """
+    raw = " ".join(str(code or "").split())
+    compact = compact_code(raw)
+    if not compact:
+        return ""
+    item = _BY_CODE.get(compact)
+    if item is None and len(compact) % 2 == 0 and compact[: len(compact) // 2] == compact[len(compact) // 2:]:
+        item = _BY_CODE.get(compact[: len(compact) // 2])
+    return str(item["code"]) if item else raw
+
+
 def find_by_code(code: Any) -> dict[str, Any] | None:
-    return _BY_CODE.get(normalize(code))
+    return _BY_CODE.get(compact_code(canonical_recycling_code(code)))
 
 
 def find_by_material(material: Any) -> dict[str, Any] | None:
@@ -133,7 +156,7 @@ def resolve_recycling_selection(component: Any, material: Any, code: Any = "") -
         "current_code": current,
         "suggested_code": suggested,
         "collection": collection,
-        "code_is_consistent": bool(suggested and normalize(current) == normalize(suggested)),
+        "code_is_consistent": bool(suggested and compact_code(canonical_recycling_code(current)) == compact_code(suggested)),
     }
 
 
@@ -146,7 +169,7 @@ def validate_recycling_items(recycle: Mapping[str, Mapping[str, Any]] | None) ->
 
     for component, raw in items.items():
         item = raw or {}
-        code = str(item.get("code") or "").strip()
+        code = canonical_recycling_code(item.get("code"))
         material = str(item.get("product") or "").strip()
         if not code or code == "-":
             missing_codes.append(str(component))
@@ -167,7 +190,7 @@ def validate_recycling_items(recycle: Mapping[str, Mapping[str, Any]] | None) ->
             })
 
         material_item = find_by_material(material) if material else None
-        if material_item and normalize(material_item.get("code")) != normalize(code):
+        if material_item and compact_code(material_item.get("code")) != compact_code(code):
             mismatches.append({
                 "component": str(component),
                 "code": code,

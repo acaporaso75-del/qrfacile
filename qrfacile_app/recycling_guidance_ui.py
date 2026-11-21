@@ -68,7 +68,13 @@ def _guidance_markup() -> str:
       const componentLabels = {component_labels_json};
       const normalize = value => String(value || '').trim().toLowerCase().replace(/\\s+/g, ' ');
       const byMaterial = new Map(catalog.map(item => [normalize(item.material), item]));
-      const byCode = new Map(catalog.filter(item => item.code).map(item => [normalize(item.code), item]));
+      const compact = value => String(value || '').replace(/\\s+/g, '').toUpperCase();
+      const byCode = new Map(catalog.filter(item => item.code).map(item => [compact(item.code), item]));
+      const lookupCode = value => {{
+        const key = compact(value);
+        const half = key.length % 2 === 0 ? key.slice(0, key.length / 2) : '';
+        return byCode.get(key) || (half && half === key.slice(key.length / 2) ? byCode.get(half) : undefined);
+      }};
       const tracked = [];
 
       document.querySelectorAll('input[name^="rec_"][name$="_product"]').forEach(product => {{
@@ -107,7 +113,7 @@ def _guidance_markup() -> str:
 
         const evaluate = () => {{
           const materialItem = byMaterial.get(normalize(product.value));
-          const codeItem = byCode.get(normalize(code.value));
+          const codeItem = lookupCode(code.value);
           const item = codeItem || materialItem || null;
           const hasValue = product.value.trim() || code.value.trim();
           accept.hidden = true;
@@ -159,7 +165,8 @@ def _guidance_markup() -> str:
           evaluate();
         }};
         const applyFromCode = () => {{
-          const item = byCode.get(normalize(code.value));
+          const item = lookupCode(code.value);
+          if (item && item.code) code.value = item.code;
           if (item && !product.value.trim()) product.value = item.material;
           if (item && note && !note.value.trim() && item.collection) note.value = item.collection;
           evaluate();

@@ -10,7 +10,7 @@ from qrfacile_app.audit_core import write_audit_event
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.csrf_core import csrf_input, require_csrf_or_same_origin
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
-from qrfacile_app.guided_flow import render_guided_stepper
+from qrfacile_app.guided_flow import completion_from_counts, render_guided_stepper
 from qrfacile_app.services.storage import versioned_upload_url
 
 router = APIRouter()
@@ -132,22 +132,23 @@ def _workflow_snapshot(cur, wine: dict, assets: dict, published: bool) -> dict:
     nutrition = cur.fetchone() or {}
     cur.execute("SELECT COUNT(*)::int AS cnt FROM wine_recycle_items WHERE wine_id=%s AND COALESCE(NULLIF(BTRIM(code), ''), '-') <> '-'", (wine_id,))
     recycling = int((cur.fetchone() or {}).get("cnt") or 0)
-    complete = {
-        "wine": bool(str(wine.get("wine_name") or "").strip() and str(wine.get("lot") or "").strip()),
-        "images": bool(assets.get("front")),
-        "ingredients": ingredients > 0 and allergens > 0,
-        "nutrition": nutrition.get("energy_kj") is not None and nutrition.get("energy_kcal") is not None,
-        "recycling": recycling > 0,
-    }
-    missing = [label for key, label in (("wine", "dati vino"), ("images", "immagine fronte"), ("ingredients", "ingredienti e allergeni"), ("nutrition", "valori nutrizionali"), ("recycling", "riciclabilità")) if not complete[key]]
+    # The previous version returned set(dict) = every step name, so the
+    # stepper showed "Completato" for steps that were still empty.
+    completed = completion_from_counts(
+        wine_name=str(wine.get("wine_name") or ""),
+        lot=str(wine.get("lot") or ""),
+        has_front_image=bool(assets.get("front")),
+        ingredients=ingredients,
+        allergens=allergens,
+        has_energy=nutrition.get("energy_kj") is not None and nutrition.get("energy_kcal") is not None,
+        recycling=recycling,
+        published=published,
+    )
+    missing = [label for key, label in (("wine", "dati vino"), ("images", "immagine fronte"), ("ingredients", "ingredienti e allergeni"), ("nutrition", "valori nutrizionali"), ("recycling", "riciclabilità")) if key not in completed]
     publishable = not missing
-    if publishable:
-        complete.update({"review": True})
-    if published:
-        complete.update({"publish": True})
-    percent = round(len(complete) / 7 * 100)
-    state = "Pubblicata" if published else ("Pronta per la pubblicazione" if publishable else ("In compilazione" if any(complete.values()) else "Bozza"))
-    return {"completed": set(complete), "missing": missing, "publishable": publishable, "percent": percent, "state": state}
+    percent = round(len(completed) / 7 * 100)
+    state = "Pubblicata" if published else ("Pronta per la pubblicazione" if publishable else ("In compilazione" if completed else "Bozza"))
+    return {"completed": completed, "missing": missing, "publishable": publishable, "percent": percent, "state": state}
 
 
 def _labels_for_wine(cur, wine_id: int, role: str, user_id: int) -> list[dict]:

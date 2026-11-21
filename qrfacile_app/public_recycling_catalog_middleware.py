@@ -53,18 +53,16 @@ def _public_recycling_widget() -> str:
 <script>
 (function(){{
   const catalog={catalog_json};
-  const normalize=value=>String(value||'').trim().toLowerCase().replace(/\\s+/g,' ');
-  const byCode=new Map(catalog.filter(item=>item.code).map(item=>[normalize(item.code),item]));
+  const compact=value=>String(value||'').replace(/\\s+/g,'').toUpperCase();
+  const byCode=new Map(catalog.filter(item=>item.code).map(item=>[compact(item.code),item]));
   const cards=document.querySelectorAll('.recycleItem');
   cards.forEach(card=>{{
     const codeNode=card.querySelector('.materialCode');
     const productNode=card.querySelector('.recycleProduct');
     const rawCode=codeNode ? String(codeNode.textContent||'').split(',')[0].trim() : '';
-    const item=byCode.get(normalize(rawCode));
-    const badge=document.createElement('span');
-    badge.className='qrfPublicRecycleBadge '+(item?'known':'custom');
-    badge.textContent=item?'Codice verificato nel catalogo':'Codice personalizzato da verificare';
-    card.appendChild(badge);
+    const item=byCode.get(compact(rawCode));
+    // Catalog checks are guidance for the winery editor, not for consumers:
+    // the public page never shows "to verify" warnings.
     if(item && item.collection){{
       const collection=document.createElement('div');
       collection.className='qrfPublicRecycleCollection';

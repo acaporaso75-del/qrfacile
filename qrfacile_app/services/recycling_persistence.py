@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from qrfacile_app.services.recycling_catalog import is_recycling_item_filled
+from qrfacile_app.services.recycling_catalog import canonical_recycling_code, is_recycling_item_filled
 
 
 @dataclass(frozen=True)
@@ -30,6 +30,8 @@ def normalize_recycling_value(raw: Mapping[str, Any] | None) -> RecyclingValue:
     code = _optional(row.get("code"))
     if code == "-":
         code = None
+    elif code:
+        code = canonical_recycling_code(code) or None
     return RecyclingValue(
         product=_optional(row.get("product")),
         code=code,

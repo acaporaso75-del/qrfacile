@@ -7,7 +7,7 @@ from psycopg.rows import dict_row
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.csrf_core import csrf_input
 from qrfacile_app.db import pg
-from qrfacile_app.guided_flow import render_guided_stepper
+from qrfacile_app.guided_flow import completed_steps, render_guided_stepper
 from qrfacile_app.services.storage import verify_saved_asset, versioned_upload_url
 from qrfacile_app.services.wine_compliance_explainability import run_explainable_wine_compliance
 from qrfacile_app.ui_shell import esc, page
@@ -78,7 +78,7 @@ def review(request: Request, wine_id: int, msg: str = ""):
     body = f"""
     <section style="max-width:1180px;margin:auto"><div class="h1">Controllo finale dell’etichetta</div>
       <p>Controlla tutti i dati in un’unica pagina. La preview è disponibile anche prima della pubblicazione.</p>
-      {render_guided_stepper(wine_id, "review", {"wine","images","ingredients","nutrition","recycling"})}
+      {render_guided_stepper(wine_id, "review", completed_steps(int(wine_id)))}
       {f'<div class="note note-ok">{esc(msg)}</div>' if msg else ''}
         <div class="card"><div class="h2">Stato: {esc(status_label)} · Compliance Score: {report['score']}/100</div><p>{'Pubblicabile' if not blocking else 'Non pubblicabile: correggere gli errori indicati'}</p><ul>{result_rows}</ul></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">{_image_preview(assets.get('front') or {}, 'Immagine fronte')}{_image_preview(assets.get('back') or {}, 'Immagine retro')}</div>
