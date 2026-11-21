@@ -438,14 +438,14 @@ _SECTION_TABS = (
     ("more", "Altre opzioni", ("altre-opzioni", "controllo-finale", "pubblicazione")),
 )
 _SECTION_TABS_TEMPLATE = """
-<nav class="qrfSectionTabs" aria-label="Sezioni dei dati obbligatori" hidden>__BUTTONS__</nav>
+<div class="qrfSectionTabs" role="tablist" aria-label="Sezioni dei dati obbligatori" hidden>__BUTTONS__</div>
 <style>
   .qrfSectionTabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:14px 0}
   .qrfSectionTabs button{display:flex;gap:8px;align-items:center;padding:12px;border:1px solid rgba(2,8,23,.12);border-radius:14px;background:#fff;font-weight:800;text-align:left;cursor:pointer}
   .qrfSectionTabs button span{display:grid;place-items:center;flex:0 0 28px;height:28px;border-radius:9px;background:#e2e8f0}
   .qrfSectionTabs button.done span{background:#dcfce7;color:#166534}
   .qrfSectionTabs button[aria-selected="true"]{border-color:#14b8a6;background:#f0fdfa}
-  .qrfSectionTabs button[aria-selected="true"] span{background:#14b8a6;color:#fff}
+  .qrfSectionTabs button[aria-selected="true"] span{background:#0f766e;color:#fff}
   .qrfSectionHidden{display:none!important}
   .qrfSectionNext{margin-top:14px}
 </style>
@@ -463,7 +463,9 @@ _SECTION_TABS_TEMPLATE = """
   const show = (key, scroll) => {
     tabs.forEach(tab => {
       nodes(tab).forEach(node => node.classList.toggle('qrfSectionHidden', tab.key !== key));
-      nav.querySelector(`[data-tab="${tab.key}"]`).setAttribute('aria-selected', String(tab.key === key));
+      const button = nav.querySelector(`[data-tab="${tab.key}"]`);
+      button.setAttribute('aria-selected', String(tab.key === key));
+      button.tabIndex = tab.key === key ? 0 : -1;
     });
     nextButtons.forEach(({owner, button}) => button.classList.toggle('qrfSectionHidden', owner !== key));
     if (scroll) nav.scrollIntoView({behavior: 'smooth', block: 'start'});
@@ -472,7 +474,19 @@ _SECTION_TABS_TEMPLATE = """
     if (!tabs.every(tab => nodes(tab).length)) return;  // unexpected layout: leave the page as is
     nav.hidden = false;
     tabs.forEach((tab, index) => {
-      nav.querySelector(`[data-tab="${tab.key}"]`).addEventListener('click', () => show(tab.key, true));
+      const tabButton = nav.querySelector(`[data-tab="${tab.key}"]`);
+      tabButton.addEventListener('click', () => show(tab.key, true));
+      tabButton.addEventListener('keydown', event => {
+        const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+        if (!keys.includes(event.key)) return;
+        event.preventDefault();
+        const current = tabs.findIndex(item => item.key === tab.key);
+        const target = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+          : (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+        const nextButton = nav.querySelector(`[data-tab="${tabs[target].key}"]`);
+        show(tabs[target].key, false);
+        nextButton.focus();
+      });
       const next = tabs[index + 1];
       if (!next) return;
       const button = document.createElement('button');
@@ -500,7 +514,8 @@ _SECTION_TABS_TEMPLATE = """
 
 def _section_tabs_html(completed: set[str]) -> str:
     buttons = "".join(
-        f'<button type="button" role="tab" data-tab="{key}" class="{"done" if key in completed else ""}">'
+        f'<button type="button" role="tab" data-tab="{key}" class="{"done" if key in completed else ""}" '
+        f'aria-selected="{"true" if index == 1 else "false"}" tabindex="{0 if index == 1 else -1}">'
         f'<span>{"✓" if key in completed else index}</span>{esc(label)}</button>'
         for index, (key, label, _ids) in enumerate(_SECTION_TABS, 1)
     )
@@ -811,52 +826,52 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
 
           <div class="complianceNutritionGrid">
             <div>
-              <label>Energia (kJ per 100 ml)*</label>
-              <input class="input mono" name="energy_kj" inputmode="decimal" min="0" max="5000"
+              <label for="nutrition-energy-kj">Energia (kJ per 100 ml)*</label>
+              <input class="input mono" id="nutrition-energy-kj" name="energy_kj" inputmode="decimal" min="0" max="5000"
                      value="{esc(_val(nut.get('energy_kj')))}"
                      placeholder="0">
             </div>
 
             <div>
-              <label>Energia (kcal per 100 ml)*</label>
-              <input class="input mono" name="energy_kcal" inputmode="decimal" min="0" max="1200"
+              <label for="nutrition-energy-kcal">Energia (kcal per 100 ml)*</label>
+              <input class="input mono" id="nutrition-energy-kcal" name="energy_kcal" inputmode="decimal" min="0" max="1200"
                      value="{esc(_val(nut.get('energy_kcal')))}"
                      placeholder="0">
             </div>
 
             <div>
-              <label>Grassi</label>
-              <input class="input mono" name="fat" inputmode="decimal" min="0" max="100"
+              <label for="nutrition-fat">Grassi</label>
+              <input class="input mono" id="nutrition-fat" name="fat" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('fat')))}">
             </div>
 
             <div>
-              <label>Saturi</label>
-              <input class="input mono" name="saturates" inputmode="decimal" min="0" max="100"
+              <label for="nutrition-saturates">Saturi</label>
+              <input class="input mono" id="nutrition-saturates" name="saturates" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('saturates')))}">
             </div>
 
             <div>
-              <label>Carboidrati</label>
-              <input class="input mono" name="carbs" inputmode="decimal" min="0" max="100"
+              <label for="nutrition-carbs">Carboidrati</label>
+              <input class="input mono" id="nutrition-carbs" name="carbs" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('carbs')))}">
             </div>
 
             <div>
-              <label>Zuccheri</label>
-              <input class="input mono" name="sugars" inputmode="decimal" min="0" max="100"
+              <label for="nutrition-sugars">Zuccheri</label>
+              <input class="input mono" id="nutrition-sugars" name="sugars" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('sugars')))}">
             </div>
 
             <div>
-              <label>Proteine</label>
-              <input class="input mono" name="protein" inputmode="decimal" min="0" max="100"
+              <label for="nutrition-protein">Proteine</label>
+              <input class="input mono" id="nutrition-protein" name="protein" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('protein')))}">
             </div>
 
             <div>
-              <label>Sale</label>
-              <input class="input mono" name="salt" inputmode="decimal" min="0" max="100"
+              <label for="nutrition-salt">Sale</label>
+              <input class="input mono" id="nutrition-salt" name="salt" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('salt')))}">
             </div>
           </div>

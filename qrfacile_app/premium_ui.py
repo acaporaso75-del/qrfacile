@@ -576,8 +576,8 @@ def new_wine_get(
           </div>
 
           <div>
-            <label>Vino</label>
-            <select name="wine_master_id">
+            <label for="wine-master-id">Vino</label>
+            <select id="wine-master-id" name="wine_master_id">
               {''.join(master_opts)}
             </select>
             <div class="note" style="margin-top:10px">
@@ -609,8 +609,8 @@ def new_wine_get(
           </div>
 
           <div>
-            <label>Volume ml</label>
-            <input class="input" name="volume_ml" value="750" inputmode="numeric">
+            <label for="wine-volume-ml">Volume ml</label>
+            <input class="input" id="wine-volume-ml" name="volume_ml" value="750" inputmode="numeric">
           </div>
 
           <div>
@@ -619,8 +619,8 @@ def new_wine_get(
           </div>
 
           <div>
-            <label>Durata QR vino</label>
-            <select name="qr_duration_years">
+            <label for="wine-qr-duration">Durata QR vino</label>
+            <select id="wine-qr-duration" name="qr_duration_years">
               <option value="10" selected>10 anni · usa 1 QR vino</option>
               <option value="25">25 anni · usa 2 QR vino</option>
             </select>
