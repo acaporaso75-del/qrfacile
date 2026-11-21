@@ -329,8 +329,7 @@ def billing(request: Request, msg: str = "", err: str = ""):
             annual_allowances_html = _annual_allowances(cur, uid)
 
     actions = (
-        pill(f"wine: {balances.get('wine', 0)}", "green") + " " +
-        pill(f"generic: {balances.get('generic', 0)}") + " " +
+        pill(f"QR vino disponibili: {balances.get('wine', 0)}", "green") + " " +
         top_actions(
             ("/app/start", "Menu"),
             ("/app/dashboard", "Dashboard"),

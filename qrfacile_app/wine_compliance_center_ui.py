@@ -53,9 +53,9 @@ def _compact_compliance_html(report: dict, wine_id: int) -> str:
     <section class='card wineComplianceCenter {state_class}' aria-labelledby='wine-compliance-title'>
       <div class='wineComplianceHead'>
         <div>
-          <div class='wineHubSmallLabel'>Compliance Center</div>
+          <div class='wineHubSmallLabel'>Dati obbligatori</div>
           <div class='h2' id='wine-compliance-title'>Stato normativo del lotto</div>
-          <div class='p'>Controlli deterministici, motivati e soggetti a revisione umana.</div>
+          <div class='p'>Cosa è a posto e cosa manca, con il collegamento per correggere.</div>
         </div>
         <div class='wineComplianceActions'>
           <a class='btn btn-primary' href='/app/wine/{int(wine_id)}/compliance-advisor'>Piano di correzione</a>
@@ -66,7 +66,7 @@ def _compact_compliance_html(report: dict, wine_id: int) -> str:
 
       <div class='wineComplianceGrid'>
         <div class='wineComplianceScore'>
-          <span>Compliance score</span>
+          <span>Completezza</span>
           <b>{score}<small>/100</small></b>
           <div class='wineComplianceBar' role='progressbar' aria-valuemin='0' aria-valuemax='100' aria-valuenow='{score}'>
             <i style='width:{max(0, min(score, 100))}%'></i>
@@ -76,7 +76,7 @@ def _compact_compliance_html(report: dict, wine_id: int) -> str:
           <span class='wineComplianceDecisionBadge'>{esc(state_title)}</span>
           <b>{errors} errori · {warnings} avvisi · {passes} controlli superati</b>
           <p>{esc(state_text)}</p>
-          <small>Engine {esc(str(report.get('engine_version') or ''))} · catalogo {esc(str(report.get('catalog_version') or ''))} · knowledge {esc(str(report.get('knowledge_version') or ''))}</small>
+          <small title="Engine {esc(str(report.get('engine_version') or ''))} · catalogo {esc(str(report.get('catalog_version') or ''))} · knowledge {esc(str(report.get('knowledge_version') or ''))}">Controllo aggiornato alle regole in vigore</small>
         </div>
       </div>
 

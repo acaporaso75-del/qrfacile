@@ -30,7 +30,7 @@ def test_compact_center_shows_publishable_state_and_score():
         _report(publishable=True, score=96, errors=0, warnings=0),
         wine_id=12,
     )
-    assert "Compliance Center" in html
+    assert "Dati obbligatori" in html
     assert "Pubblicazione consentita" in html
     assert "96<small>/100</small>" in html
     assert "/app/wine/12/compliance-report" in html

@@ -447,6 +447,54 @@ def _next_step(rows: list[dict], role: str) -> tuple[str, str, str]:
     return ("Nuovo lotto", "Aggiungi un nuovo lotto quando hai una nuova etichetta da preparare.", "/app/new-wine")
 
 
+def _first_wine_checklist(rows: list[dict], master_count: int, role: str) -> str:
+    """Step-by-step guide shown until the first wine page is published."""
+    if role not in ("winery", "admin") or any(_lot_flags(r)["published"] for r in rows):
+        return ""
+    first = rows[0] if rows else None
+    flags = _lot_flags(first) if first else {}
+    wine_id = int(first["wine_id"]) if first else 0
+    base = f"/app/wine/{wine_id}" if wine_id else ""
+    steps = [
+        ("Dai un nome al tuo vino", master_count > 0 or bool(rows), "/app/new-wine-master"),
+        ("Crea il lotto: ottieni il QR", bool(rows), "/app/new-wine"),
+        ("Ingredienti e allergeni", bool(flags.get("ingredients") and flags.get("allergens")), f"{base}/compliance#ingredienti"),
+        ("Valori nutrizionali", bool(flags.get("nutrition")), f"{base}/compliance#nutrizione"),
+        ("Bottiglia, tappo e imballaggi", bool(flags.get("recycle")), f"{base}/compliance#riciclabilita"),
+        ("Foto dell’etichetta", bool(flags.get("images")), f"{base}/images"),
+        ("Controlla e pubblica", False, f"{base}/review"),
+        ("Scarica il QR per la tipografia", False, f"{base}/export"),
+    ]
+    current = next((i for i, (_label, done, _href) in enumerate(steps) if not done), len(steps) - 1)
+    items = []
+    for i, (label, done, href) in enumerate(steps):
+        reachable = i <= current and (i < 2 or wine_id)
+        state = "Fatto" if done else ("Da fare adesso" if i == current else "Dopo")
+        cls = "firstWineStep" + (" done" if done else "") + (" current" if i == current else "")
+        title = f'<a href="{_h(href)}">{_h(label)}</a>' if reachable and not done else _h(label)
+        items.append(f'<li class="{cls}"><span>{"✓" if done else i + 1}</span><div><b>{title}</b><small>{state}</small></div></li>')
+    cta_label, _cta_done, cta_href = steps[current]
+    return f"""
+    <section class="card firstWine" aria-labelledby="first-wine-title">
+      <div class="dashboardSectionKicker">Il tuo primo vino</div>
+      <div class="h2" id="first-wine-title">Segui questi passi, uno alla volta</div>
+      <div class="p">Ogni passo si salva da solo: puoi interrompere e riprendere quando vuoi.</div>
+      <ol class="firstWineSteps">{''.join(items)}</ol>
+      <a class="btn btn-primary firstWineCta" href="{_h(cta_href)}">Continua: {_h(cta_label)}</a>
+      <style>
+        .firstWine{{margin-bottom:18px;border:2px solid #14b8a6}}
+        .firstWineSteps{{list-style:none;margin:14px 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}}
+        .firstWineStep{{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid rgba(2,8,23,.09);border-radius:14px;background:#fff}}
+        .firstWineStep span{{display:grid;place-items:center;flex:0 0 30px;height:30px;border-radius:10px;background:#e2e8f0;font-weight:900}}
+        .firstWineStep b{{display:block;font-size:14px}}.firstWineStep small{{color:#64748b}}
+        .firstWineStep.done span{{background:#dcfce7;color:#166534}}
+        .firstWineStep.current{{border-color:#14b8a6;background:#f0fdfa}}.firstWineStep.current span{{background:#14b8a6;color:#fff}}
+        .firstWineCta{{font-size:16px;padding:14px 18px}}
+      </style>
+    </section>
+    """
+
+
 def _onboarding_html(rows: list[dict], role: str) -> str:
     counts = _dashboard_counts(rows)
     total = counts["total"]
@@ -586,7 +634,7 @@ def _wine_card(r: dict, role: str = "", labels_by_wine: dict[int, list[dict]] | 
               <div class="dashboardMeta">
                 {vintage_html}
                 <span class="dashboardMetaPill">Lotto {lot}</span>
-                <span class="dashboardMetaPill">Slug {slug_safe or "-"}</span>
+                <span class="dashboardMetaPill">Codice pagina {slug_safe or "-"}</span>
               </div>
 
               {checks}
@@ -681,8 +729,7 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
 
                 if not active:
                     actions = (
-                        pill(f"wine: {balances['wine']}", "green") + " " +
-                        pill(f"generic: {balances['generic']}") + " " +
+                        pill(f"QR vino disponibili: {balances['wine']}", "green") + " " +
                         top_actions(
                             ("/admin", "Admin"),
                             ("/app/start", "Menu"),
@@ -754,8 +801,7 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
             if not allowed_winery_ids:
                 if role == "studio":
                     actions = (
-                        pill(f"wine: {balances['wine']}", "green") + " " +
-                        pill(f"generic: {balances['generic']}") + " " +
+                        pill(f"QR vino disponibili: {balances['wine']}", "green") + " " +
                         top_actions(
                             ("/app/start", "Menu"),
                             ("/studio", "Area Studio"),
@@ -815,8 +861,7 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
                     ))
 
                 actions = (
-                    pill(f"wine: {balances['wine']}", "green") + " " +
-                    pill(f"generic: {balances['generic']}") + " " +
+                    pill(f"QR vino disponibili: {balances['wine']}", "green") + " " +
                     top_actions(
                         ("/app/start", "Menu"),
                         ("/app/new-wine", "Nuovo lotto"),
@@ -1057,8 +1102,7 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
                 labels_by_wine, studios_by_winery = {}, {}
 
     actions = (
-        pill(f"wine: {balances['wine']}", "green") + " " +
-        pill(f"generic: {balances['generic']}") + " " +
+        pill(f"QR vino disponibili: {balances['wine']}", "green") + " " +
         top_actions(
             ("/app/start", "Menu"),
             ("/app/new-wine-master", "Nuova etichetta"),
@@ -1125,9 +1169,11 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
 
     counts = _dashboard_counts(rows)
     onboarding_html = _onboarding_html(rows, role)
+    first_wine_html = "" if q else _first_wine_checklist(rows, master_count, role)
 
     body = f"""
     <section class="dashboardWrap">
+      {first_wine_html}
       <div class="dashboardHero">
         <div>
           <div class="dashboardEyebrow">Dashboard Wine</div>
@@ -1174,7 +1220,7 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
       <div class="dashboardToolbar card">
         <form method="get" class="dashboardSearchForm">
           <div>
-            <label style="margin-top:0">Cerca lotto, vino o slug</label>
+            <label style="margin-top:0">Cerca per nome del vino, lotto o codice pagina</label>
             <input class="input" name="q" value="{_h(q)}" placeholder="Es. Falanghina, lotto L25, slug...">
           </div>
 

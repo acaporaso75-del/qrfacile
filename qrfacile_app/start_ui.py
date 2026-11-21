@@ -182,9 +182,7 @@ def start(request: Request, msg: str = "", err: str = ""):
         pass
 
     actions = ""
-    actions += pill(f"wine: {balances.get('wine', 0)}", "green")
-    actions += " "
-    actions += pill(f"generic: {balances.get('generic', 0)}")
+    actions += pill(f"QR vino disponibili: {balances.get('wine', 0)}", "green")
     actions += " "
     actions += top_actions(
         ("/app/billing", "Crediti"),

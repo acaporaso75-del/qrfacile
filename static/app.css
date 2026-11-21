@@ -655,6 +655,15 @@ th{
     padding:14px 14px 70px;
   }
 
+  /* On phones the work comes first; the menu and credits follow below. */
+  .shell > .content{
+    order:1;
+  }
+
+  .shell > .sidebar{
+    order:2;
+  }
+
   .h1{
     font-size:32px;
   }

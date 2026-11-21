@@ -344,12 +344,13 @@ def _summary_html(ingredients: list[str], allergens: list[str], nut: dict, recyc
               action="/app/wine/{int(wine_id)}/request-publish-override"
               class="complianceOverrideRequest">
           {csrf_html}
-          <div>
-            <label>Richiesta sblocco admin</label>
+          <details>
+            <summary>Ti manca un dato e devi pubblicare comunque? Chiedi aiuto all’assistenza</summary>
+            <label>Spiega cosa ti serve</label>
             <input class="input" name="reason"
-                   placeholder="Motivo richiesta, es. test stampa, urgenza, dati in verifica...">
-          </div>
-          <button class="btn" type="submit">Richiedi sblocco admin</button>
+                   placeholder="es. aspetto i valori dall’enologo, devo stampare entro venerdì">
+            <button class="btn" type="submit">Invia richiesta all’assistenza</button>
+          </details>
         </form>
         """
 
@@ -742,7 +743,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
 
       <div class="card compliancePanel" id="controllo-finale" style="margin-top:18px">
         <div class="complianceSmallLabel">Step 6</div><div class="h2">Controllo finale</div>
-        <p>Il Compliance Score mostra errori bloccanti, warning e collegamenti ai campi da correggere. Il gate server viene eseguito di nuovo quando pubblichi.</p>
+        <p>Qui vedi cosa manca e il collegamento per completarlo. Al momento della pubblicazione il controllo viene ripetuto automaticamente.</p>
         {summary_html}
       </div>
       <div class="card compliancePanel" id="pubblicazione" style="margin-top:18px">

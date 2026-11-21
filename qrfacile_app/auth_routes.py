@@ -471,7 +471,9 @@ def login_get(request: Request, expired: str = "", created: str = "", reset: str
     if expired == "1":
         msg = "Sessione scaduta, effettua di nuovo l’accesso."
     elif created == "1":
-        msg = "Registrazione completata. Ora puoi accedere."
+        msg = ("Account creato. Ti abbiamo inviato un’email: apri il link per attivare "
+               "l’account, poi accedi qui. Non la trovi? Controlla anche nella cartella Spam; "
+               "dopo l’accesso potrai chiederne un’altra.")
     elif reset == "1":
         msg = "Password aggiornata. Ora puoi accedere."
 
@@ -756,7 +758,9 @@ def login_post(
 
     # Sicurezza: accetta solo percorsi interni, niente redirect esterni.
     if not next_url.startswith("/") or next_url.startswith("//"):
-        next_url = "/app/start"
+        # Wineries go straight to their wines; the module chooser is for
+        # studios and admins (and stays reachable from the "Menu" link).
+        next_url = "/app/dashboard" if (u.get("role") or "").lower().strip() == "winery" else "/app/start"
 
     if (
         (u.get("role") or "").lower().strip() != "admin"

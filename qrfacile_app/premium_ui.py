@@ -490,8 +490,7 @@ def new_wine_get(
         winery_hint = "La cantina è già preselezionata. Scegli una etichetta/prodotto esistente a cui collegare il lotto."
 
     actions = (
-        pill(f"wine: {balances.get('wine', 0)}", "green") + " " +
-        pill(f"generic: {balances.get('generic', 0)}") + " " +
+        pill(f"QR vino disponibili: {balances.get('wine', 0)}", "green") + " " +
         top_actions(
             ("/app/start", "Menu"),
             ("/app/dashboard", "Dashboard"),
@@ -1297,8 +1296,7 @@ def new_label_get(request: Request, msg: str = "", wine_id: int = 0):
         subtitle = f"Etichetta per {esc(selected_wine.get('wine_name') or '')}"
 
     actions = (
-        pill(f"wine: {balances.get('wine', 0)}", "green") + " " +
-        pill(f"generic: {balances.get('generic', 0)}") + " " +
+        pill(f"QR vino disponibili: {balances.get('wine', 0)}", "green") + " " +
         top_actions(
             ("/app/start", "Menu"),
             ("/app/dashboard", "Dashboard"),

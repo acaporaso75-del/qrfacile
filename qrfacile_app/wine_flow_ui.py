@@ -8,12 +8,22 @@ from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.csrf_core import csrf_input
 from qrfacile_app.db import pg
 from qrfacile_app.guided_flow import completed_steps, render_guided_stepper
+from qrfacile_app.services.recycling_catalog import canonical_recycling_code
 from qrfacile_app.services.storage import verify_saved_asset, versioned_upload_url
 from qrfacile_app.services.wine_compliance_explainability import run_explainable_wine_compliance
 from qrfacile_app.ui_shell import esc, page
 from qrfacile_app.wine_compliance_engine_ui import _load_payload
 
 router = APIRouter(tags=["wine-guided-flow"])
+
+_COMPONENT_LABELS = {
+    "bottle": "Bottiglia",
+    "closure": "Tappo",
+    "capsule": "Capsula",
+    "label": "Etichetta",
+    "box": "Cartone",
+    "other": "Altro",
+}
 
 
 def _context(wine_id: int, user: dict) -> dict:
@@ -57,7 +67,7 @@ def review(request: Request, wine_id: int, msg: str = ""):
     published = str(qr.get("status") or "").lower() == "attiva"
     slug = str(qr.get("slug") or "")
     role = str(user.get("role") or "").lower()
-    status_label = "Pubblicato" if published else ("Incompleto" if blocking else "Pronto")
+    status_label = "Pubblicato" if published else ("Dati da completare" if blocking else "Pronto per la pubblicazione")
     if not published and not payload.get("wine", {}).get("wine_name"):
         status_label = "Bozza"
     if blocking:
@@ -71,16 +81,16 @@ def review(request: Request, wine_id: int, msg: str = ""):
     result_rows = "".join(
         f'<li><a href="/app/wine/{wine_id}/compliance#{"nutrizione" if str(item.get("field") or "").startswith("nutrition") else "riciclabilita" if item.get("field")=="recycle" else "ingredienti"}"><b>{esc(item["title"])}</b> — {esc(item.get("remediation") or item["explanation"])}</a></li>'
         for item in blocking + warnings
-    ) or "<li>Nessun errore bloccante o avviso.</li>"
+    ) or "<li>Nessun dato mancante.</li>"
     recycle = payload.get("recycle") or {}
-    recycle_rows = "".join(f'<li><b>{esc(key.capitalize())}</b>: {esc(row.get("product") or "—")} · {esc(row.get("code") or "—")}</li>' for key, row in recycle.items()) or "<li>Nessun componente</li>"
+    recycle_rows = "".join(f'<li><b>{esc(_COMPONENT_LABELS.get(key, key.capitalize()))}</b>: {esc(row.get("product") or "—")} · {esc(canonical_recycling_code(row.get("code")) or "—")}</li>' for key, row in recycle.items()) or "<li>Nessun componente</li>"
     nut = payload.get("nutrition") or {}
     body = f"""
     <section style="max-width:1180px;margin:auto"><div class="h1">Controllo finale dell’etichetta</div>
       <p>Controlla tutti i dati in un’unica pagina. La preview è disponibile anche prima della pubblicazione.</p>
       {render_guided_stepper(wine_id, "review", completed_steps(int(wine_id)))}
       {f'<div class="note note-ok">{esc(msg)}</div>' if msg else ''}
-        <div class="card"><div class="h2">Stato: {esc(status_label)} · Compliance Score: {report['score']}/100</div><p>{'Pubblicabile' if not blocking else 'Non pubblicabile: correggere gli errori indicati'}</p><ul>{result_rows}</ul></div>
+        <div class="card"><div class="h2">Stato: {esc(status_label)}</div><p>{'Tutti i dati obbligatori sono presenti: puoi pubblicare.' if not blocking else 'Prima di pubblicare correggi i punti indicati qui sotto.'}</p><ul>{result_rows}</ul><div style="margin-top:12px">{primary}</div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">{_image_preview(assets.get('front') or {}, 'Immagine fronte')}{_image_preview(assets.get('back') or {}, 'Immagine retro')}</div>
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:16px">
         <div class="card"><div class="h2">Ingredienti</div>{_list(payload.get('ingredients') or [], 'Nessun ingrediente')}</div>
@@ -93,7 +103,7 @@ def review(request: Request, wine_id: int, msg: str = ""):
         <div data-preview-frame-wrap style="width:100%;max-width:100%;margin:auto;transition:max-width .2s ease"><iframe title="Anteprima pagina pubblica del vino" src="/app/wine/{int(wine_id)}/preview" style="width:100%;height:620px;border:1px solid #ddd;border-radius:14px;background:#fff"></iframe></div>
         <p><a target="_blank" rel="noopener" href="/app/wine/{int(wine_id)}/preview">Apri anteprima in nuova scheda</a></p>
       </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px"><a class="btn" href="/app/wine/{wine_id}/compliance">Indietro</a><a class="btn" href="/app/wine/{wine_id}/compliance">Modifica</a><a class="btn" href="/app/wine/{wine_id}/compliance">Salva dati</a><a class="btn" href="/app/wine/{wine_id}">Dashboard del lotto</a><a class="btn" target="_blank" rel="noopener" href="/app/wine/{int(wine_id)}/preview">Apri anteprima</a>{primary}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px"><a class="btn" href="/app/wine/{wine_id}/compliance">Torna a correggere</a><a class="btn" target="_blank" rel="noopener" href="/app/wine/{int(wine_id)}/preview">Anteprima</a>{primary}</div>
       <script>document.querySelectorAll('[data-preview-width]').forEach(button => button.addEventListener('click', () => {{ document.querySelector('[data-preview-frame-wrap]').style.maxWidth = button.dataset.previewWidth; }}));</script>
     </section>"""
     return HTMLResponse(page(title="QRFACILE · Controllo finale", subtitle="Step 7 di 7", body_html=body, actions_html="", user_email=user.get("email", ""), role=role, credits={}))

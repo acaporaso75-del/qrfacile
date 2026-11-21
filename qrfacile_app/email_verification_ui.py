@@ -28,7 +28,7 @@ def verification_required_page(request: Request, next: str = "/app/start"):
     body = f"""
     <div class='card'>
       <div class='h1'>Verifica il tuo indirizzo email</div>
-      <div class='p'>Prima di usare le funzioni riservate, apri il collegamento inviato a <b>{esc(user.get('email',''))}</b>.</div>
+      <div class='p'>Per proteggere il tuo account ti abbiamo inviato un’email a <b>{esc(user.get('email',''))}</b>. Apri il link contenuto nel messaggio e poi torna qui.</div><div class='p' style='margin-top:8px'>Non la trovi? Controlla la cartella Spam o Promozioni, oppure chiedine una nuova.</div>
       <form method='post' action='/api/me/email-verification/resend' style='margin-top:16px'>
         {csrf_input(request)}
         <button class='btn btn-primary' type='submit'>Invia di nuovo l'email</button>

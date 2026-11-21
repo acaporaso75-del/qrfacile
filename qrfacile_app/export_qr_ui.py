@@ -389,8 +389,8 @@ def export_page(request: Request, wine_id: int, preset: str = "label_pro", name:
           <div class="exportEyebrow">Export tipografico</div>
           <div class="h1">QR pronto per stampa</div>
           <div class="p">
-            Genera file professionali per retro-etichetta, cartone, fiera o tipografia.
-            PNG alta risoluzione, SVG vettoriale, PDF e ZIP completo.
+            Scarica il QR da stampare sull’etichetta del vino. Il QR non cambia mai:
+            puoi stamparlo anche prima di pubblicare la pagina.
           </div>
 
           <div class="exportMeta">
@@ -400,7 +400,7 @@ def export_page(request: Request, wine_id: int, preset: str = "label_pro", name:
           </div>
 
           <div class="exportUrlBox">
-            <div>URL contenuto nel QR</div>
+            <div>Indirizzo che si apre inquadrando il QR</div>
             <code>{esc(url)}</code>
           </div>
 
@@ -428,8 +428,8 @@ def export_page(request: Request, wine_id: int, preset: str = "label_pro", name:
         <div class="exportStep done">
           <span>1</span>
           <div>
-            <b>Compliance</b>
-            <small>Dati completati o verificati</small>
+            <b>Dati del vino</b>
+            <small>Completati o verificati</small>
           </div>
         </div>
 
@@ -437,7 +437,7 @@ def export_page(request: Request, wine_id: int, preset: str = "label_pro", name:
           <span>2</span>
           <div>
             <b>Export</b>
-            <small>Scegli formato e preset</small>
+            <small>Scarica il PDF</small>
           </div>
         </div>
 
@@ -450,6 +450,18 @@ def export_page(request: Request, wine_id: int, preset: str = "label_pro", name:
         </div>
       </div>
 
+      <div class="card exportSimple">
+        <div class="h2">Il file da dare alla tipografia</div>
+        <p class="p">Un PDF con il QR alla misura giusta per la retro-etichetta (25 mm). Mandalo alla
+        tipografia o al grafico: va bene così, non serve scegliere altro.</p>
+        <div class="exportSimpleActions">
+          <a class="btn btn-primary exportSimpleMain" href="/app/wine/{int(wine_id)}/export/file?preset=a4_pdf&name={esc(base_name)}">Scarica PDF per la tipografia</a>
+          <a class="btn" href="#invio-tipografia">Invialo per email alla tipografia</a>
+        </div>
+      </div>
+
+      <details class="exportAdvanced">
+        <summary>Opzioni avanzate per lo studio grafico (PNG, SVG, ZIP, altre misure)</summary>
       <div class="exportGrid">
         <div class="card exportPanel">
           <div class="exportPanelHead">
@@ -505,12 +517,13 @@ def export_page(request: Request, wine_id: int, preset: str = "label_pro", name:
           </div>
         </div>
       </div>
+      </details>
 
-      <div class="card exportPanel" style="margin-top:18px">
+      <div class="card exportPanel" id="invio-tipografia" style="margin-top:18px">
         <div class="exportPanelHead">
           <div>
             <div class="exportSmallLabel">Invio tipografia</div>
-            <div class="h2">Invia pacchetto ZIP via email</div>
+            <div class="h2">Invia i file del QR per email</div>
           </div>
           <span class="exportIcon">✉️</span>
         </div>
@@ -521,7 +534,7 @@ def export_page(request: Request, wine_id: int, preset: str = "label_pro", name:
             <input class="input" name="to_email" type="email" required autocomplete="email" placeholder="tipografia@example.com">
           </div>
 
-          <button class="btn btn-primary" type="submit" data-package-send-button>Invia pacchetti</button>
+          <button class="btn btn-primary" type="submit" data-package-send-button>Invia alla tipografia</button>
         </form>
         <div class="exportHint" data-package-send-message role="status" aria-live="polite"></div>
 
@@ -531,6 +544,11 @@ def export_page(request: Request, wine_id: int, preset: str = "label_pro", name:
       </div>
 
       <style>
+        .exportSimple {{ margin-top:18px; border:2px solid #14b8a6; }}
+        .exportSimpleActions {{ display:flex; gap:12px; flex-wrap:wrap; margin-top:14px; }}
+        .exportSimpleMain {{ font-size:17px; padding:15px 20px; }}
+        .exportAdvanced {{ margin-top:18px; }}
+        .exportAdvanced > summary {{ cursor:pointer; font-weight:800; color:#334155; padding:10px 0; }}
         .exportWrap {{
           max-width:1180px;
           margin:0 auto;

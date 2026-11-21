@@ -851,7 +851,7 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
 
     vintage_html = f"<span>Annata <b>{esc(vintage)}</b></span>" if vintage else ""
     lot_html = f"<span>Lotto <b>{esc(lot)}</b></span>" if lot else ""
-    slug_html = f"<span>Slug <b>{esc(slug or '-')}</b></span>"
+    slug_html = f"<span>Codice pagina <b>{esc(slug or '-')}</b></span>"
 
     studio_note = ""
     if role == "studio":

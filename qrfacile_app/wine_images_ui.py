@@ -252,11 +252,13 @@ def _image_card(wine_id: int, kind: str, asset: dict) -> str:
     tech_rows = ""
     if original or optimized or thumb:
         tech_rows = f"""
+        <details class="imagesTechDetails"><summary>Dettagli tecnici (per l’assistenza)</summary>
         <div class="imagesTech">
           <div><span>Originale</span><b>{esc(original or "-")}</b></div>
           <div><span>Ottimizzata</span><b>{esc(optimized or "-")}</b></div>
-          <div><span>Thumbnail</span><b>{esc(thumb or "-")}</b></div>
+          <div><span>Anteprima</span><b>{esc(thumb or "-")}</b></div>
         </div>
+        </details>
         """
 
     delete_form = ""
@@ -380,7 +382,7 @@ def images_page(request: Request, wine_id: int, msg: str = ""):
           <div class="imagesRules">
             <div><b>JPG / PNG / WebP</b><span>Formati accettati</span></div>
             <div><b>Max 5MB</b><span>Limite per file</span></div>
-            <div><b>Anti-bomb</b><span>Controllo immagine reale</span></div>
+            <div><b>Controllo automatico</b><span>Verifichiamo che il file sia una vera immagine</span></div>
           </div>
         </div>
       </div>

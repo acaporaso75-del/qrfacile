@@ -97,3 +97,63 @@ def test_sidebar_loads_real_balance_instead_of_showing_zero(monkeypatch):
     monkeypatch.setattr(ui_shell, "_credits_for_email", lambda email: None)
     unknown = ui_shell._sidebar("winery", "cantina@example.test", None)
     assert "<b>—</b>" in unknown and "<b>0</b>" not in unknown
+
+
+def test_winery_lands_on_dashboard_after_login():
+    source = (ROOT / "qrfacile_app" / "auth_routes.py").read_text(encoding="utf-8")
+    assert 'next_url = "/app/dashboard" if (u.get("role") or "").lower().strip() == "winery" else "/app/start"' in source
+    assert "Ti abbiamo inviato un’email" in source
+    assert "Ora puoi accedere.\"" not in source.split("created == \"1\"")[1].split("elif")[0]
+
+
+def _row(**flags):
+    row = {"wine_id": 9, "wine_name": "Aglianico", "status": "bozza", "slug": "ABC"}
+    row.update(flags)
+    return row
+
+
+def test_first_wine_checklist_guides_until_first_publication():
+    from qrfacile_app.dashboard_ui import _first_wine_checklist
+
+    empty = _first_wine_checklist([], 0, "winery")
+    assert "Il tuo primo vino" in empty
+    assert "Continua: Dai un nome al tuo vino" in empty and 'href="/app/new-wine-master"' in empty
+
+    started = _first_wine_checklist([_row(ingredient_count=1, allergen_count=1)], 1, "winery")
+    assert "Continua: Valori nutrizionali" in started
+    assert 'href="/app/wine/9/compliance#nutrizione"' in started
+
+    published = _first_wine_checklist([_row(status="attiva")], 1, "winery")
+    assert published == ""
+    assert _first_wine_checklist([], 0, "studio") == ""
+
+
+def test_final_check_has_only_clear_actions():
+    source = (ROOT / "qrfacile_app" / "wine_flow_ui.py").read_text(encoding="utf-8")
+    assert "Torna a correggere" in source
+    for removed in (">Indietro<", ">Modifica<", ">Salva dati<", "Compliance Score"):
+        assert removed not in source
+    assert '"closure": "Tappo"' in source
+
+
+def test_export_leads_with_one_pdf_for_the_printer():
+    source = (ROOT / "qrfacile_app" / "export_qr_ui.py").read_text(encoding="utf-8")
+    assert "Scarica PDF per la tipografia" in source
+    assert "export/file?preset=a4_pdf" in source
+    simple = source.index("Scarica PDF per la tipografia")
+    advanced = source.index('<details class="exportAdvanced">')
+    assert simple < advanced < source.index("Preset tipografico")
+
+
+def test_customer_pages_avoid_technical_jargon():
+    checks = {
+        "wine_images_ui.py": ("Anti-bomb",),
+        "wine_compliance_ui.py": ("Richiedi sblocco admin",),
+        "wine_hub_ui.py": ("<span>Slug ",),
+        "dashboard_ui.py": ("Slug {slug_safe", 'pill(f"wine: {balances'),
+        "start_ui.py": ('pill(f"generic: ',),
+    }
+    for name, forbidden in checks.items():
+        source = (ROOT / "qrfacile_app" / name).read_text(encoding="utf-8")
+        for text in forbidden:
+            assert text not in source, (name, text)
