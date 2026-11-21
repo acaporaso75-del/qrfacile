@@ -75,6 +75,20 @@ MANDATORY_ROUTERS = frozenset(
         "qrfacile_app.winery_register_routes",
         "qrfacile_app.public",
         "qrfacile_app.uploads_routes",
+        # Revenue, publishing and legal paths: a SaaS instance without them
+        # must not go online partially.
+        "qrfacile_app.pricing_ui",
+        "qrfacile_app.billing_ui",
+        "qrfacile_app.paypal_ui",
+        "qrfacile_app.publish_routes",
+        "qrfacile_app.export_qr_ui",
+        "qrfacile_app.legal_pages",
+        "qrfacile_app.legal_acceptance_ui",
+        "qrfacile_app.privacy_requests_ui",
+        "qrfacile_app.wine_flow_ui",
+        "qrfacile_app.wine_hub_ui",
+        "qrfacile_app.wine_images_ui",
+        "qrfacile_app.wine_compliance_ui",
     }
 )
 
