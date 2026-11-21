@@ -57,14 +57,14 @@ credenziali, token o segreti.
 - Host applicativo: `192.168.1.139`.
 - Directory: `/opt/qrfacile-staging`.
 - Servizio: `qrfacile-staging.service`, verificato `active` il 2026-11-21;
-  ultimo avvio riuscito 2026-11-21 11:47:14 CET.
+  ultimo avvio riuscito 2026-11-21 17:15:32 CET.
 - Runtime: Gunicorn con worker Uvicorn, porta `8001` in ascolto.
 - Commit distribuito: detached HEAD a
-  `3da7d35654ed2bc9b74cc8865c11cf293d70473f`.
+  `32cf797d126259114917dccc0d3f1b53c83769b9`.
 - Backup fresco verificato:
-  `/opt/qrfacile-backups/staging/20261121_114411_staging_ed7f0b0663f6`.
+  `/opt/qrfacile-backups/staging/20261121_171518_staging_3da7d35654ed`.
 - Rollback dedicato conservato:
-  `/opt/qrfacile-staging.rollback-20261121_114522-ed7f0b0663f6`.
+  `/opt/qrfacile-staging.rollback-20261121_171518-3da7d35654ed`.
 - Readback completo:
   `docs/STAGING_DEPLOY_READBACK_2026-11-21.md`.
 - Database: PostgreSQL su `192.168.1.143:5432`, database
@@ -74,11 +74,19 @@ credenziali, token o segreti.
   correnti del file `.env` non sono riportati né copiati.
 - PayPal: staging verificato in modalità Sandbox. La CSP live espone
   `form-action 'self' https://www.sandbox.paypal.com`; un click reale da Billing
-  ha raggiunto la pagina di accesso Sandbox. Nessun pagamento completato.
-- SMTP reale: messaggio ricevuto sulla casella controllata; il click è
-  bloccato da un `DatatypeMismatch` tra la colonna storica
-  `users.email_verified` (`integer`) e il booleano usato dal codice. Nessun
+  ha raggiunto la pagina di accesso Sandbox. Un solo ordine di collaudo è
+  rimasto `pending`; nessun login PayPal, approvazione, capture o pagamento.
+- SMTP reale: messaggi Cantina e Studio ricevuti sulla casella controllata;
+  verifica email e login riusciti sullo SHA installato. Il readback DB della
+  Cantina ID 428 conferma il flag intero di verifica positivo e il timestamp
+  valorizzato. Nessun
   account è stato marcato verificato via SQL.
+- Collaudo Fase E: PASS sui nove punti; vino 623 pubblicato in staging, pagina
+  pubblica IT/EN e export PNG/SVG/PDF verificati, credito 3 → 2.
+- Limite deploy: la copia versionata dello script richiede una correzione per
+  eseguire clone/checkout come proprietario del repository; durante questa
+  ridistribuzione è stata usata una copia operativa temporanea documentata nel
+  readback.
 - Origin pubblico dedicato, DNS e reverse proxy staging: `NOT_VERIFIED`; il
   collaudo attuale usa `http://192.168.1.139:8001`.
 - Database privilege isolation: la revoca esplicita di `CONNECT` dall'utente

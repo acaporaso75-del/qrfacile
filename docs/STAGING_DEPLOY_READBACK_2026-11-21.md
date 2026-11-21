@@ -8,15 +8,12 @@ personali. Produzione, Caddy, DNS e PayPal Live non sono stati modificati.
 
 ## Esito sintetico
 
-Il deploy dello SHA `3da7d35654ed2bc9b74cc8865c11cf293d70473f` è
-**PASS**: servizio attivo, `/healthz` coerente e backup/rollback verificati.
-
-Il collaudo SMTP è **PASS**, ma il click del collegamento di verifica email è
-**FAIL**. Lo schema staging conserva `users.email_verified` come `integer`,
-mentre il codice installato tenta di assegnare il booleano `TRUE`. PostgreSQL
-restituisce `DatatypeMismatch` e l'account non viene sbloccato. Non è stato
-usato SQL per aggirare il controllo. Checkout autenticato e flusso vino restano
-quindi `NOT_VERIFIED`.
+Il primo deploy dello SHA `3da7d35654ed2bc9b74cc8865c11cf293d70473f`
+ha evidenziato il difetto storico `integer`/`boolean` sulla verifica email. La
+successiva ridistribuzione autorizzata dello SHA
+`32cf797d126259114917dccc0d3f1b53c83769b9` ha corretto il difetto ed è
+**PASS**: servizio attivo, `/healthz` coerente, backup/rollback verificati e
+collaudo Fase E completato senza bypass SQL, capture o pagamento completato.
 
 ## Identità runtime
 
@@ -176,8 +173,157 @@ produzione o PayPal Live.
    stati eseguiti.
 4. Nessuna capture, approvazione PayPal o pagamento completato.
 
-## Conclusione
+## Conclusione del primo deploy
 
-Deploy staging PASS e SMTP reale PASS; collaudo applicativo complessivo non
-chiudibile finché la verifica email non viene resa compatibile con lo schema
-staging e distribuita con una nuova autorizzazione puntuale.
+Questa conclusione descrive il checkpoint storico su `3da7d35`. Il difetto è
+stato corretto e verificato dalla ridistribuzione documentata nella sezione
+seguente.
+
+## Ridistribuzione 32cf797
+
+### Identità e perimetro
+
+- data e ora di attivazione: 2026-11-21 17:15:32 CET (Europe/Rome);
+- host: `192.168.1.139`;
+- root: `/opt/qrfacile-staging`;
+- servizio: `qrfacile-staging.service`, `active`;
+- database: `qrfacile_staging_db`;
+- SHA prima: `3da7d35654ed2bc9b74cc8865c11cf293d70473f`;
+- SHA dopo: `32cf797d126259114917dccc0d3f1b53c83769b9`;
+- produzione: invariata a `de0a4f1d848e68b5ea4113b3b80d2fa94cc23ffd`.
+
+Readback `GET /healthz`, HTTP 200:
+
+```json
+{"status":"OK","environment":"staging","database":"OK","release":"32cf797d126259114917dccc0d3f1b53c83769b9"} <!-- pragma: allowlist secret -->
+```
+
+Il journal del servizio non contiene errori dal nuovo avvio. Home e login
+staging rispondono HTTP 200. La home produzione risponde ancora HTTP 200.
+
+### Backup e rollback
+
+Backup fresco conservato:
+
+```text
+/opt/qrfacile-backups/staging/20261121_171518_staging_3da7d35654ed
+```
+
+| Artefatto | SHA-256 |
+| --- | --- |
+| dump PostgreSQL | `13862eb0fc4a55e3882d1d47a8a74f2438064d4fd47e16d5901b3c0c2d9eaeee` |
+| archivio filesystem | `7362a7553f626f9ded4c72558af343dc7bcaa3287def87e44afb301d01b85aa0` |
+
+Verifiche: `sha256sum -c` PASS su entrambi gli artefatti,
+`pg_restore --list` PASS e `gzip -t` PASS.
+
+Rollback dedicato conservato:
+
+```text
+/opt/qrfacile-staging.rollback-20261121_171518-3da7d35654ed
+```
+
+Il readback Git della directory di rollback restituisce lo SHA precedente
+`3da7d35654ed2bc9b74cc8865c11cf293d70473f`.
+
+### Release
+
+Prima dello swap il target ha superato `compileall`, import applicazione,
+security audit (0 finding) e controllo transazioni SQL. Ambiente `staging` e
+database `qrfacile_staging_db` sono stati confermati. Il primo health probe
+eseguito immediatamente dopo il restart ha incontrato il breve intervallo di
+avvio; il retry previsto dallo script ha poi restituito
+`RELEASE_HEALTH_OK` sullo SHA esatto.
+
+La copia versionata dello script ha richiesto una correzione operativa
+temporanea: il clone locale eseguito da `root` era rifiutato da Git per
+`dubious ownership` sul repository appartenente all'utente di servizio. La
+copia runtime LF ha eseguito soltanto clone e checkout come proprietario del
+repository; backup, swap, health check e rollback sono rimasti invariati. I
+tentativi precedenti si sono fermati prima dello swap e non hanno riavviato il
+servizio. La correzione permanente dello script resta da versionare.
+
+### Collaudo Fase E aggiornato
+
+| # | Punto | Esito | Evidenza sintetica |
+| ---: | --- | ---: | --- |
+| 1 | Home e CTA vino | **PASS** | `/` HTTP 200; CTA di prova gratuita verso `/register-winery` |
+| 2 | Registrazione Cantina minima | **PASS** | account minimo creato da interfaccia, mail ricevuta, 3 crediti iniziali |
+| 3 | Profilo fiscale incompleto | **PASS** | profilo parziale rifiutato prima della scrittura; profilo vuoto ammesso per la prova |
+| 4 | Profilo fiscale completo | **PASS** | dati di test formalmente validi salvati e normalizzati tramite interfaccia |
+| 5 | Checkout vuoto → impostazioni → Sandbox | **PASS** | account con profilo vuoto: redirect a `#profilo-fiscale` e 0 ordini; account completo: redirect PayPal Sandbox, ordine 67 `pending`, nessun login/approvazione/capture |
+| 6 | Vino 7 step, preview, pubblicazione, `/e/`, export e QR | **PASS** | vino 623: fronte/retro, ingredienti/allergeni, nutrizione, riciclabilità, review, preview e pubblicazione; IT/EN HTTP 200; PNG/SVG/PDF validi; QR decodificato sull'URL pubblico staging; crediti 3 → 2 |
+| 7 | Login/reset/Studio/pagine pubbliche | **PASS** | login/logout Cantina e Studio riusciti; pagina reset 200; Studio creato e verificato via email; seconda apertura dei link rifiutata |
+| 8 | Discoverability | **PASS** | `robots.txt`, `sitemap.xml` e `llms.txt` HTTP 200 dopo la ridistribuzione |
+| 9 | Produzione invariata | **PASS** | SHA produzione `de0a4f1d848e68b5ea4113b3b80d2fa94cc23ffd`, servizio attivo e home HTTP 200 |
+
+La pagina pubblica `/e/` non imposta cookie e non contiene riferimenti ai
+tracker controllati (Google Analytics/Tag Manager, Meta Pixel, Matomo, Hotjar).
+
+### Prova SMTP e verifica email
+
+- destinatario: casella di test controllata dal titolare;
+- dominio mittente osservato: `qrfacile.it`;
+- origine dei link: `http://192.168.1.139:8001`;
+- Cantina ID 428: stesso link del tentativo fallito riutilizzato con successo;
+- readback DB ID 428: flag intero di verifica positivo e
+  `email_verified_at` valorizzato;
+- seconda apertura dello stesso link: HTTP 404, collegamento non valido;
+- Studio ID 430: messaggio ricevuto, link aperto con successo e login riuscito;
+- aggiornamenti SQL manuali: **NESSUNO**.
+
+Nessun indirizzo completo o token è riportato.
+
+### Conteggi DB staging
+
+| Tabella | Prima della ridistribuzione | Dopo il collaudo |
+| --- | ---: | ---: |
+| `users` | 16 | 18 |
+| `wineries` | 12 | 13 |
+| `orders` | 61 | 62 |
+| `qr_items` | 52 | 53 |
+| `qr_wines` | 31 | 32 |
+
+L'unico ordine aggiunto è `pending` in ambiente `sandbox`. Nessun pagamento è
+stato approvato o completato.
+
+### Account QA aggiornati
+
+| ID | Prefisso | Stato |
+| ---: | --- | --- |
+| 426 | `qa-fase2-20261121114829-min` | non verificato |
+| 427 | `qa-fase2-20261121114829-full` | non verificato |
+| 428 | `qa-fase2-e2e-20261121154920` | verificato; vino e ordine Sandbox pending presenti |
+| 429 | `qa-fase2-empty-202611211725` | verificato; profilo vuoto, 3 crediti, 0 ordini |
+| 430 | `qa-fase2-studio-202611211735` | Studio verificato; login/logout riusciti |
+
+Proposta conservativa aggiornata, **non eseguita**:
+
+```sql
+BEGIN;
+DELETE FROM sessions WHERE user_id IN (426, 427, 428, 429, 430);
+UPDATE email_verification_tokens
+SET revoked_at = now()
+WHERE user_id IN (426, 427, 428, 429, 430)
+  AND used_at IS NULL AND revoked_at IS NULL;
+UPDATE users
+SET pass_hash = '!qa-disabled!',
+    email_verified = 0,
+    email_verified_at = NULL,
+    email_verification_required = TRUE
+WHERE id IN (426, 427, 428, 429, 430);
+-- Verificare i record e sostituire ROLLBACK con COMMIT solo dopo autorizzazione.
+ROLLBACK;
+```
+
+La rimozione fisica non è proposta: l'account 428 possiede crediti, un ordine
+Sandbox pending e un vino pubblicato, quindi occorre preservare le relazioni.
+
+### Limiti residui
+
+1. La copia versionata di `scripts/deploy_staging.sh` deve essere resa
+   indipendente dalla proprietà Git eseguendo clone/checkout come utente del
+   repository; la correzione operativa non è stata committata.
+2. Non sono stati eseguiti login PayPal, approvazioni, capture o pagamenti.
+3. Produzione, `.env`, Caddy, DNS, PayPal Live e database produzione non sono
+   stati modificati.
