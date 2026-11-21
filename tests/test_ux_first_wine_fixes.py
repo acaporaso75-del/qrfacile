@@ -199,3 +199,18 @@ def test_new_lot_page_is_plain_and_studio_section_optional():
     assert "Etichetta selezionata" not in source
     assert "credito wine" not in source and "crediti wine" not in source
     assert "if not selected_master_id and len(master_ids) == 1:" in source
+
+
+def test_compliance_page_shows_one_section_at_a_time():
+    from qrfacile_app.wine_compliance_ui import _SECTION_TABS, _section_tabs_html
+
+    source = (ROOT / "qrfacile_app" / "wine_compliance_ui.py").read_text(encoding="utf-8")
+    for _key, _label, ids in _SECTION_TABS:
+        for section_id in ids:
+            assert f'id="{section_id}"' in source, section_id
+    html = _section_tabs_html({"nutrition"})
+    assert 'class="qrfSectionTabs"' in html and " hidden>" in html  # visible only with JavaScript
+    assert "Avanti: " in html and "qrfSectionHidden" in html
+    assert 'data-tab="nutrition" class="done"' in html
+    assert "__TABS__" not in html and "__BUTTONS__" not in html
+    assert ">Dati obbligatori</a>" in source and ">Compliance</a>" not in source

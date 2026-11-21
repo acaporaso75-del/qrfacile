@@ -34,7 +34,8 @@ BASE_FIELDS = (
 
 def _redirect_error(wine_id: int, message: str) -> RedirectResponse:
     return RedirectResponse(
-        f"/app/wine/{int(wine_id)}/compliance?msg={quote(message)}",
+        # Every error raised here concerns packaging: reopen that section.
+        f"/app/wine/{int(wine_id)}/compliance?msg={quote(message)}#riciclabilita",
         status_code=303,
     )
 

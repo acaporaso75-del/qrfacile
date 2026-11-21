@@ -1,3 +1,4 @@
+import json
 import time
 from typing import Optional
 
@@ -426,6 +427,91 @@ def _recycle_rows(recycle: dict) -> str:
     return "\n".join(rows)
 
 
+# The compliance page holds ingredients, nutrition, packaging and options in
+# one very long page (about 10,000 px on a phone). With JavaScript the
+# sections are shown one at a time; every field stays in the same form, so
+# "Salva" still saves everything. Without JavaScript the page is unchanged.
+_SECTION_TABS = (
+    ("ingredients", "Ingredienti e allergeni", ("ingredienti", "ingredienti-testo")),
+    ("nutrition", "Valori nutrizionali", ("nutrizione",)),
+    ("recycling", "Bottiglia e imballaggi", ("riciclabilita",)),
+    ("more", "Altre opzioni", ("altre-opzioni", "controllo-finale", "pubblicazione")),
+)
+_SECTION_TABS_TEMPLATE = """
+<nav class="qrfSectionTabs" aria-label="Sezioni dei dati obbligatori" hidden>__BUTTONS__</nav>
+<style>
+  .qrfSectionTabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:14px 0}
+  .qrfSectionTabs button{display:flex;gap:8px;align-items:center;padding:12px;border:1px solid rgba(2,8,23,.12);border-radius:14px;background:#fff;font-weight:800;text-align:left;cursor:pointer}
+  .qrfSectionTabs button span{display:grid;place-items:center;flex:0 0 28px;height:28px;border-radius:9px;background:#e2e8f0}
+  .qrfSectionTabs button.done span{background:#dcfce7;color:#166534}
+  .qrfSectionTabs button[aria-selected="true"]{border-color:#14b8a6;background:#f0fdfa}
+  .qrfSectionTabs button[aria-selected="true"] span{background:#14b8a6;color:#fff}
+  .qrfSectionHidden{display:none!important}
+  .qrfSectionNext{margin-top:14px}
+</style>
+<script>
+(() => {
+  const tabs = __TABS__;
+  const nav = document.querySelector('.qrfSectionTabs');
+  if (!nav) return;
+  const nodes = tab => tab.ids.map(id => document.getElementById(id)).filter(Boolean);
+  const keyForHash = () => {
+    const id = location.hash.replace('#', '');
+    return (tabs.find(tab => tab.ids.includes(id)) || tabs[0]).key;
+  };
+  let nextButtons = [];
+  const show = (key, scroll) => {
+    tabs.forEach(tab => {
+      nodes(tab).forEach(node => node.classList.toggle('qrfSectionHidden', tab.key !== key));
+      nav.querySelector(`[data-tab="${tab.key}"]`).setAttribute('aria-selected', String(tab.key === key));
+    });
+    nextButtons.forEach(({owner, button}) => button.classList.toggle('qrfSectionHidden', owner !== key));
+    if (scroll) nav.scrollIntoView({behavior: 'smooth', block: 'start'});
+  };
+  const start = () => {
+    if (!tabs.every(tab => nodes(tab).length)) return;  // unexpected layout: leave the page as is
+    nav.hidden = false;
+    tabs.forEach((tab, index) => {
+      nav.querySelector(`[data-tab="${tab.key}"]`).addEventListener('click', () => show(tab.key, true));
+      const next = tabs[index + 1];
+      if (!next) return;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn-primary qrfSectionNext';
+      button.textContent = `Avanti: ${next.label}`;
+      button.addEventListener('click', () => show(next.key, true));
+      const anchor = nodes(tab)[nodes(tab).length - 1];
+      anchor.insertAdjacentElement('afterend', button);
+      nextButtons.push({owner: tab.key, button});
+    });
+    show(keyForHash(), false);
+    window.addEventListener('hashchange', () => show(keyForHash(), true));
+    // A required field in a hidden section must become visible to be fixed.
+    document.addEventListener('invalid', event => {
+      const owner = tabs.find(tab => nodes(tab).some(node => node.contains(event.target)));
+      if (owner) show(owner.key, false);
+    }, true);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+</script>
+"""
+
+
+def _section_tabs_html(completed: set[str]) -> str:
+    buttons = "".join(
+        f'<button type="button" role="tab" data-tab="{key}" class="{"done" if key in completed else ""}">'
+        f'<span>{"✓" if key in completed else index}</span>{esc(label)}</button>'
+        for index, (key, label, _ids) in enumerate(_SECTION_TABS, 1)
+    )
+    tabs = [{"key": key, "label": label, "ids": list(ids)} for key, label, ids in _SECTION_TABS]
+    return (
+        _SECTION_TABS_TEMPLATE
+        .replace("__BUTTONS__", buttons)
+        .replace("__TABS__", json.dumps(tabs, ensure_ascii=False))
+    )
+
+
 _NUTRITION_ESTIMATOR_TEMPLATE = """
 <details class="nutritionEstimator" open>
   <summary>Non hai i valori? Calcolali dalla gradazione e dagli zuccheri residui</summary>
@@ -596,9 +682,9 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
       {render_guided_stepper(int(wine_id), "ingredients", completed_steps(int(wine_id)))}
 
       <div class="complianceTabs">
-        <a class="complianceTab" href="/app/wine/{int(wine_id)}">Overview</a>
+        <a class="complianceTab" href="/app/wine/{int(wine_id)}">Scheda vino</a>
         <a class="complianceTab" href="/app/wine/{int(wine_id)}/images">Immagini</a>
-        <a class="complianceTab active" href="/app/wine/{int(wine_id)}/compliance">Compliance</a>
+        <a class="complianceTab active" href="/app/wine/{int(wine_id)}/compliance">Dati obbligatori</a>
         <a class="complianceTab" href="/app/wine/{int(wine_id)}/export">Export</a>
       </div>
 
@@ -621,6 +707,8 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
           <small>Scarica QR per stampa</small>
         </a>
       </div>
+
+      {_section_tabs_html(completed_steps(int(wine_id)))}
 
       <div class="complianceGrid2" id="ingredienti">
         <div class="card compliancePanel">
@@ -690,7 +778,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
 
       <form id="saveForm" method="post" action="/app/wine/{int(wine_id)}/compliance/save">
         {csrf_html}
-        <div class="card compliancePanel" style="margin-top:18px">
+        <div class="card compliancePanel" id="ingredienti-testo" style="margin-top:18px">
           <div class="compliancePanelHead">
             <div>
               <div class="complianceSmallLabel">Extra ingredienti</div>
@@ -789,7 +877,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
           </div>
         </div>
 
-        <div class="card compliancePanel" style="margin-top:18px">
+        <div class="card compliancePanel" id="altre-opzioni" style="margin-top:18px">
           <div class="compliancePanelHead">
             <div>
               <div class="complianceSmallLabel">Pagina pubblica</div>
