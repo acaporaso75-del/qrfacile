@@ -171,8 +171,8 @@ def _studio_assignment_box(
             </span>
           </label>
           <div class="newWineWorkNested">
-            <label>Email Studio Grafico</label>
-            <input class="input" name="invite_studio_email" type="email" placeholder="studio@example.com">
+            <label for="f-invite_studio_email">Email Studio Grafico</label>
+            <input id="f-invite_studio_email" class="input" name="invite_studio_email" type="email" placeholder="studio@example.com">
           </div>
         """
 
@@ -204,8 +204,8 @@ def _studio_assignment_box(
         </span>
       </label>
       <div class="newWineWorkNested">
-        <label>Studio collegato</label>
-        <select name="assigned_studio_user_id" {connected_disabled}>
+        <label for="f-assigned_studio_user_id">Studio collegato</label>
+        <select id="f-assigned_studio_user_id" name="assigned_studio_user_id" {connected_disabled}>
           {''.join(opts)}
         </select>
         <div class="note" style="margin-top:10px">
@@ -479,8 +479,8 @@ def new_wine_get(
         """
     else:
         winery_field_html = f"""
-            <label>Cantina</label>
-            <select name="winery_id" required onchange="newWineReloadForWinery(this)">
+            <label for="f-winery_id">Cantina</label>
+            <select id="f-winery_id" name="winery_id" required onchange="newWineReloadForWinery(this)">
               {''.join(opts)}
             </select>
             <div class="note" style="margin-top:10px">
@@ -576,8 +576,8 @@ def new_wine_get(
           </div>
 
           <div>
-            <label>Vino</label>
-            <select name="wine_master_id">
+            <label for="f-wine_master_id">Vino</label>
+            <select id="f-wine_master_id" name="wine_master_id">
               {''.join(master_opts)}
             </select>
             <div class="note" style="margin-top:10px">
@@ -599,28 +599,28 @@ def new_wine_get(
           <input type="hidden" name="wine_name">
 
           <div>
-            <label>Annata (se dichiarata in etichetta)</label>
-            <input class="input" name="vintage" placeholder="2023">
+            <label for="f-vintage">Annata (se dichiarata in etichetta)</label>
+            <input id="f-vintage" class="input" name="vintage" placeholder="2023">
           </div>
 
           <div>
-            <label>Codice lotto</label>
-            <input class="input" name="lot" placeholder="L001/7">
+            <label for="f-lot">Codice lotto</label>
+            <input id="f-lot" class="input" name="lot" placeholder="L001/7">
           </div>
 
           <div>
-            <label>Volume ml</label>
-            <input class="input" name="volume_ml" value="750" inputmode="numeric">
+            <label for="f-volume_ml">Volume ml</label>
+            <input id="f-volume_ml" class="input" name="volume_ml" value="750" inputmode="numeric">
           </div>
 
           <div>
-            <label>Grado alcolico (% vol)</label>
-            <input class="input" name="alcohol" placeholder="13.5">
+            <label for="f-alcohol">Grado alcolico (% vol)</label>
+            <input id="f-alcohol" class="input" name="alcohol" placeholder="13.5">
           </div>
 
           <div>
-            <label>Durata QR vino</label>
-            <select name="qr_duration_years">
+            <label for="f-qr_duration_years">Durata QR vino</label>
+            <select id="f-qr_duration_years" name="qr_duration_years">
               <option value="10" selected>10 anni · usa 1 QR vino</option>
               <option value="25">25 anni · usa 2 QR vino</option>
             </select>
@@ -1356,8 +1356,8 @@ def new_label_get(request: Request, msg: str = "", wine_id: int = 0):
           </div>
         </div>
 
-        <label>Lotto</label>
-        <select name="wine_id" required>
+        <label for="f-wine_id">Lotto</label>
+        <select id="f-wine_id" name="wine_id" required>
           {''.join(options) if options else "<option value=''>Nessun lotto disponibile</option>"}
         </select>
 
@@ -1371,16 +1371,16 @@ def new_label_get(request: Request, msg: str = "", wine_id: int = 0):
 
         <div class="newWineGrid3">
           <div>
-            <label>Tipo etichetta</label>
-            <select name="label_type">
+            <label for="f-label_type">Tipo etichetta</label>
+            <select id="f-label_type" name="label_type">
               <option value="front">Fronte</option>
               <option value="back">Retro</option>
             </select>
           </div>
 
           <div>
-            <label>Lingua</label>
-            <select name="language">
+            <label for="f-language">Lingua</label>
+            <select id="f-language" name="language">
               <option value="it">Italiano</option>
               <option value="en">English</option>
               <option value="de">Deutsch</option>
@@ -1390,8 +1390,8 @@ def new_label_get(request: Request, msg: str = "", wine_id: int = 0):
           </div>
 
           <div>
-            <label>Nome interno opzionale</label>
-            <input class="input" name="title_override" placeholder="es. Back export UK">
+            <label for="f-title_override">Nome interno opzionale</label>
+            <input id="f-title_override" class="input" name="title_override" placeholder="es. Back export UK">
           </div>
         </div>
 

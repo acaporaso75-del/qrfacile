@@ -772,8 +772,7 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
     status_badge = pill("Pubblicato", "green") if is_published else pill("Bozza", "muted")
 
     actions = (
-        pill(f"wine: {balances.get('wine', 0)}", "green") + " " +
-        pill(f"generic: {balances.get('generic', 0)}") + " " +
+        pill(f"QR vino disponibili: {balances.get('wine', 0)}", "green") + " " +
         top_actions(
             ("/app/start", "Menu"),
             ("/app/dashboard", "Dashboard"),

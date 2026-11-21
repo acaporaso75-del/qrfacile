@@ -486,9 +486,9 @@ def _first_wine_checklist(rows: list[dict], master_count: int, role: str) -> str
         .firstWineSteps{{list-style:none;margin:14px 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}}
         .firstWineStep{{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid rgba(2,8,23,.09);border-radius:14px;background:#fff}}
         .firstWineStep span{{display:grid;place-items:center;flex:0 0 30px;height:30px;border-radius:10px;background:#e2e8f0;font-weight:900}}
-        .firstWineStep b{{display:block;font-size:14px}}.firstWineStep small{{color:#64748b}}
+        .firstWineStep b{{display:block;font-size:14px}}.firstWineStep small{{color:#556377}}
         .firstWineStep.done span{{background:#dcfce7;color:#166534}}
-        .firstWineStep.current{{border-color:#14b8a6;background:#f0fdfa}}.firstWineStep.current span{{background:#14b8a6;color:#fff}}
+        .firstWineStep.current{{border-color:#14b8a6;background:#f0fdfa}}.firstWineStep.current span{{background:#0f766e;color:#fff}}
         .firstWineCta{{font-size:16px;padding:14px 18px}}
       </style>
     </section>
@@ -1222,13 +1222,13 @@ def dashboard(request: Request, q: str = "", work: str = "all", view: str = ""):
       <div class="dashboardToolbar card">
         <form method="get" class="dashboardSearchForm">
           <div>
-            <label style="margin-top:0">Cerca per nome del vino, lotto o codice pagina</label>
-            <input class="input" name="q" value="{_h(q)}" placeholder="Es. Falanghina, lotto L25, slug...">
+            <label for="dash-q" style="margin-top:0">Cerca per nome del vino, lotto o codice pagina</label>
+            <input id="dash-q" class="input" name="q" value="{_h(q)}" placeholder="Es. Falanghina, lotto L25, slug...">
           </div>
 
           <div>
-            <label style="margin-top:0">Chi lavora</label>
-            <select name="work">
+            <label for="dash-work" style="margin-top:0">Chi lavora</label>
+            <select id="dash-work" name="work">
               <option value="all" {'selected' if work == 'all' else ''}>Tutte</option>
               <option value="self" {'selected' if work == 'self' else ''}>Gestisco io</option>
               <option value="assigned" {'selected' if work == 'assigned' else ''}>Studio assegnato</option>

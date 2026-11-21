@@ -123,8 +123,7 @@ def winery_logo_page(request: Request, msg: str = "", err: str = ""):
         """
 
     actions = (
-        pill(f"wine: {balances.get('wine', 0)}", "green") + " " +
-        pill(f"generic: {balances.get('generic', 0)}") + " " +
+        pill(f"QR vino disponibili: {balances.get('wine', 0)}", "green") + " " +
         top_actions(
             ("/app/dashboard", "Dashboard"),
             ("/app/start", "Menu"),

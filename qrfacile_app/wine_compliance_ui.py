@@ -348,8 +348,8 @@ def _summary_html(ingredients: list[str], allergens: list[str], nut: dict, recyc
           {csrf_html}
           <details>
             <summary>Ti manca un dato e devi pubblicare comunque? Chiedi aiuto all’assistenza</summary>
-            <label>Spiega cosa ti serve</label>
-            <input class="input" name="reason"
+            <label for="f-reason">Spiega cosa ti serve</label>
+            <input id="f-reason" class="input" name="reason"
                    placeholder="es. aspetto i valori dall’enologo, devo stampare entro venerdì">
             <button class="btn" type="submit">Invia richiesta all’assistenza</button>
           </details>
@@ -438,14 +438,14 @@ _SECTION_TABS = (
     ("more", "Altre opzioni", ("altre-opzioni", "controllo-finale", "pubblicazione")),
 )
 _SECTION_TABS_TEMPLATE = """
-<nav class="qrfSectionTabs" aria-label="Sezioni dei dati obbligatori" hidden>__BUTTONS__</nav>
+<nav class="qrfSectionTabs" role="tablist" aria-label="Sezioni dei dati obbligatori" hidden>__BUTTONS__</nav>
 <style>
   .qrfSectionTabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:14px 0}
   .qrfSectionTabs button{display:flex;gap:8px;align-items:center;padding:12px;border:1px solid rgba(2,8,23,.12);border-radius:14px;background:#fff;font-weight:800;text-align:left;cursor:pointer}
   .qrfSectionTabs button span{display:grid;place-items:center;flex:0 0 28px;height:28px;border-radius:9px;background:#e2e8f0}
   .qrfSectionTabs button.done span{background:#dcfce7;color:#166534}
   .qrfSectionTabs button[aria-selected="true"]{border-color:#14b8a6;background:#f0fdfa}
-  .qrfSectionTabs button[aria-selected="true"] span{background:#14b8a6;color:#fff}
+  .qrfSectionTabs button[aria-selected="true"] span{background:#0f766e;color:#fff}
   .qrfSectionHidden{display:none!important}
   .qrfSectionNext{margin-top:14px}
 </style>
@@ -534,7 +534,7 @@ _NUTRITION_ESTIMATOR_TEMPLATE = """
   .nutritionEstimatorGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:10px 0}
   .nutritionEstimatorGrid label{display:grid;gap:6px;font-weight:700}
   .nutritionEstimatorResult{margin:10px 0;font-size:15px}
-  .nutritionEstimatorNote{margin-top:10px;font-size:12px;color:#64748b}
+  .nutritionEstimatorNote{margin-top:10px;font-size:12px;color:#556377}
 </style>
 <script>
 (() => {
@@ -620,10 +620,9 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
     meta = data["meta"]
 
     actions = (
-        pill(f"wine: {balances.get('wine', 0)}", "green") + " " +
-        pill(f"generic: {balances.get('generic', 0)}") + " " +
+        pill(f"QR vino disponibili: {balances.get('wine', 0)}", "green") + " " +
         top_actions(
-            (f"/app/wine/{int(wine_id)}", "Overview"),
+            (f"/app/wine/{int(wine_id)}", "Scheda vino"),
             ("/app/dashboard", "Dashboard"),
             ("/logout", "Logout"),
         )
@@ -729,8 +728,8 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
                 class="complianceInlineForm">
             {csrf_html}
             <div>
-              <label>Aggiungi ingrediente</label>
-              <input class="input" name="name"
+              <label for="f-ingredient-name">Aggiungi ingrediente</label>
+              <input id="f-ingredient-name" class="input" name="name"
                      placeholder="es. uva, mosto, anidride solforosa..."
                      required>
             </div>
@@ -761,8 +760,8 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
                 class="complianceInlineForm">
             {csrf_html}
             <div>
-              <label>Aggiungi allergene</label>
-              <input class="input" name="name"
+              <label for="f-allergen-name">Aggiungi allergene</label>
+              <input id="f-allergen-name" class="input" name="name"
                      placeholder="es. solfiti, latte, uova..."
                      required>
             </div>
@@ -787,8 +786,8 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
             <span class="complianceIcon">✍️</span>
           </div>
 
-          <label>Extra ingredienti</label>
-          <input class="input" name="extra_ingredients"
+          <label for="f-extra_ingredients">Extra ingredienti</label>
+          <input id="f-extra_ingredients" class="input" name="extra_ingredients"
                  value="{esc((meta.get('extra_ingredients') or '').strip())}"
                  placeholder="es. eventuali ingredienti non presenti in lista">
         </div>
@@ -811,52 +810,52 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
 
           <div class="complianceNutritionGrid">
             <div>
-              <label>Energia (kJ per 100 ml)*</label>
-              <input class="input mono" name="energy_kj" inputmode="decimal" min="0" max="5000"
+              <label for="f-energy_kj">Energia (kJ per 100 ml)*</label>
+              <input id="f-energy_kj" class="input mono" name="energy_kj" inputmode="decimal" min="0" max="5000"
                      value="{esc(_val(nut.get('energy_kj')))}"
                      placeholder="0">
             </div>
 
             <div>
-              <label>Energia (kcal per 100 ml)*</label>
-              <input class="input mono" name="energy_kcal" inputmode="decimal" min="0" max="1200"
+              <label for="f-energy_kcal">Energia (kcal per 100 ml)*</label>
+              <input id="f-energy_kcal" class="input mono" name="energy_kcal" inputmode="decimal" min="0" max="1200"
                      value="{esc(_val(nut.get('energy_kcal')))}"
                      placeholder="0">
             </div>
 
             <div>
-              <label>Grassi</label>
-              <input class="input mono" name="fat" inputmode="decimal" min="0" max="100"
+              <label for="f-fat">Grassi</label>
+              <input id="f-fat" class="input mono" name="fat" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('fat')))}">
             </div>
 
             <div>
-              <label>Saturi</label>
-              <input class="input mono" name="saturates" inputmode="decimal" min="0" max="100"
+              <label for="f-saturates">Saturi</label>
+              <input id="f-saturates" class="input mono" name="saturates" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('saturates')))}">
             </div>
 
             <div>
-              <label>Carboidrati</label>
-              <input class="input mono" name="carbs" inputmode="decimal" min="0" max="100"
+              <label for="f-carbs">Carboidrati</label>
+              <input id="f-carbs" class="input mono" name="carbs" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('carbs')))}">
             </div>
 
             <div>
-              <label>Zuccheri</label>
-              <input class="input mono" name="sugars" inputmode="decimal" min="0" max="100"
+              <label for="f-sugars">Zuccheri</label>
+              <input id="f-sugars" class="input mono" name="sugars" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('sugars')))}">
             </div>
 
             <div>
-              <label>Proteine</label>
-              <input class="input mono" name="protein" inputmode="decimal" min="0" max="100"
+              <label for="f-protein">Proteine</label>
+              <input id="f-protein" class="input mono" name="protein" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('protein')))}">
             </div>
 
             <div>
-              <label>Sale</label>
-              <input class="input mono" name="salt" inputmode="decimal" min="0" max="100"
+              <label for="f-salt">Sale</label>
+              <input id="f-salt" class="input mono" name="salt" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('salt')))}">
             </div>
           </div>
@@ -888,8 +887,8 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
 
           <div class="complianceGrid2">
             <div>
-              <label>Stile pagina pubblica</label>
-              <select name="public_theme">
+              <label for="f-public_theme">Stile pagina pubblica</label>
+              <select id="f-public_theme" name="public_theme">
                 <option value="minimal" {"selected" if theme == "minimal" else ""}>Normativo</option>
                 <option value="saas" {"selected" if theme == "saas" else ""}>Moderno</option>
                 <option value="classic" {"selected" if theme == "classic" else ""}>Classico</option>
@@ -902,8 +901,8 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
             </div>
           </div>
 
-          <label>Descrizione opzionale</label>
-          <textarea class="input" name="story_text" style="min-height:110px">{esc((meta.get("story_text") or "").strip())}</textarea>
+          <label for="f-story_text">Descrizione opzionale</label>
+          <textarea id="f-story_text" class="input" name="story_text" style="min-height:110px">{esc((meta.get("story_text") or "").strip())}</textarea>
         </div>
 
         <div class="complianceActions">

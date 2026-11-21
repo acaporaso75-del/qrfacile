@@ -122,7 +122,7 @@ def render_guided_stepper(wine_id: int, active: str, completed: set[str] | None 
       .qrfWizard{{display:grid;grid-template-columns:repeat(7,minmax(130px,1fr));gap:10px;margin:18px 0;overflow-x:auto;padding-bottom:4px}}
       .qrfWizardStep{{display:grid;grid-template-columns:32px 1fr;column-gap:9px;align-items:center;min-width:140px;padding:12px;border:1px solid rgba(2,8,23,.09);border-radius:17px;background:#fff}}
       .qrfWizardStep span{{grid-row:1/3;display:grid;place-items:center;width:32px;height:32px;border-radius:11px;background:#e2e8f0;font-weight:950}}
-      .qrfWizardStep b{{font-size:12px;line-height:1.15}}.qrfWizardStep small{{font-size:10px;color:#64748b}}
-      .qrfWizardStep.complete span{{background:#dcfce7;color:#166534}}.qrfWizardStep.active{{border-color:#14b8a6;background:#f0fdfa}}.qrfWizardStep.active span{{background:#14b8a6;color:#fff}}
+      .qrfWizardStep b{{font-size:12px;line-height:1.15}}.qrfWizardStep small{{font-size:11px;color:#556377}}
+      .qrfWizardStep.complete span{{background:#dcfce7;color:#166534}}.qrfWizardStep.active{{border-color:#14b8a6;background:#f0fdfa}}.qrfWizardStep.active span{{background:#0f766e;color:#fff}}
     </style>
     """

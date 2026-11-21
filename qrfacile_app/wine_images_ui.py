@@ -330,10 +330,9 @@ def images_page(request: Request, wine_id: int, msg: str = ""):
             back = _asset(cur, int(wine_id), "back")
 
     actions = (
-        pill(f"wine: {balances.get('wine', 0)}", "green") + " " +
-        pill(f"generic: {balances.get('generic', 0)}") + " " +
+        pill(f"QR vino disponibili: {balances.get('wine', 0)}", "green") + " " +
         top_actions(
-            (f"/app/wine/{int(wine_id)}", "Overview"),
+            (f"/app/wine/{int(wine_id)}", "Scheda vino"),
             ("/app/dashboard", "Dashboard"),
             ("/logout", "Logout"),
         )
