@@ -39,7 +39,9 @@ done
 [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || die "--sha deve essere uno SHA Git completo"
 [[ "$root" == /* && "$root" != "/" ]] || die "--root deve essere un percorso assoluto non radice"
 [[ "$service" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || die "--service non valido"
-[[ "$port" =~ ^[0-9]+$ ]] && (( port >= 1 && port <= 65535 )) || die "--port non valida"
+if [[ ! "$port" =~ ^[0-9]+$ ]] || (( port < 1 || port > 65535 )); then
+  die "--port non valida"
+fi
 [[ "$environment" == "staging" ]] || die "questo script accetta esclusivamente --environment staging"
 
 root="$(readlink -f "$root")"
@@ -48,15 +50,29 @@ root="$(readlink -f "$root")"
 [[ -f "$root/.env" ]] || die ".env staging assente"
 [[ -x "$root/venv/bin/python" ]] || die "virtualenv staging assente"
 command -v git >/dev/null || die "git assente"
+command -v runuser >/dev/null || die "runuser assente"
 command -v pg_dump >/dev/null || die "pg_dump assente"
 command -v pg_restore >/dev/null || die "pg_restore assente"
 command -v sha256sum >/dev/null || die "sha256sum assente"
 command -v systemctl >/dev/null || die "systemctl assente"
 
-old_sha="$(git -C "$root" rev-parse HEAD)"
+# Git refuses repositories owned by another user ("dubious ownership"), so
+# every git command runs as the owner of the staging checkout instead of root.
+repo_user="$(stat -c '%U' "$root/.git")"
+repo_group="$(stat -c '%G' "$root/.git")"
+[[ "$repo_user" != "UNKNOWN" && "$repo_group" != "UNKNOWN" ]] || die "proprietario del repository non risolvibile"
+as_repo_owner() {
+  if [[ "$repo_user" == "root" ]]; then
+    "$@"
+  else
+    runuser -u "$repo_user" -- "$@"
+  fi
+}
+
+old_sha="$(as_repo_owner git -C "$root" rev-parse HEAD)"
 [[ "$old_sha" =~ ^[0-9a-f]{40}$ ]] || die "SHA installato non valido"
-[[ -z "$(git -C "$root" status --short)" ]] || die "checkout staging non pulito"
-git -C "$root" cat-file -e "$sha^{commit}" || die "SHA target non presente nel repository"
+[[ -z "$(as_repo_owner git -C "$root" status --short)" ]] || die "checkout staging non pulito"
+as_repo_owner git -C "$root" cat-file -e "$sha^{commit}" || die "SHA target non presente nel repository"
 
 timestamp="$(date +%Y%m%d_%H%M%S)"
 parent="$(dirname "$root")"
@@ -68,6 +84,7 @@ rollback="${root}.rollback-${timestamp}-${old_sha:0:12}"
 failed="${root}.failed-${timestamp}-${sha:0:12}"
 swapped=0
 
+# shellcheck disable=SC2329 # invoked through the EXIT trap
 cleanup() {
   rc=$?
   if (( rc != 0 && swapped == 1 )); then
@@ -151,13 +168,15 @@ tar -tzf "$archive_file" >/dev/null
 )
 touch "$backup_dir/BACKUP_COMPLETE"
 
-git clone --no-hardlinks --no-checkout "$root" "$candidate"
-git -C "$candidate" checkout --detach "$sha"
+install -d -m 0700 -o "$repo_user" -g "$repo_group" "$candidate"
+as_repo_owner git clone --no-hardlinks --no-checkout "$root" "$candidate"
+as_repo_owner git -C "$candidate" checkout --detach "$sha"
+[[ "$(as_repo_owner git -C "$candidate" rev-parse HEAD)" == "$sha" ]] || die "checkout candidato non corrisponde allo SHA richiesto"
 cp -a "$root/.env" "$candidate/.env"
 cp -a "$root/venv" "$candidate/venv"
 for persistent in uploads logs invoices qr; do
   if [[ -e "$root/$persistent" ]]; then
-    rm -rf -- "$candidate/$persistent"
+    rm -rf -- "${candidate:?}/${persistent:?}"
     cp -a "$root/$persistent" "$candidate/$persistent"
   fi
 done
