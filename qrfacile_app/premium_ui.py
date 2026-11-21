@@ -176,14 +176,16 @@ def _studio_assignment_box(
           </div>
         """
 
+    # Most wineries work alone: keep the studio options folded away.
     return f"""
-    <div class="newWineSectionTitle" style="margin-top:24px">
+    <details class="newWineStudioDetails">
+    <summary class="newWineSectionTitle" style="margin-top:24px;cursor:pointer">
       <span>{int(section_no)}</span>
       <div>
-        <b>Chi lavora su questa etichetta?</b>
-        <small>{esc(context)}</small>
+        <b>Lavori con uno studio grafico? (facoltativo)</b>
+        <small>Se fai tutto tu, salta questo passaggio. {esc(context)}</small>
       </div>
-    </div>
+    </summary>
 
     <div class="newWineWorkBox">
       <label class="newWineWorkOption">
@@ -213,6 +215,7 @@ def _studio_assignment_box(
 
       {invite_html}
     </div>
+    </details>
     """
 
 
@@ -449,9 +452,12 @@ def new_wine_get(
 
     selected_master_id = int(wine_master_id or 0)
     master_ids = {int(wm["id"]) for wm in (wine_masters or [])}
+    if not selected_master_id and len(master_ids) == 1:
+        # A winery with a single wine should not have to pick it from a list.
+        selected_master_id = next(iter(master_ids))
     keep_master_selection = selected_master_id in master_ids
     master_placeholder_selected = "" if keep_master_selection else "selected"
-    master_opts = [f"<option value='0' {master_placeholder_selected}>— Seleziona etichetta esistente —</option>"]
+    master_opts = [f"<option value='0' {master_placeholder_selected}>— Scegli il vino —</option>"]
 
     for wm in (wine_masters or []):
         mid = int(wm["id"])
@@ -539,16 +545,17 @@ def new_wine_get(
           <div class="newWineEyebrow">Lotti QR</div>
           <div class="h1">{subtitle}</div>
           <div class="p">
-            Crea un lotto collegandolo a una etichetta/prodotto esistente.
-            La creazione genera il QR definitivo e scala <b>1 credito wine</b> per QR 10 anni oppure <b>2 crediti wine</b> per QR 25 anni.
+            Il lotto è la singola produzione del vino (annata e codice lotto).
+            Creandolo ottieni subito il QR definitivo: usa <b>1 dei tuoi QR vino</b>
+            (2 se scegli la durata di 25 anni).
           </div>
           {msg_html}
         </div>
 
         <div class="newWineHeroCard">
-          <div class="newWineHeroCardTitle">Crediti richiesti</div>
-          <div class="newWineCreditValue">1/2</div>
-          <div class="newWineHeroCardText">1 credito per 10 anni · 2 crediti per 25 anni</div>
+          <div class="newWineHeroCardTitle">QR vino disponibili</div>
+          <div class="newWineCreditValue">{int((balances or {}).get("wine", 0) or 0)}</div>
+          <div class="newWineHeroCardText">Questo lotto ne usa 1 (2 per la durata di 25 anni)</div>
         </div>
       </div>
 
@@ -569,14 +576,13 @@ def new_wine_get(
           </div>
 
           <div>
-            <label>Etichetta esistente</label>
+            <label>Vino</label>
             <select name="wine_master_id">
               {''.join(master_opts)}
             </select>
             <div class="note" style="margin-top:10px">
-              Se scegli un’etichetta esistente, i dati disponibili verranno copiati nel nuovo lotto. Potrai modificarli prima di salvare.
-              Se non esiste ancora, creala da
-              <a class="dashboardInlineLink" href="/app/new-wine-master">Nuova etichetta</a>.
+              I dati del vino scelto vengono copiati nel lotto. Il vino non è nell’elenco?
+              <a class="dashboardInlineLink" href="/app/new-wine-master">Aggiungilo qui</a>.
             </div>
           </div>
         </div>
@@ -590,10 +596,7 @@ def new_wine_get(
         </div>
 
         <div class="newWineGrid3">
-          <div style="grid-column:1 / -1">
-            <label>Etichetta selezionata</label>
-            <input class="input" name="wine_name" placeholder="Scegli prima un’etichetta dall’elenco" readonly>
-          </div>
+          <input type="hidden" name="wine_name">
 
           <div>
             <label>Annata (se dichiarata in etichetta)</label>
@@ -618,8 +621,8 @@ def new_wine_get(
           <div>
             <label>Durata QR vino</label>
             <select name="qr_duration_years">
-              <option value="10" selected>10 anni · 1 credito wine</option>
-              <option value="25">25 anni · 2 crediti wine</option>
+              <option value="10" selected>10 anni · usa 1 QR vino</option>
+              <option value="25">25 anni · usa 2 QR vino</option>
             </select>
             <div class="note" style="margin-top:10px">
               Puoi creare un QR standard da 10 anni oppure un QR esteso da 25 anni.
@@ -637,7 +640,7 @@ def new_wine_get(
 
         <div class="note" style="margin-top:16px">
           Dopo la creazione entrerai nella scheda del lotto, dove potrai caricare immagini,
-          completare i dati obbligatori, gestire la compliance ed esportare il QR.
+          completare i dati obbligatori ed esportare il QR.
         </div>
       </form>
 

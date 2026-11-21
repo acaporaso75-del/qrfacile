@@ -179,3 +179,23 @@ def test_compliance_page_offers_presets_and_repairs_typed_duplicates():
     assert "Scegli il tuo imballaggio" in html
     assert "Bottiglia verde + tappo in sughero" in html
     assert "const lookupCode" in html and "if (item && item.code) code.value = item.code;" in html
+
+
+def test_dashboard_first_wine_mode_hides_overlapping_panels():
+    source = (ROOT / "qrfacile_app" / "dashboard_ui.py").read_text(encoding="utf-8")
+    assert 'first_wine_mode = bool(first_wine_html) and role == "winery" and view != "full"' in source
+    assert 'full_dashboard_html = "" if first_wine_mode else f"""' in source
+    assert "/app/dashboard?view=full" in source
+    # hero, guided compliance panel and search live inside the full view only
+    full = source.split('full_dashboard_html = "" if first_wine_mode else f"""', 1)[1].split('    """\n', 1)[0]
+    for block in ('class="dashboardHero"', "{onboarding_html}", 'class="dashboardToolbar card"'):
+        assert block in full
+
+
+def test_new_lot_page_is_plain_and_studio_section_optional():
+    source = (ROOT / "qrfacile_app" / "premium_ui.py").read_text(encoding="utf-8")
+    assert "Lavori con uno studio grafico? (facoltativo)" in source
+    assert '<details class="newWineStudioDetails">' in source
+    assert "Etichetta selezionata" not in source
+    assert "credito wine" not in source and "crediti wine" not in source
+    assert "if not selected_master_id and len(master_ids) == 1:" in source

@@ -707,7 +707,7 @@ def _worker_summary_html(r: dict, role: str = "") -> str:
 
 
 @router.get("/app/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request, q: str = "", work: str = "all"):
+def dashboard(request: Request, q: str = "", work: str = "all", view: str = ""):
     user = require_any_role(request, ("winery", "studio", "admin"))
 
     role = (user.get("role") or "").lower().strip()
@@ -1171,9 +1171,11 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
     onboarding_html = _onboarding_html(rows, role)
     first_wine_html = "" if q else _first_wine_checklist(rows, master_count, role)
 
-    body = f"""
-    <section class="dashboardWrap">
-      {first_wine_html}
+    # First-wine mode: until the first page is published a winery sees only
+    # the step-by-step checklist (and its draft), not three overlapping
+    # panels with the same buttons. ?view=full shows everything.
+    first_wine_mode = bool(first_wine_html) and role == "winery" and view != "full"
+    full_dashboard_html = "" if first_wine_mode else f"""
       <div class="dashboardHero">
         <div>
           <div class="dashboardEyebrow">Dashboard Wine</div>
@@ -1242,6 +1244,19 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
         </form>
       </div>
 
+    """
+    if first_wine_mode:
+        cards_html = (
+            '<div class="h2" style="margin:8px 0 12px">Il tuo vino in preparazione</div>' + cards_html
+            if rows else ""
+        )
+        cards_html += '<p class="p" style="margin-top:14px"><a href="/app/dashboard?view=full">Vedi la dashboard completa</a></p>'
+        actions = pill(f"QR vino disponibili: {balances['wine']}", "green") + " " + top_actions(("/logout", "Esci"))
+
+    body = f"""
+    <section class="dashboardWrap">
+      {first_wine_html}
+      {full_dashboard_html}
       <div class="dashboardList">
         {cards_html}
       </div>
