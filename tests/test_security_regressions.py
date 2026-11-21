@@ -76,7 +76,7 @@ def test_verified_accounts_require_a_valid_one_time_token():
     lock = source.index("FOR UPDATE")
     reject = source.index('if not row or row.get("used_at") or row.get("revoked_at")')
     expiry = source.index('if row["expires_at"] < datetime.now(timezone.utc)')
-    verify = source.index("UPDATE users SET email_verified=TRUE")
+    verify = source.index("UPDATE users SET email_verified=1")
     consume = source.index("UPDATE email_verification_tokens SET used_at=now()")
     assert lock < reject < expiry < verify < consume
     assert "WHERE token_hash=%s" in source

@@ -113,7 +113,7 @@ def verify_email(token: str) -> dict[str, Any]:
                 raise HTTPException(404, "Collegamento non valido")
             if row["expires_at"] < datetime.now(timezone.utc):
                 raise HTTPException(410, "Collegamento scaduto")
-            cur.execute("UPDATE users SET email_verified=TRUE, email_verified_at=now() WHERE id=%s", (int(row["user_id"]),))
+            cur.execute("UPDATE users SET email_verified=1, email_verified_at=now() WHERE id=%s", (int(row["user_id"]),))
             cur.execute("UPDATE email_verification_tokens SET used_at=now() WHERE id=%s", (int(row["id"]),))
         conn.commit()
     return {"user_id": int(row["user_id"]), "verified": True}

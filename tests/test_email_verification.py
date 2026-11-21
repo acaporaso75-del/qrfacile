@@ -35,7 +35,7 @@ def test_verification_service_uses_strong_tokens_and_sha256():
     assert "LIMIT 1 FOR UPDATE" in text
     assert "raise HTTPException(429" in text
     assert "verification_attempts+1" in text
-    assert "UPDATE users SET email_verified=TRUE" in text
+    assert "UPDATE users SET email_verified=1" in text
     assert "used_at=now()" in text
 
 
