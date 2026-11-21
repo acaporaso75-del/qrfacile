@@ -93,10 +93,13 @@ credenziali, token o segreti.
   sull'host. Il remote `origin` installato è autoreferenziale e il file non
   aveva il bit eseguibile; sono stati usati fetch URL esplicito e invocazione
   con `bash`, senza cambiare configurazione o permessi.
-- Danea: migrazione e destinatari staging configurati. Prova runtime non
-  completabile: gli ordini Sandbox pagati 32, 31 e 15 sono privi di snapshot
-  fiscale; il tentativo su 32 ha registrato `fiscal_snapshot_missing` e non ha
-  inviato email. UI, allegato e download restano `NOT_VERIFIED`.
+- Danea: migrazione e destinatari staging configurati. Il 2026-11-21 un account
+  `qa-danea-*` è stato verificato via email, il profilo fiscale fittizio è stato
+  salvato e un solo ordine Start ha raggiunto PayPal Sandbox con totale
+  € 120,78. Il titolare non era al PC e la prova si è fermata prima della
+  conferma: capture, email, `.DefXml`, UI Admin, idempotenza e import Easyfatt
+  restano `NOT_VERIFIED`. Evidenza:
+  `docs/DANEA_HANDOFF_ACCEPTANCE_2026-11-21.md`.
 - Origin pubblico dedicato, DNS e reverse proxy staging: `NOT_VERIFIED`; il
   collaudo attuale usa `http://192.168.1.139:8001`.
 - Database privilege isolation: la revoca esplicita di `CONNECT` dall'utente

@@ -433,17 +433,20 @@ Evidenza completa e screenshot:
 
 ### Fatturazione Danea
 
-Gli ordini Sandbox pagati disponibili (`32`, `31`, `15`) sono tutti storici e
-privi dello snapshot fiscale richiesto. Con autorizzazione esplicita è stato
-tentato l'invio dell'ordine `32` usando sul runtime la stessa funzione chiamata
-dal pulsante Admin. Esito: `fiscal_snapshot_missing`; tentativi `1`, timestamp
-di invio non valorizzato, nessuna email generata. Gli ordini `31` e `15` sono
-stati controllati in sola lettura e hanno lo stesso limite.
+Il 2026-11-21 è stato creato un nuovo account `qa-danea-*`, verificato mediante
+email reale e completato con un profilo fiscale fittizio formalmente valido.
+La UI ha mostrato correttamente il pacchetto Start (€ 99,00 + € 21,78 IVA =
+€ 120,78), ha creato un solo ordine e ha raggiunto PayPal Sandbox. La prova si
+è fermata prima dell'approvazione perché il titolare non era al PC: capture,
+stato `paid`, email, allegato, UI Admin, idempotenza e import Easyfatt restano
+**NOT_VERIFIED**, non `PASS`.
 
-Di conseguenza oggetto `[TEST SANDBOX - NON FATTURARE]`, allegato `.DefXml`,
-stato “Inviato a fatturazione”, download dalla UI e singolo invio per ordine
-restano **NOT_VERIFIED sul runtime**. Non sono stati creati o alterati ordini
-per forzare la prova e non sono stati eseguiti pagamenti o capture.
+Evidenza completa: `docs/DANEA_HANDOFF_ACCEPTANCE_2026-11-21.md`.
+
+Resta inoltre valida l'anomalia storica: gli ordini Sandbox pagati `32`, `31` e
+`15`, precedenti allo snapshot fiscale, non sono utilizzabili per questa prova;
+il tentativo già documentato sull'ordine `32` terminò con
+`fiscal_snapshot_missing` e nessuna email.
 
 ### Confini
 
