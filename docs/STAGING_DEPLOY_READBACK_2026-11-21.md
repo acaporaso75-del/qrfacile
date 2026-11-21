@@ -453,3 +453,59 @@ il tentativo già documentato sull'ordine `32` terminò con
 Nessuna operazione su produzione, PayPal Live, Caddy o DNS. Nessun pagamento
 reale. La sola modifica di configurazione riguarda i due destinatari Danea
 dello staging autorizzati; valori e segreti non sono riportati.
+
+## Deploy e walkthrough UX v3 — `0afb234`
+
+### Identità e protezioni
+
+- data deploy: 2026-11-21 21:32 CET (Europe/Rome);
+- host/root/servizio: `192.168.1.139`, `/opt/qrfacile-staging`,
+  `qrfacile-staging.service`;
+- database: `qrfacile_staging_db`;
+- SHA prima: `10fda8c56e6ab9c1dcc89a00938f30a028743704`;
+- SHA dopo: `0afb234327b66ad3a91e47402c9ba26a88f0aede`;
+- Compliance CI pre-deploy: run `44946635708`, **SUCCESS**;
+- backup verificato conservato:
+  `/opt/qrfacile-backups/staging/20261121_213218_staging_10fda8c56e6a`;
+- rollback conservato:
+  `/opt/qrfacile-staging.rollback-20261121_213218-10fda8c56e6a`.
+
+Lo script ha completato backup, release isolata, swap, restart e verifica dello
+SHA atteso. Il primo probe HTTP ha intercettato il breve avvio del servizio; il
+retry previsto ha restituito `RELEASE_HEALTH_OK` sullo SHA `0afb234`. Nessuna
+migrazione nuova è stata applicata.
+
+### Walkthrough UX v3
+
+| Controllo | Esito | Evidenza sintetica |
+| --- | ---: | --- |
+| Account QA e verifica email | **PASS** | account `qa-ux3-*`, link reale, nessun bypass SQL |
+| Stato vuoto iniziale | **PASS** | checklist, saldo `3`, Esci e link alla dashboard completa; assenza della scheda bozza corretta |
+| Nuovo lotto | **PASS** | vino unico preselezionato, Studio chiuso, gestione cantina predefinita, saldo `3 → 2` |
+| Bozza e checklist | **PASS** | “Il tuo vino in preparazione”, scheda vino e passo ingredienti successivo |
+| Dati obbligatori | **PASS** | quattro schede progressive, Avanti, spunte e ancore corrette; errore riciclo riapre la sezione |
+| Calcolatore e preset | **PASS** | 13,5% e 2 g/l → 312 kJ / 75 kcal; `GL 71`, nessun duplicato |
+| Review e pubblicazione | **PASS** | tre azioni finali; pubblicazione riuscita; ritorno alla dashboard completa |
+| Export | **PASS** | CTA PDF tipografia; PDF A4 15.127 byte; QR decodificato verso la pagina staging |
+| Pubblico IT/EN | **PASS** | codici e valori corretti; nessun “da verificare” |
+| Cookie/tracker pubblico | **PASS** | contesto anonimo: 0 cookie, 0 storage e 0 tracker |
+
+La pagina mobile “Dati obbligatori”, misurata sullo stesso contenuto a 390 px,
+passa da 11.275 px con tutte le sezioni aperte a 4.370 px con una scheda alla
+volta: riduzione di 6.905 px, circa 61%.
+
+Tempi comparabili per la persona con scheda tecnica pronta: 60-90 minuti prima
+delle correzioni, 35-50 minuti in UX v2, 28-42 minuti in UX v3. I punti residui
+di assistenza sono l'imballaggio non coperto dai preset, la conferma dei valori
+nutrizionali e, in misura minore, il rapporto fra vino/etichetta e lotto.
+
+Evidenza completa e screenshot:
+`docs/UX_REVIEW_2026-11-21_v3.md` e
+`docs/ux-review-2026-11-v3/`.
+
+### Danea e confini
+
+Il test Danea è **sospeso: pagamento Sandbox da completare con il titolare al
+PC**. L'unico ordine predisposto resta non pagato; capture, email `.DefXml`, UI
+Admin, idempotenza e import Easyfatt restano `NOT_VERIFIED`. Nessuna operazione
+ha interessato produzione, database produzione, PayPal Live, Caddy o DNS.

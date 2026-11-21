@@ -57,16 +57,16 @@ credenziali, token o segreti.
 - Host applicativo: `192.168.1.139`.
 - Directory: `/opt/qrfacile-staging`.
 - Servizio: `qrfacile-staging.service`, verificato `active` il 2026-11-21;
-  ultimo avvio riuscito 2026-11-21 20:30:04 CET.
+  ultimo deploy UX v3 riuscito 2026-11-21 21:32 CET.
 - Runtime: Gunicorn con worker Uvicorn, porta `8001` in ascolto.
 - Commit distribuito: detached HEAD a
-  `10fda8c56e6ab9c1dcc89a00938f30a028743704`.
+  `0afb234327b66ad3a91e47402c9ba26a88f0aede`.
 - Backup fresco verificato:
-  `/opt/qrfacile-backups/staging/20261121_202949_staging_a49bed3a9179`.
+  `/opt/qrfacile-backups/staging/20261121_213218_staging_10fda8c56e6a`.
 - Backup DB pre-migrazione verificato:
   `/opt/qrfacile-backups/staging/20261121_202909_pre_ux2_a49bed3a9179`.
 - Rollback dedicato conservato:
-  `/opt/qrfacile-staging.rollback-20261121_202949-a49bed3a9179`.
+  `/opt/qrfacile-staging.rollback-20261121_213218-10fda8c56e6a`.
 - Readback completo:
   `docs/STAGING_DEPLOY_READBACK_2026-11-21.md`.
 - Database: PostgreSQL su `192.168.1.143:5432`, database
@@ -89,6 +89,11 @@ credenziali, token o segreti.
   pubblicato solo su staging, checklist primo vino, saldo 3 → 2, calcolatore
   312 kJ / 75 kcal, preset imballaggi, IT/EN, PDF A4 e QR decodificato: PASS.
   Evidenza: `docs/UX_REVIEW_2026-11-21_v2.md`.
+- Collaudo UX v3: account `qa-ux3-*` verificato via email, vino QA pubblicato
+  solo su staging, stato vuoto e bozza guidata coerenti, saldo 3 → 2,
+  calcolatore 312 kJ / 75 kcal, schede dati obbligatori, preset imballaggi,
+  dashboard completa dopo la pubblicazione, IT/EN, PDF A4 e QR decodificato:
+  **PASS**. Evidenza: `docs/UX_REVIEW_2026-11-21_v3.md`.
 - Deploy script: clone e checkout come proprietario del repository verificati
   sull'host. Il remote `origin` installato è autoreferenziale e il file non
   aveva il bit eseguibile; sono stati usati fetch URL esplicito e invocazione
@@ -100,6 +105,8 @@ credenziali, token o segreti.
   conferma: capture, email, `.DefXml`, UI Admin, idempotenza e import Easyfatt
   restano `NOT_VERIFIED`. Evidenza:
   `docs/DANEA_HANDOFF_ACCEPTANCE_2026-11-21.md`.
+  Stato corrente: **sospeso, pagamento Sandbox da completare con il titolare
+  al PC**; nessun pagamento reale eseguito.
 - Origin pubblico dedicato, DNS e reverse proxy staging: `NOT_VERIFIED`; il
   collaudo attuale usa `http://192.168.1.139:8001`.
 - Database privilege isolation: la revoca esplicita di `CONNECT` dall'utente
