@@ -57,14 +57,16 @@ credenziali, token o segreti.
 - Host applicativo: `192.168.1.139`.
 - Directory: `/opt/qrfacile-staging`.
 - Servizio: `qrfacile-staging.service`, verificato `active` il 2026-11-21;
-  ultimo avvio riuscito 2026-11-21 17:15:32 CET.
+  ultimo avvio riuscito 2026-11-21 20:30:04 CET.
 - Runtime: Gunicorn con worker Uvicorn, porta `8001` in ascolto.
 - Commit distribuito: detached HEAD a
-  `32cf797d126259114917dccc0d3f1b53c83769b9`.
+  `10fda8c56e6ab9c1dcc89a00938f30a028743704`.
 - Backup fresco verificato:
-  `/opt/qrfacile-backups/staging/20261121_171518_staging_3da7d35654ed`.
+  `/opt/qrfacile-backups/staging/20261121_202949_staging_a49bed3a9179`.
+- Backup DB pre-migrazione verificato:
+  `/opt/qrfacile-backups/staging/20261121_202909_pre_ux2_a49bed3a9179`.
 - Rollback dedicato conservato:
-  `/opt/qrfacile-staging.rollback-20261121_171518-3da7d35654ed`.
+  `/opt/qrfacile-staging.rollback-20261121_202949-a49bed3a9179`.
 - Readback completo:
   `docs/STAGING_DEPLOY_READBACK_2026-11-21.md`.
 - Database: PostgreSQL su `192.168.1.143:5432`, database
@@ -83,10 +85,18 @@ credenziali, token o segreti.
   account è stato marcato verificato via SQL.
 - Collaudo Fase E: PASS sui nove punti; vino 623 pubblicato in staging, pagina
   pubblica IT/EN e export PNG/SVG/PDF verificati, credito 3 → 2.
-- Limite deploy: la copia versionata dello script richiede una correzione per
-  eseguire clone/checkout come proprietario del repository; durante questa
-  ridistribuzione è stata usata una copia operativa temporanea documentata nel
-  readback.
+- Collaudo UX v2: account `qa-ux2-*` verificato via email, nuovo vino 625
+  pubblicato solo su staging, checklist primo vino, saldo 3 → 2, calcolatore
+  312 kJ / 75 kcal, preset imballaggi, IT/EN, PDF A4 e QR decodificato: PASS.
+  Evidenza: `docs/UX_REVIEW_2026-11-21_v2.md`.
+- Deploy script: clone e checkout come proprietario del repository verificati
+  sull'host. Il remote `origin` installato è autoreferenziale e il file non
+  aveva il bit eseguibile; sono stati usati fetch URL esplicito e invocazione
+  con `bash`, senza cambiare configurazione o permessi.
+- Danea: migrazione e destinatari staging configurati. Prova runtime non
+  completabile: gli ordini Sandbox pagati 32, 31 e 15 sono privi di snapshot
+  fiscale; il tentativo su 32 ha registrato `fiscal_snapshot_missing` e non ha
+  inviato email. UI, allegato e download restano `NOT_VERIFIED`.
 - Origin pubblico dedicato, DNS e reverse proxy staging: `NOT_VERIFIED`; il
   collaudo attuale usa `http://192.168.1.139:8001`.
 - Database privilege isolation: la revoca esplicita di `CONNECT` dall'utente

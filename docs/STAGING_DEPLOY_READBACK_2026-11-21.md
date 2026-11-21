@@ -329,3 +329,124 @@ Sandbox pending e un vino pubblicato, quindi occorre preservare le relazioni.
 2. Non sono stati eseguiti login PayPal, approvazioni, capture o pagamenti.
 3. Produzione, `.env`, Caddy, DNS, PayPal Live e database produzione non sono
    stati modificati.
+
+## Deploy UX v2 e verifica Danea — `10fda8c`
+
+### Identità e CI
+
+- data di attivazione: 2026-11-21 20:30:04 CET (Europe/Rome);
+- host/root/servizio: `192.168.1.139`, `/opt/qrfacile-staging`,
+  `qrfacile-staging.service`;
+- database: `qrfacile_staging_db`;
+- SHA prima: `a49bed3a91796f61567a046303f4aea63b97f237`;
+- SHA dopo: `10fda8c56e6ab9c1dcc89a00938f30a028743704`;
+- Compliance CI prima del deploy: run `44940949949`, **SUCCESS**.
+
+Readback HTTP 200:
+
+```json
+{"status":"OK","environment":"staging","database":"OK","release":"10fda8c56e6ab9c1dcc89a00938f30a028743704"} <!-- pragma: allowlist secret -->
+```
+
+### Backup, migrazione e rollback
+
+Backup DB pre-migrazione, conservato e verificato:
+
+```text
+/opt/qrfacile-backups/staging/20261121_202909_pre_ux2_a49bed3a9179
+```
+
+- dump: `20261121_202909_qrfacile_staging_db.dump`;
+- SHA-256:
+  `fa8fd66d5152f15aca72b6cda90aaec1d0aa7a2181ba64ac3adb9706c8469340`;
+- `sha256sum -c`, `pg_restore --list` e restore verso `/dev/null`: **PASS**.
+
+Il primo nome generato dal wrapper remoto conteneva letteralmente variabili
+shell a causa dell'escaping PowerShell. Prima di procedere il backup è stato
+rinominato nel percorso sopra, il manifest è stato rigenerato e tutte le
+verifiche sono state ripetute con esito positivo. Il proprietario del `.env`,
+temporaneamente modificato dal replace atomico, è stato ripristinato a
+`qrfacile:qrfacile`; modo finale `0600`.
+
+La migrazione `sql/2026_order_invoice_handoff.sql` è stata applicata col ruolo
+applicativo. Le tre colonne `invoice_handoff_*` erano già presenti: PostgreSQL
+ha emesso solo notifiche “esiste già, saltata” e la transazione ha completato
+con `COMMIT`. Nel `.env` staging risultano configurati i soli nomi
+`QRFACILE_INVOICE_TO` e `QRFACILE_INVOICE_CC`; nessun valore è riportato.
+
+Backup creato dallo script immediatamente prima dello swap:
+
+```text
+/opt/qrfacile-backups/staging/20261121_202949_staging_a49bed3a9179
+```
+
+| Artefatto | SHA-256 |
+| --- | --- |
+| dump PostgreSQL | `c400dcf56e7e6fd7c286d24566d7d840fdba92bd54573ee4bfecc081538236ef` |
+| archivio filesystem | `eb4c637eb254a5855c418fe45878241f13ad14ebc0d5cb487cfa71ab2e663ff8` |
+
+`sha256sum -c`, `pg_restore --list`, restore verso `/dev/null`, `gzip -t` e
+lettura archivio: **PASS**.
+
+Rollback dedicato conservato:
+
+```text
+/opt/qrfacile-staging.rollback-20261121_202949-a49bed3a9179
+```
+
+Readback del rollback come proprietario del checkout:
+`a49bed3a91796f61567a046303f4aea63b97f237`.
+
+### Deploy e comportamento Git
+
+Il remote `origin` del checkout installato era autoreferenziale
+(`/opt/qrfacile-staging`), quindi il primo fetch per nome ramo si è fermato
+senza swap. È stato eseguito un fetch esplicito dall'URL pubblico del
+repository, senza cambiare la configurazione del remote. Lo script versionato
+non aveva il bit eseguibile nell'installazione precedente ed è stato invocato
+con `bash` senza modificare permessi.
+
+Il deploy ha poi superato backup, clone, checkout detached dello SHA esatto,
+installazione dipendenze, `compileall`, security audit (0 finding), controllo
+transazioni SQL, swap, restart e health check. Clone e checkout sono stati
+eseguiti correttamente come proprietario `qrfacile:qrfacile`. Il primo probe
+ha intercettato il breve avvio; il retry ha prodotto `RELEASE_HEALTH_OK`.
+
+### Walkthrough UX v2
+
+| Controllo | Esito | Evidenza sintetica |
+| --- | ---: | --- |
+| Account QA nuovo e verifica email | **PASS** | account `qa-ux2-*`, verifica via link ricevuto, nessun bypass SQL |
+| Dashboard “Il tuo primo vino” | **PASS** | login diretto a `/app/dashboard`, checklist visibile |
+| Saldo QR | **PASS** | `3` prima del lotto, `2` dopo, coerente nelle pagine successive |
+| Stati dei passi | **PASS** | completamento aggiornato dopo ogni salvataggio |
+| Calcolatore | **PASS** | 13,5% e 2 g/l → 312 kJ / 75 kcal; applicazione e salvataggio riusciti |
+| Preset imballaggi | **PASS** | `GL 71`, `FOR 51`, `ALU 41`, `PAP 22`; nessuna duplicazione/avviso |
+| Review/export | **PASS** | tre azioni finali; CTA “Scarica PDF per la tipografia”; PDF A4 e QR decodificato |
+| Pagina pubblica IT/EN | **PASS** | nuovo vino `0 g / 0,2 g` (`0.2` EN); vecchio vino `0 g / 2,6 g` (`2.6` EN); codici corretti |
+| Mobile | **PASS** | contenuto prima del menu laterale |
+| Cookie/tracker | **PASS** | 0 cookie e solo host staging in contesto pulito |
+
+Evidenza completa e screenshot:
+`docs/UX_REVIEW_2026-11-21_v2.md` e
+`docs/ux-review-2026-11-v2/`.
+
+### Fatturazione Danea
+
+Gli ordini Sandbox pagati disponibili (`32`, `31`, `15`) sono tutti storici e
+privi dello snapshot fiscale richiesto. Con autorizzazione esplicita è stato
+tentato l'invio dell'ordine `32` usando sul runtime la stessa funzione chiamata
+dal pulsante Admin. Esito: `fiscal_snapshot_missing`; tentativi `1`, timestamp
+di invio non valorizzato, nessuna email generata. Gli ordini `31` e `15` sono
+stati controllati in sola lettura e hanno lo stesso limite.
+
+Di conseguenza oggetto `[TEST SANDBOX - NON FATTURARE]`, allegato `.DefXml`,
+stato “Inviato a fatturazione”, download dalla UI e singolo invio per ordine
+restano **NOT_VERIFIED sul runtime**. Non sono stati creati o alterati ordini
+per forzare la prova e non sono stati eseguiti pagamenti o capture.
+
+### Confini
+
+Nessuna operazione su produzione, PayPal Live, Caddy o DNS. Nessun pagamento
+reale. La sola modifica di configurazione riguarda i due destinatari Danea
+dello staging autorizzati; valori e segreti non sono riportati.
