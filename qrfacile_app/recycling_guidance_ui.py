@@ -9,6 +9,7 @@ from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.services.recycling_catalog import (
     CATALOG_SOURCE,
     CATALOG_VERSION,
+    PACKAGING_PRESETS,
     RECYCLING_CATALOG,
     get_recycling_suggestions,
 )
@@ -35,6 +36,7 @@ def _guidance_markup() -> str:
     }
     suggestions_json = json.dumps(suggestions, ensure_ascii=False)
     component_labels_json = json.dumps(COMPONENT_LABELS, ensure_ascii=False)
+    presets_json = json.dumps(PACKAGING_PRESETS, ensure_ascii=False)
     datalists = "".join(
         f'''<datalist id="qrf-recycling-materials-{component}">
           {''.join(f'<option value="{item["material"]}">{item["family"]} · {item["code"] or "codice da inserire"}</option>' for item in items)}
@@ -58,6 +60,11 @@ def _guidance_markup() -> str:
       .qrfRecycleAlert{{display:none;margin:14px 0;padding:13px 14px;border-radius:14px;border:1px solid #fecaca;background:#fff1f2;color:#991b1b;font-weight:750}}
       .qrfRecycleAlert.show{{display:block}}
       .qrfRecycleAlert ul{{margin:7px 0 0 18px;padding:0}}
+      .qrfPackagingPresets{{margin:0 0 14px;padding:14px 16px;border:2px solid #14b8a6;border-radius:16px;background:#f0fdfa}}
+      .qrfPackagingPresets p{{margin:4px 0 10px;color:#475569}}
+      .qrfPackagingPresetButtons{{display:grid;gap:8px}}
+      .qrfPackagingPresetButtons .btn{{text-align:left;white-space:normal}}
+      .qrfPackagingPresetStatus{{margin-top:8px;font-weight:700;color:#0f766e}}
     </style>
     {datalists}
     <div id="qrf-recycling-alert" class="qrfRecycleAlert" role="alert" aria-live="assertive"></div>
@@ -66,6 +73,7 @@ def _guidance_markup() -> str:
       const catalog = {catalog_json};
       const suggestions = {suggestions_json};
       const componentLabels = {component_labels_json};
+      const presets = {presets_json};
       const normalize = value => String(value || '').trim().toLowerCase().replace(/\\s+/g, ' ');
       const byMaterial = new Map(catalog.map(item => [normalize(item.material), item]));
       const compact = value => String(value || '').replace(/\\s+/g, '').toUpperCase();
@@ -185,9 +193,53 @@ def _guidance_markup() -> str:
           ? 'es. ' + preferred.slice(0, 3).map(item => item.material.split(' - ')[0]).join(', ')
           : product.placeholder;
 
-        tracked.push({{component, product, code, evaluate}});
+        tracked.push({{component, product, code, note, evaluate, apply}});
         evaluate();
       }});
+
+      const list = document.querySelector('#riciclabilita .complianceRecycleList');
+      if (list && tracked.length && presets.length) {{
+        const bar = document.createElement('div');
+        bar.className = 'qrfPackagingPresets';
+        bar.innerHTML = '<b>Scegli il tuo imballaggio e compiliamo noi codici e raccolta</b>'
+          + '<p>Poi puoi modificare qualsiasi riga. Ricordati di salvare.</p>';
+        const buttons = document.createElement('div');
+        buttons.className = 'qrfPackagingPresetButtons';
+        presets.forEach(preset => {{
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'btn';
+          button.textContent = preset.label;
+          button.addEventListener('click', () => {{
+            const covered = new Set(presets.flatMap(item => Object.keys(item.items)));
+            tracked.forEach(entry => {{
+              const wanted = preset.items[entry.component];
+              if (!wanted) {{
+                // e.g. a screw cap has no capsule: clear rows the preset does not use.
+                if (covered.has(entry.component)) {{
+                  [entry.product, entry.code, entry.note].forEach(input => {{ if (input) input.value = ''; }});
+                  entry.evaluate();
+                }}
+                return;
+              }}
+              const item = lookupCode(wanted);
+              if (item) {{
+                entry.apply(item);
+                [entry.product, entry.code].forEach(input => input.dispatchEvent(new Event('input', {{bubbles: true}})));
+              }}
+            }});
+            bar.querySelector('[role="status"]').textContent = 'Fatto: controlla le righe qui sotto e premi Salva.';
+          }});
+          buttons.appendChild(button);
+        }});
+        bar.appendChild(buttons);
+        const done = document.createElement('div');
+        done.setAttribute('role', 'status');
+        done.setAttribute('aria-live', 'polite');
+        done.className = 'qrfPackagingPresetStatus';
+        bar.appendChild(done);
+        list.insertAdjacentElement('beforebegin', bar);
+      }}
 
       const form = tracked.length ? tracked[0].product.closest('form') : null;
       const alertBox = document.getElementById('qrf-recycling-alert');

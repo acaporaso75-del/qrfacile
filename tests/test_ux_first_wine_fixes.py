@@ -157,3 +157,25 @@ def test_customer_pages_avoid_technical_jargon():
         source = (ROOT / "qrfacile_app" / name).read_text(encoding="utf-8")
         for text in forbidden:
             assert text not in source, (name, text)
+
+
+def test_packaging_presets_use_valid_catalog_codes_for_each_component():
+    from qrfacile_app.services.recycling_catalog import PACKAGING_PRESETS, find_by_code
+
+    assert len(PACKAGING_PRESETS) >= 3
+    for preset in PACKAGING_PRESETS:
+        assert preset["label"] and preset["items"]
+        report = validate_recycling_items({
+            component: {"product": find_by_code(code)["material"], "code": code}
+            for component, code in preset["items"].items()
+        })
+        assert report["all_known_and_consistent"], preset["key"]
+
+
+def test_compliance_page_offers_presets_and_repairs_typed_duplicates():
+    from qrfacile_app.recycling_guidance_ui import _guidance_markup
+
+    html = _guidance_markup()
+    assert "Scegli il tuo imballaggio" in html
+    assert "Bottiglia verde + tappo in sughero" in html
+    assert "const lookupCode" in html and "if (item && item.code) code.value = item.code;" in html

@@ -43,6 +43,37 @@ RECYCLING_CATALOG: list[dict[str, Any]] = [
 ]
 
 
+# One-click starting points for the most common wine packaging. Every code
+# must exist in the catalog for its component (checked by the test suite).
+PACKAGING_PRESETS: list[dict[str, Any]] = [
+    {
+        "key": "still_green_cork",
+        "label": "Bottiglia verde + tappo in sughero + capsula in alluminio + etichetta di carta",
+        "items": {"bottle": "GL 71", "closure": "FOR 51", "capsule": "ALU 41", "label": "PAP 22"},
+    },
+    {
+        "key": "still_clear_cork",
+        "label": "Bottiglia trasparente + tappo in sughero + capsula in alluminio + etichetta di carta",
+        "items": {"bottle": "GL 70", "closure": "FOR 51", "capsule": "ALU 41", "label": "PAP 22"},
+    },
+    {
+        "key": "still_brown_cork",
+        "label": "Bottiglia marrone + tappo in sughero + capsula in alluminio + etichetta di carta",
+        "items": {"bottle": "GL 72", "closure": "FOR 51", "capsule": "ALU 41", "label": "PAP 22"},
+    },
+    {
+        "key": "green_synthetic",
+        "label": "Bottiglia verde + tappo sintetico in plastica + capsula in alluminio + etichetta di carta",
+        "items": {"bottle": "GL 71", "closure": "PP 5", "capsule": "ALU 41", "label": "PAP 22"},
+    },
+    {
+        "key": "green_screwcap",
+        "label": "Bottiglia verde + tappo a vite in alluminio + etichetta di carta",
+        "items": {"bottle": "GL 71", "closure": "ALU 41", "label": "PAP 22"},
+    },
+]
+
+
 RECYCLING_COMPONENT_PRIORITIES: dict[str, tuple[str, ...]] = {
     "bottle": ("GL 71", "GL 72", "GL 70", "PET 1", "C/GL 95", "C/GL 96", "C/GL 97", "C/GL 98"),
     "closure": ("FOR 51", "PP 5", "ALU 41", "FE 40", "HDPE 2", "PS 6", "OTHER 7"),

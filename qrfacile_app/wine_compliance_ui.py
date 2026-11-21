@@ -10,6 +10,7 @@ from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.csrf_core import csrf_input, require_csrf_or_same_origin
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
 from qrfacile_app.guided_flow import completed_steps, render_guided_stepper
+from qrfacile_app.services.nutrition_estimate import FORMULA_TEXT, estimator_js_constants
 
 router = APIRouter()
 
@@ -425,6 +426,87 @@ def _recycle_rows(recycle: dict) -> str:
     return "\n".join(rows)
 
 
+_NUTRITION_ESTIMATOR_TEMPLATE = """
+<details class="nutritionEstimator" open>
+  <summary>Non hai i valori? Calcolali dalla gradazione e dagli zuccheri residui</summary>
+  <p class="p">Bastano i dati della scheda dell’enologo. Il risultato è una stima: controllala
+  e, se hai le analisi di laboratorio, usa quelle.</p>
+  <div class="nutritionEstimatorGrid">
+    <label>Gradazione alcolica (% vol)*<input class="input mono" data-est="alcohol" inputmode="decimal" placeholder="es. 13,5"></label>
+    <label>Zuccheri residui (g/l)*<input class="input mono" data-est="sugar" inputmode="decimal" placeholder="es. 2"></label>
+    <label>Glicerolo (g/l, facoltativo)<input class="input mono" data-est="glycerol" inputmode="decimal" placeholder="es. 7"></label>
+    <label>Acidità totale (g/l, facoltativo)<input class="input mono" data-est="acids" inputmode="decimal" placeholder="es. 5,5"></label>
+  </div>
+  <button class="btn" type="button" data-est-run>Calcola</button>
+  <div class="nutritionEstimatorResult" data-est-result role="status" aria-live="polite"></div>
+  <button class="btn btn-primary" type="button" data-est-apply hidden>Usa questi valori</button>
+  <p class="nutritionEstimatorNote">__FORMULA__ Dopo aver usato i valori ricordati di salvare.</p>
+</details>
+<style>
+  .nutritionEstimator{margin:0 0 16px;padding:14px 16px;border:2px solid #14b8a6;border-radius:16px;background:#f0fdfa}
+  .nutritionEstimator>summary{cursor:pointer;font-weight:800;color:#0f766e}
+  .nutritionEstimatorGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:10px 0}
+  .nutritionEstimatorGrid label{display:grid;gap:6px;font-weight:700}
+  .nutritionEstimatorResult{margin:10px 0;font-size:15px}
+  .nutritionEstimatorNote{margin-top:10px;font-size:12px;color:#64748b}
+</style>
+<script>
+(() => {
+  const F = __CONSTANTS__;
+  const box = document.currentScript.closest('.nutritionEstimator') || document.querySelector('.nutritionEstimator');
+  if (!box) return;
+  const num = key => {
+    const raw = String((box.querySelector(`[data-est="${key}"]`) || {}).value || '').trim().replace(',', '.');
+    return raw === '' ? 0 : Number(raw);
+  };
+  const result = box.querySelector('[data-est-result]');
+  const apply = box.querySelector('[data-est-apply]');
+  let values = null;
+  const fmt = (v, d) => v.toFixed(d).replace('.', ',');
+  box.querySelector('[data-est-run]').addEventListener('click', () => {
+    const alcohol = num('alcohol'), sugar = num('sugar'), glycerol = num('glycerol'), acids = num('acids');
+    const alcoholRaw = String(box.querySelector('[data-est="alcohol"]').value || '').trim();
+    if (!alcoholRaw || [alcohol, sugar, glycerol, acids].some(v => !Number.isFinite(v) || v < 0) || alcohol > 25) {
+      result.textContent = 'Inserisci almeno la gradazione (tra 0 e 25) e gli zuccheri residui, con numeri validi.';
+      apply.hidden = true; values = null; return;
+    }
+    const g = {alcohol: alcohol * F.density, carbohydrate: sugar / 10, polyol: glycerol / 10, organic_acid: acids / 10};
+    let kj = 0, kcal = 0;
+    for (const key of Object.keys(g)) { kj += g[key] * F[key][0]; kcal += g[key] * F[key][1]; }
+    values = {
+      energy_kj: Math.round(kj), energy_kcal: Math.round(kcal), fat: 0, saturates: 0,
+      carbs: Math.round((g.carbohydrate + g.polyol) * 10) / 10, sugars: Math.round(g.carbohydrate * 10) / 10,
+      protein: 0, salt: 0,
+    };
+    result.innerHTML = `<b>Stima per 100 ml:</b> energia ${values.energy_kj} kJ / ${values.energy_kcal} kcal · `
+      + `carboidrati ${fmt(values.carbs, 1)} g di cui zuccheri ${fmt(values.sugars, 1)} g · grassi, proteine e sale 0 g`;
+    apply.hidden = false;
+  });
+  apply.addEventListener('click', () => {
+    if (!values) return;
+    for (const [name, value] of Object.entries(values)) {
+      const input = document.querySelector(`input[name="${name}"]`);
+      if (!input) continue;
+      input.value = String(value).replace('.', ',');
+      input.dispatchEvent(new Event('input', {bubbles: true}));
+      input.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+    result.innerHTML += '<br><b>Valori inseriti nel modulo qui sotto: controllali e premi Salva.</b>';
+    apply.hidden = true;
+  });
+})();
+</script>
+"""
+
+
+def _nutrition_estimator_html() -> str:
+    return (
+        _NUTRITION_ESTIMATOR_TEMPLATE
+        .replace("__CONSTANTS__", estimator_js_constants())
+        .replace("__FORMULA__", esc(FORMULA_TEXT))
+    )
+
+
 @router.get("/app/wine/{wine_id}/compliance", response_class=HTMLResponse)
 def compliance_get(request: Request, wine_id: int, msg: str = ""):
     user = require_any_role(request, ("winery", "studio", "admin"))
@@ -636,6 +718,8 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
           <div class="note" style="margin-top:0">
             Valori riferiti a 100 ml. kJ e kcal sono obbligatori; virgola e punto sono entrambi accettati.
           </div>
+
+          {_nutrition_estimator_html()}
 
           <div class="complianceNutritionGrid">
             <div>
