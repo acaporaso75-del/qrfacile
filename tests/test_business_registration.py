@@ -49,7 +49,7 @@ REQUEST = SimpleNamespace(
     app=SimpleNamespace(state=SimpleNamespace(app_base_url="https://www.qrfacile.it")),
     url=SimpleNamespace(scheme="https"), headers={}, cookies={},
 )
-FORM = dict(email="Bar@Example.test", password="Lunga-Password-2026!", password_confirm="Lunga-Password-2026!",
+FORM = dict(email="Bar@Example.test", password="Lunga-Password-2026!", password_confirm="Lunga-Password-2026!",  # pragma: allowlist secret
             business_name="Bar Sport", terms_accepted="yes", privacy_acknowledged="yes")
 
 
@@ -89,7 +89,7 @@ def test_register_business_creates_verified_required_user(monkeypatch):
 
 @pytest.mark.parametrize("override, message", [
     ({"terms_accepted": ""}, "Termini"),
-    ({"password_confirm": "altro"}, "coincidono"),
+    ({"password_confirm": "altro"}, "coincidono"),  # pragma: allowlist secret
     ({"business_name": " "}, "nome"),
     ({"email": "nope"}, "Email"),
 ])

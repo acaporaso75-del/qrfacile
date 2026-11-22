@@ -101,7 +101,10 @@ def test_sidebar_loads_real_balance_instead_of_showing_zero(monkeypatch):
 
 def test_winery_lands_on_dashboard_after_login():
     source = (ROOT / "qrfacile_app" / "auth_routes.py").read_text(encoding="utf-8")
-    assert 'next_url = "/app/dashboard" if (u.get("role") or "").lower().strip() == "winery" else "/app/start"' in source
+    from qrfacile_app.auth_routes import default_landing
+
+    assert 'next_url = default_landing(u.get("role") or "")' in source
+    assert default_landing("winery") == "/app/dashboard"
     assert "Ti abbiamo inviato un’email" in source
     assert "Ora puoi accedere.\"" not in source.split("created == \"1\"")[1].split("elif")[0]
 
