@@ -96,6 +96,8 @@ def invoice_data(order: Mapping[str, Any]) -> dict[str, Any]:
     if not paid_at:
         raise InvoiceHandoffError("paid_at_missing")
     paid = datetime.fromtimestamp(int(paid_at), tz=timezone.utc).astimezone(ROME)
+    if snapshot.get("kind") == "link":
+        return _link_invoice_data(order, snapshot, customer, paid, net, vat, gross)
     units = int(snapshot.get("wine_credits") or 0)
     name = str(snapshot.get("name") or order.get("pack") or "").strip()
 
@@ -124,6 +126,56 @@ def invoice_data(order: Mapping[str, Any]) -> dict[str, Any]:
         "vat_cents": vat,
         "gross_cents": gross,
         "vat_rate": int(snapshot.get("vat_rate") or 22),
+    }
+
+
+def _link_invoice_data(order, snapshot, customer, paid, net, vat, gross) -> dict[str, Any]:
+    """QRFacile Link: any customer (company, private, association, foreign)."""
+    country = str(customer.get("country") or "IT").upper()
+    private = customer.get("customer_type") == "private"
+    if country != "IT":
+        dest = "XXXXXXX"
+    elif private:
+        dest = "0000000"
+    else:
+        dest = str(customer.get("sdi") or ("" if customer.get("pec") else "0000000"))
+    rate = str(snapshot.get("vat_rate") or "0")
+    code = snapshot.get("vat_code") or {}
+    note = str(snapshot.get("exemption_note") or "")
+    credits = int(snapshot.get("generic_credits") or 0)
+    description = (
+        f"QRFacile Link - pacchetto {snapshot.get('name') or order.get('pack')}: {credits} QR "
+        f"(ordine n. {int(order['id'])})"
+    )
+    if note:
+        description += f" - {note}"
+    return {
+        "order_id": int(order["id"]),
+        "environment": str(order.get("payment_environment") or "unknown"),
+        "paypal_capture_id": str(order.get("paypal_capture_id") or ""),
+        "paid_date": paid.date().isoformat(),
+        "paid_label": paid.strftime("%d/%m/%Y %H:%M"),
+        "customer": {
+            "name": str(customer.get("name") or ""),
+            "vat": str(customer.get("vat_number") or ""),
+            "fiscal_code": str(customer.get("fiscal_code") or customer.get("vat_number") or ""),
+            "sdi": dest,
+            "pec": str(customer.get("pec") or ""),
+            "address": str(customer.get("address") or ""),
+            "postcode": str(customer.get("postcode") or ""),
+            "city": str(customer.get("city") or ""),
+            "province": str(customer.get("province") or ""),
+            "country": country,
+        },
+        "description": description,
+        "row_code": "QRFACILE-LINK",
+        "net_cents": net,
+        "vat_cents": vat,
+        "gross_cents": gross,
+        "vat_rate": rate,
+        "vat_class": str(code.get("class") or "Imponibile"),
+        "vat_description": str(code.get("description") or f"Imponibile {rate}%"),
+        "exemption_note": note,
     }
 
 
@@ -163,7 +215,7 @@ def build_easyfatt_xml(data: Mapping[str, Any]) -> bytes:
     _child(document, "CustomerProvince", customer["province"])
     _child(document, "CustomerCountry", "Italia" if customer["country"] == "IT" else customer["country"])
     _child(document, "CustomerVatCode", customer["vat"])
-    _child(document, "CustomerFiscalCode", customer["vat"])
+    _child(document, "CustomerFiscalCode", customer.get("fiscal_code", customer["vat"]))
     _child(document, "CustomerEInvoiceDestCode", customer["sdi"] or "0000000")
     if customer["pec"]:
         _child(document, "CustomerPec", customer["pec"])
@@ -183,21 +235,22 @@ def build_easyfatt_xml(data: Mapping[str, Any]) -> bytes:
     _child(
         document,
         "InternalComment",
-        f"QRFACILE ordine {data['order_id']} - PayPal capture {data['paypal_capture_id']}",
+        f"QRFACILE ordine {data['order_id']} - PayPal capture {data['paypal_capture_id']}"
+        + (f" - {data['exemption_note']}" if data.get("exemption_note") else ""),
     )
 
     rows = ET.SubElement(document, "Rows")
     row = ET.SubElement(rows, "Row")
-    _child(row, "Code", "QRFACILE-WINE")
+    _child(row, "Code", data.get("row_code", "QRFACILE-WINE"))
     _child(row, "Description", data["description"])
     _child(row, "Qty", "1")
     _child(row, "Um", "pz")
     _child(row, "Price", _money(data["net_cents"]))
-    rate = int(data["vat_rate"])
+    rate = str(data["vat_rate"])
     vat_code = _child(row, "VatCode", rate)
-    vat_code.set("Perc", str(rate))
-    vat_code.set("Class", "Imponibile")
-    vat_code.set("Description", f"Imponibile {rate}%")
+    vat_code.set("Perc", rate)
+    vat_code.set("Class", data.get("vat_class", "Imponibile"))
+    vat_code.set("Description", data.get("vat_description", f"Imponibile {rate}%"))
     _child(row, "Total", _money(data["net_cents"]))
     _child(row, "Stock", "false")
 
@@ -227,6 +280,7 @@ def build_summary(data: Mapping[str, Any]) -> tuple[str, str]:
         "Cliente",
         f"  Ragione sociale: {customer['name']}",
         f"  Partita IVA: {customer['vat']}",
+        *([f"  Codice fiscale: {customer['fiscal_code']}"] if customer.get("fiscal_code") and customer.get("fiscal_code") != customer["vat"] else []),
         f"  Codice SDI: {customer['sdi'] or '-'}",
         f"  PEC: {customer['pec'] or '-'}",
         f"  Indirizzo: {customer['address']}, {customer['postcode']} {customer['city']} ({customer['province']})",
@@ -235,6 +289,7 @@ def build_summary(data: Mapping[str, Any]) -> tuple[str, str]:
         f"  {data['description']}",
         f"  Imponibile: {_euro(data['net_cents'])}",
         f"  IVA {data['vat_rate']}%: {_euro(data['vat_cents'])}",
+        *([f"  Nota IVA: {data['exemption_note']}"] if data.get("exemption_note") else []),
         f"  Totale incassato: {_euro(data['gross_cents'])}",
         "",
         "In allegato il file Easyfatt-Xml: in Danea Easyfatt usa",

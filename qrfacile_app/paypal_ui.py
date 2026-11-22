@@ -20,8 +20,12 @@ from qrfacile_app.db import pg
 from qrfacile_app.annual_packages import annual_quote, grant_annual_units, load_order_product, validate_capture
 from qrfacile_app.fiscal_profile import normalized_italian_fiscal_profile
 from qrfacile_app.services.invoice_handoff import handoff_after_payment
+from qrfacile_app.modules.switches import is_enabled
+from qrfacile_app.services.billing_profile import load_billing_profile, normalize_billing_profile
+from qrfacile_app.services.vat import link_quote
 
 from qrfacile_app.pricing_config import (
+    LINK_PACK_KEY,
     get_purchase_pack,
 )
 
@@ -486,7 +490,7 @@ def paypal_start(
     csrf_token: str = Form(""),
     fiscal_confirmation: str = Form(""),
 ):
-    user = require_any_role(request, ("winery", "studio", "admin"))
+    user = require_any_role(request, ("winery", "studio", "admin", "business"))
     require_csrf(request, csrf_token)
 
     pack = (pack or "").strip().lower()
@@ -500,6 +504,8 @@ def paypal_start(
         raise HTTPException(400, "Pacchetto non acquistabile online")
 
     role = (user.get("role") or "").lower().strip()
+    if role == "business" and pack != LINK_PACK_KEY:
+        raise HTTPException(403, "Pacchetto non disponibile per questo account")
 
     uid = int(user["id"])
     base = _base_url(request)
@@ -535,6 +541,39 @@ def paypal_start(
 
             snapshot = None
             total_cents = int(data['amount_cents'])
+            if pack == LINK_PACK_KEY and is_enabled("link_sales_it"):
+                stored = load_billing_profile(cur, uid)
+                try:
+                    if not stored:
+                        raise HTTPException(422, "Profilo di fatturazione mancante")
+                    customer = normalize_billing_profile(stored)
+                except HTTPException:
+                    return RedirectResponse(
+                        "/app/billing-profile?next=/app/billing&err="
+                        + quote_plus("Prima dell'acquisto completa i dati per la fattura."),
+                        status_code=303,
+                    )
+                customer["vies_valid"] = stored.get("vies_valid")
+                try:
+                    quote = link_quote(
+                        profile=customer,
+                        gross_cents=int(data["amount_cents"]),
+                        oss_threshold_exceeded=is_enabled("link_oss_threshold_exceeded"),
+                        foreign_enabled=is_enabled("link_sales_foreign"),
+                    )
+                except HTTPException as exc:
+                    return RedirectResponse(f"/app/billing?err={quote_plus(str(exc.detail))}", status_code=303)
+                snapshot = {
+                    "version": "link-2026-11-22",
+                    "kind": "link",
+                    "pack": pack,
+                    "name": data.get("name") or "QR Link 10",
+                    "generic_credits": int(data.get("generic_credits") or 0),
+                    "wine_credits": 0,
+                    **quote,
+                    "customer": customer,
+                }
+                total_cents = int(snapshot["gross_cents"])
             if data.get('annual'):
                 if fiscal_confirmation != 'IT_ORDINARY':
                     raise HTTPException(422, 'Conferma i dati fiscali e il totale IVA inclusa prima di acquistare.')
