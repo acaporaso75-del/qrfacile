@@ -94,3 +94,35 @@ def test_image_upload_inputs_are_labelled_per_side():
     assert 'id="image-upload-{esc(kind)}" type="file"' in source
     compliance = (ROOT / "qrfacile_app" / "wine_compliance_ui.py").read_text(encoding="utf-8")
     assert '<label for="public-theme-note">Nota</label>' in compliance
+
+
+def test_every_customer_form_control_has_an_accessible_name():
+    """Broader than the label check: any select/textarea/visible input.
+
+    Staging d7a7d38 still had two unnamed selects in the Studio area
+    (mode, recommended_pack). A control passes when it has aria-label /
+    aria-labelledby / title, sits inside a <label>, or has an id targeted
+    by a for= attribute in the same module.
+    """
+    control = re.compile(r"<(select|textarea|input)\b([^>]*)>", re.S)
+    skip = ("hidden", "submit", "button", "reset", "image")
+    offenders = []
+    for path in sorted((ROOT / "qrfacile_app").glob("*.py")):
+        if path.name.startswith("admin_"):
+            continue
+        source = path.read_text(encoding="utf-8")
+        for match in control.finditer(source):
+            tag, attrs = match.groups()
+            kind = re.search(r"""type\s*=\s*["']?([a-z]+)""", attrs)
+            if tag == "input" and kind and kind.group(1) in skip:
+                continue
+            if any(token in attrs for token in ("aria-label", "aria-labelledby", "title=")):
+                continue
+            before = source[: match.start()]
+            if before.rfind("<label") > before.rfind("</label>"):
+                continue
+            ident = re.search(r"""\bid=["']([^"']+)["']""", attrs)
+            if ident and (f'for="{ident.group(1)}"' in source or f"for='{ident.group(1)}'" in source):
+                continue
+            offenders.append(f"{path.name}:{before.count(chr(10)) + 1} <{tag}{attrs[:60]}>")
+    assert offenders == []

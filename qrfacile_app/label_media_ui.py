@@ -135,7 +135,7 @@ def label_image_page(request: Request, label_id: int, msg: str = ""):
         <form class="card" method="post" action="/app/label/{int(label_id)}/image" enctype="multipart/form-data" style="max-width:860px">
           <div class="section-title">Carica immagine etichetta</div>
           <div class="p">Carica un file JPG, PNG o WEBP. Verranno generate versioni ottimizzate e thumbnail.</div>
-          <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required>
+          <input type="file" name="image" aria-label="Immagine dell'etichetta" accept="image/jpeg,image/png,image/webp" required>
           <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
             <button class="btn btn-primary" type="submit">Carica</button>
             <a class="btn" href="/app/label/{int(label_id)}">Torna etichetta</a>

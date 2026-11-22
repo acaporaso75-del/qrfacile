@@ -150,8 +150,8 @@ def _management_picker(wine_id: int, labels: list[dict], studios: list[dict], re
     return f"""
     <form method="post" action="/app/wine/{int(wine_id)}/management/set" class="dashboardManagementPicker">
       <input type="hidden" name="return_to" value="{_h(return_to)}">
-      <span>Gestione grafica</span>
-      <select name="management_value">
+      <span id="mgmt-label-{int(wine_id)}">Gestione grafica</span>
+      <select aria-labelledby="mgmt-label-{int(wine_id)}" name="management_value">
         {''.join(options)}
       </select>
       <button class="btn" type="submit">Salva</button>

@@ -313,7 +313,7 @@ def studio_dashboard(request: Request, msg: str = "", err: str = ""):
         <tr>
           <td>
             <div class="qrfInviteCopyWrap studioInviteLinkBox">
-              <input class="input qrfInviteCopyInput" readonly value="{esc(invite_url or token)}"
+              <input class="input qrfInviteCopyInput" readonly aria-label="Link di invito da copiare" value="{esc(invite_url or token)}"
                 onclick="this.focus();this.select();this.setSelectionRange(0, 99999);">
               <div class="studioInviteActions">
                 {copy_btn}
@@ -418,13 +418,13 @@ def studio_dashboard(request: Request, msg: str = "", err: str = ""):
 
         <form method="post" action="/studio/invite" style="margin-top:12px">
           <div class="studioInviteForm">
-            <input class="input" name="winery_email" placeholder="Email cantina (es. cantina@...)" required>
-            <select name="mode">
+            <input class="input" name="winery_email" aria-label="Email della cantina da invitare" placeholder="Email cantina (es. cantina@...)" required>
+            <select name="mode" aria-label="Permessi richiesti alla cantina">
               <option value="both">Autorizza vista + modifica</option>
               <option value="view">Solo vista</option>
             </select>
 
-            <select name="recommended_pack">
+            <select name="recommended_pack" aria-label="Pacchetto da suggerire alla cantina">
               <option value="" selected>Da valutare dopo registrazione</option>
               <option value="annual_start">Suggerisci Start · 15 unità/anno · €99 + IVA 22%</option>
               <option value="annual_winery">Suggerisci Cantina · 50 unità/anno · €179 + IVA 22%</option>
@@ -821,7 +821,7 @@ def studio_winery(request: Request, winery_id: int, msg: str = "", err: str = ""
 
         <form method="post" action="/studio/winery/{int(winery_id)}/recommended-pack" style="margin-top:12px">
           <div class="studioPlanForm">
-            <select name="recommended_pack">
+            <select name="recommended_pack" aria-label="Pacchetto consigliato per la cantina">
               <option value="" {_sel_pack("")}>Da valutare</option>
               <option value="annual_start" {_sel_pack("annual_start")}>Start · 15 unità/anno · €99 + IVA 22%</option>
               <option value="annual_winery" {_sel_pack("annual_winery")}>Cantina · 50 unità/anno · €179 + IVA 22%</option>
