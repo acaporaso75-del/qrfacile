@@ -11,7 +11,7 @@ from qrfacile_app.services.vat import link_quote
 IT_COMPANY = {"customer_type": "company", "country": "IT", "name": "Bar Sport srl", "vat_number": "01234567897", "sdi": "ABC1234"}
 IT_PRIVATE = {"customer_type": "private", "country": "IT", "name": "Mario Rossi", "fiscal_code": "RSSMRA80A01H501U"}
 DE_PRIVATE = {"customer_type": "private", "country": "DE", "name": "Hans Muller"}
-DE_COMPANY = {"customer_type": "company", "country": "DE", "name": "Hans GmbH", "vat_number": "DE123456789"}
+DE_COMPANY = {"customer_type": "company", "country": "DE", "name": "Hans GmbH", "vat_number": "DE123456789"}  # pragma: allowlist secret
 US_COMPANY = {"customer_type": "company", "country": "US", "name": "Acme Inc"}
 
 
