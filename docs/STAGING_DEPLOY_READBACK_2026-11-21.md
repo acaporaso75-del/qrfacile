@@ -540,3 +540,26 @@ aggregati, senza payload, identificativi o dati personali. Il titolare ne ha
 confermato la ricezione nella chat QRFacile il 2026-11-21: **PASS** per la
 consegna dell'alert staging. Nessuna modifica è stata eseguita su database,
 produzione o PayPal.
+
+## Deploy staging e verifica Home Chooser — 2026-11-22
+
+- SHA staging prima: `abecf547c6b1ff09ee4b79e01c40492c76715d91`.
+- SHA staging dopo e head PR #12 (Draft):
+  `30c985f6786670f85177f9a332a9767fafea1d45`.
+- Fetch esplicito: SHA verificato, remoto invariato. Diff `sql/` vuoto.
+- Backup: tag creato, SHA-256 di dump e archivio verificati, indice
+  `pg_restore --list` verificato. Rollback conservato.
+- `RELEASE_HEALTH_OK` sullo SHA atteso.
+- Server: `574 passed, 10 skipped`; transazioni SQL OK; audit 0 rilievi.
+- Home: sezione e sei schede corrette; tutte le destinazioni HTTP 200;
+  CTA a `#scegli`; nessun link a `/register-business`.
+- Nessuno scroll orizzontale a 375 px o nel viewport equivalente al
+  reflow 400% (320 px); tutte e sei le schede raggiunte con focus visibile.
+  Zoom nativo del browser non verificato. Axe 4.10.2: 0 serious/critical.
+  Screenshot desktop e mobile acquisiti.
+- QR storici: `HISTORIC_QR_OK legacy=12/broken=0 wine=29/broken=0/to_complete=10`.
+  Nessun QR rotto, ma lo staging ha 29 QR vino nel controllo invece dei
+  24 attesi. Collaudo interrotto al passo 5; Link beta e pagine Wine non
+  collaudati.
+- Esito complessivo: `STAGING_HOME_CHOOSER: FAIL` per conteggio inatteso
+  e collaudo non concluso. Nessun deploy in produzione.
