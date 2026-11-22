@@ -292,8 +292,17 @@ def external_update_target(request: Request, qr_id: int, target_url: str = Form(
         with conn.cursor(row_factory=dict_row) as cur:
             _owned_external(cur, qr_id, u)
             cur.execute(
-                "UPDATE qr_items SET payload=jsonb_build_object('url', %s::text), updated_at=%s WHERE id=%s",
-                (target_url, now(), int(qr_id)),
+                # Merge: PDF / mini-page content of module rows must survive.
+                """
+                UPDATE qr_items
+                SET payload=COALESCE(payload, '{}'::jsonb) || jsonb_build_object(
+                      'url', %s::text, 'type', 'link',
+                      'content', COALESCE(payload->'content', '{}'::jsonb)
+                                 || jsonb_build_object('link', jsonb_build_object('url', %s::text))),
+                    updated_at=%s
+                WHERE id=%s
+                """,
+                (target_url, target_url, now(), int(qr_id)),
             )
         conn.commit()
     return RedirectResponse(f"/app/external/{int(qr_id)}?msg=Destinazione%20aggiornata", status_code=303)

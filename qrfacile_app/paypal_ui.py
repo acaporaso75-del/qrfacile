@@ -504,8 +504,9 @@ def paypal_start(
         raise HTTPException(400, "Pacchetto non acquistabile online")
 
     role = (user.get("role") or "").lower().strip()
-    if role == "business" and pack != LINK_PACK_KEY:
-        raise HTTPException(403, "Pacchetto non disponibile per questo account")
+    if role == "business" and (pack != LINK_PACK_KEY or not is_enabled("link_sales_it")):
+        # Business customers need the billing profile flow (invoice in Danea).
+        raise HTTPException(403, "Acquisto non ancora disponibile per questo account")
 
     uid = int(user["id"])
     base = _base_url(request)

@@ -74,6 +74,6 @@ def test_admin_can_handle_and_unpublish(area, monkeypatch):
     assert slug in html and "<script>x</script>" not in html
     response = ui.admin_handle(_request(), report_id, unpublish="on")
     assert response.status_code == 303
-    assert area.sql("SELECT status FROM qr_items")[0]["status"] == "bozza"
+    assert area.sql("SELECT status FROM qr_items")[0]["status"] == "sospesa"
     handled = area.sql("SELECT handled_at, handled_by FROM abuse_reports")[0]
     assert handled["handled_at"] is not None and handled["handled_by"] == 1

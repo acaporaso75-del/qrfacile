@@ -10,6 +10,7 @@ produzione.** Segreti mai stampati. Ogni punto: PASS / FAIL con evidenza breve.
 - [ ] Migrazione: `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/2026_vertical_modules_base.sql`
       due volte (idempotente). Verificare: 4 switch tutti `false`, righe `qr_type='external'`
       con `module='link'` e `payload.type='link'`.
+- [ ] Verificare che `qr_items.status` accetti il valore `sospesa` (nessun vincolo CHECK che lo rifiuti).
 - [ ] `python scripts/check_sql_transactions.py`, `pytest -q` sul server: verdi.
 
 ## 1. Switch spento = nulla cambia
@@ -50,7 +51,7 @@ produzione.** Segreti mai stampati. Ogni punto: PASS / FAIL con evidenza breve.
 
 ## 5. Segnalazioni
 - [ ] `/segnala/<slug>` senza login: invio OK; 6ª segnalazione nella stessa ora non registrata; campo nascosto compilato → nessuna riga.
-- [ ] `/admin/abuse-reports`: "Sospendi il QR e chiudi" → QR in bozza, `/d/<slug>` → 404 con link "Segnala contenuto"; voce in `audit_log`.
+- [ ] `/admin/abuse-reports`: "Sospendi il QR e chiudi" → QR sospeso (stato `sospesa`), il proprietario non può ripubblicarlo, `/d/<slug>` → 404 con link "Segnala contenuto"; voce in `audit_log`.
 
 ## 6. Spegnimento
 - [ ] Switch `link` spento → punto 1 di nuovo tutto PASS; i QR `/d/` pubblicati continuano a funzionare.

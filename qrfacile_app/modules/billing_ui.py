@@ -26,7 +26,12 @@ TYPE_LABELS = {"company": "Azienda o professionista con Partita IVA", "private":
 
 def _safe_next(value: str) -> str:
     value = (value or "").strip()
-    return value if value.startswith("/") and not value.startswith("//") and len(value) <= 200 else ""
+    if not value.startswith("/") or value.startswith("//") or len(value) > 200:
+        return ""
+    # Browsers read "/\host" as "//host"; control characters split headers.
+    if "\\" in value or any(ord(ch) < 32 for ch in value):
+        return ""
+    return value
 
 
 def _field(name: str, label: str, value: str, hint: str = "", **attrs: str) -> str:

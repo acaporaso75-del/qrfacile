@@ -71,6 +71,8 @@ def _record(request: Request, qr_item_id: int, level: str) -> None:
     try:
         with pg() as conn:
             with conn.cursor() as cur:
+                # A slow statistics write must never hold up the scan.
+                cur.execute("SET LOCAL statement_timeout = '300ms'")
                 record_scan(
                     cur,
                     qr_item_id=qr_item_id,

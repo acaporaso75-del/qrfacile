@@ -27,6 +27,9 @@ def is_enabled(key: str) -> bool:
                 cur.execute("SELECT enabled FROM module_switches WHERE key=%s", (key,))
                 row = cur.fetchone()
     except Exception:
+        # Cache the failure too: before the migration every page would
+        # otherwise open a connection and log a failing query.
+        _cache[key] = (now, False)
         return False
     if isinstance(row, dict):
         value = bool(row.get("enabled"))

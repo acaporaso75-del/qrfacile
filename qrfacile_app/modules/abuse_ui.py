@@ -178,7 +178,7 @@ def admin_handle(request: Request, report_id: int, unpublish: str = Form("")):
             if not row:
                 raise HTTPException(404, "Segnalazione non trovata o già gestita")
             if unpublish == "on" and row.get("qr_item_id"):
-                cur.execute("UPDATE qr_items SET status='bozza' WHERE id=%s", (int(row["qr_item_id"]),))
+                cur.execute("UPDATE qr_items SET status='sospesa' WHERE id=%s", (int(row["qr_item_id"]),))
                 if _has_audit_log(cur):
                     cur.execute(
                         """

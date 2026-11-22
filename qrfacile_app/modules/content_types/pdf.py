@@ -44,6 +44,8 @@ class PdfType:
 
     def public_response(self, content: dict, *, slug: str) -> Response:
         path = Path(get_uploads_dir()) / content["file"]
+        if not path.is_file():
+            raise FileNotFoundError(content["file"])
         return FileResponse(
             path,
             media_type="application/pdf",

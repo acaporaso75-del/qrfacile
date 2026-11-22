@@ -146,7 +146,6 @@ def _assisted_card(key: str, service: dict, icon: str) -> str:
     """
 
 
-@router.get("/pricing", response_class=HTMLResponse)
 def _link_pricing_section() -> str:
     from qrfacile_app.modules import switches
 
@@ -163,6 +162,7 @@ def _link_pricing_section() -> str:
     """
 
 
+@router.get("/pricing", response_class=HTMLResponse)
 def pricing_page(request: Request):
     qr_cards = "".join([
         _qr_pack_card(request, key, pack)

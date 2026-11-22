@@ -123,7 +123,10 @@ def _render(request: Request, user: dict, title: str, body: str, msg: str = "", 
 
 
 def _state_pill(status: str) -> str:
-    return pill("Attivo", "green") if (status or "").lower() == "attiva" else pill("Bozza", "muted")
+    status = (status or "").lower()
+    if status == "sospesa":
+        return pill("Sospeso", "warn")
+    return pill("Attivo", "green") if status == "attiva" else pill("Bozza", "muted")
 
 
 @router.get("/app/link", response_class=HTMLResponse)
@@ -438,6 +441,9 @@ def link_status_post(request: Request, qr_id: int, status: str = Form("")):
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             row = _owned(cur, qr_id, user)
+            if (row.get("status") or "").lower() == "sospesa" and (user.get("role") or "").lower() != "admin":
+                conn.rollback()
+                return _go(f"/app/link/{int(qr_id)}", err="QR sospeso dopo una segnalazione: scrivi a info@qrfacile.it.")
             if status == "attiva" and _content(row["payload"]) is None:
                 conn.rollback()
                 return _go(f"/app/link/{int(qr_id)}", err="Completa il contenuto prima di pubblicare.")
