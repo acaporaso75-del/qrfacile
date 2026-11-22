@@ -1,11 +1,14 @@
+from urllib.parse import urlsplit
+
 from fastapi import APIRouter, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
-from qrfacile_app.ui_shell import page
+from qrfacile_app.csrf_core import csrf_input
+from qrfacile_app.ui_shell import esc, page
 from qrfacile_app.util import new_slug
 
 router = APIRouter()
@@ -128,7 +131,7 @@ def new_external_create(request: Request, target_url: str = Form(...)):
                     return RedirectResponse("/app/billing?error=crediti_insufficienti", status_code=303)
 
             slug = new_slug()
-            public_path = f"/e/{slug}"
+            public_path = f"/d/{slug}"
 
             cur.execute(
                 """
@@ -199,30 +202,34 @@ def external_detail(request: Request, qr_id: int, msg: str = "", err: str = ""):
       <a class="btn" href="/app/dashboard">Dashboard</a>
     """
 
+    slug = str(r.get("slug") or "")
+    absolute_url = _direct_public_url(request, slug)
     body = f"""
-    <div class="h1" style="margin-top:14px">QR Link creato</div>
-    <div class="p">Questo QR punta a un URL pubblico stabile. La destinazione può essere aggiornata in futuro.</div>
+    <div class="h1" style="margin-top:14px">Il tuo QR Link</div>
+    <div class="p">Il QR resta sempre lo stesso: puoi cambiare la destinazione quando vuoi, senza ristampare.</div>
 
     <div class="card" style="margin-top:14px;max-width:980px">
-      <div class="h2">Dettagli</div>
-
-      <div class="note" style="margin-top:12px">
-        <b>URL pubblico:</b> <a href="{public_url}" target="_blank" rel="noopener">{public_url}</a>
-      </div>
-
-      <div class="note" style="margin-top:12px">
-        <b>Destinazione:</b> <span class="mono">{target}</span>
-      </div>
-
+      <div class="h2">QR da stampare</div>
+      <img src="/app/external/{int(qr_id)}/qr.png" alt="QR code del link" width="180" height="180" style="margin-top:10px;border:1px solid #e2e8f0;border-radius:12px">
       <div class="row" style="margin-top:14px">
-        <a class="btn btn-primary" href="{public_url}" target="_blank" rel="noopener">Apri URL pubblico</a>
-        <a class="btn" href="/app/new-external">Crea un altro QR</a>
+        <a class="btn btn-primary" href="/app/external/{int(qr_id)}/qr.pdf">Scarica PDF per la stampa</a>
+        <a class="btn" href="/app/external/{int(qr_id)}/qr.png" download>Scarica immagine PNG</a>
       </div>
-
-      <div class="note" style="margin-top:14px">
-        Tip: stampa sempre il QR sull’URL pubblico, non sulla destinazione.
+      <div class="note" style="margin-top:12px">
+        <b>Indirizzo del QR:</b> <a href="{esc(absolute_url)}" target="_blank" rel="noopener">{esc(absolute_url)}</a>
       </div>
     </div>
+
+    <form class="card" method="post" action="/app/external/{int(qr_id)}/target" style="margin-top:14px;max-width:980px">
+      {csrf_input(request)}
+      <div class="h2">Destinazione</div>
+      <label for="target-url" style="margin-top:10px">Dove porta il QR</label>
+      <input id="target-url" class="input" name="target_url" value="{esc(target)}" placeholder="https://..." required>
+      <div class="row" style="margin-top:12px">
+        <button class="btn btn-primary" type="submit">Salva la nuova destinazione</button>
+        <a class="btn" href="{esc(absolute_url)}" target="_blank" rel="noopener">Prova il QR</a>
+      </div>
+    </form>
     """
 
     return HTMLResponse(page(
@@ -236,3 +243,105 @@ def external_detail(request: Request, qr_id: int, msg: str = "", err: str = ""):
         role=role,
         credits=credits,
     ))
+
+
+def _valid_target(url: str) -> bool:
+    url = (url or "").strip()
+    if len(url) > 2000:
+        return False
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return False
+    return parts.scheme in ("http", "https") and bool(parts.netloc)
+
+
+def _direct_public_url(request: Request, slug: str) -> str:
+    base = str(getattr(request.app.state, "app_base_url", "") or "").rstrip("/")
+    if not base:
+        base = f"{request.url.scheme}://{request.headers.get('host', 'localhost:8000')}"
+    return f"{base}/d/{slug}"
+
+
+def _owned_external(cur, qr_id: int, user: dict) -> dict:
+    cur.execute(
+        "SELECT id, owner_user_id, slug, payload FROM qr_items WHERE id=%s AND qr_type='external' LIMIT 1",
+        (int(qr_id),),
+    )
+    row = cur.fetchone()
+    if not row:
+        raise HTTPException(404, "QR non trovato")
+    if int(row["owner_user_id"]) != int(user["id"]) and (user.get("role") or "").lower() != "admin":
+        raise HTTPException(403, "Forbidden")
+    return row
+
+
+@router.post("/app/external/{qr_id}/target")
+def external_update_target(request: Request, qr_id: int, target_url: str = Form(...)):
+    require_csrf_or_same_origin(request)
+    u = require_any_role(request, ("winery", "studio", "admin"))
+    target_url = (target_url or "").strip()
+    if not _valid_target(target_url):
+        return RedirectResponse(f"/app/external/{int(qr_id)}?err=Indirizzo%20non%20valido", status_code=303)
+    with pg() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            _owned_external(cur, qr_id, u)
+            cur.execute(
+                "UPDATE qr_items SET payload=jsonb_build_object('url', %s::text), updated_at=%s WHERE id=%s",
+                (target_url, now(), int(qr_id)),
+            )
+        conn.commit()
+    return RedirectResponse(f"/app/external/{int(qr_id)}?msg=Destinazione%20aggiornata", status_code=303)
+
+
+@router.get("/app/external/{qr_id}/qr.{fmt}")
+def external_qr_file(request: Request, qr_id: int, fmt: str):
+    from qrfacile_app.export_qr_ui import _qr_pdf_a4, _qr_png
+
+    u = require_any_role(request, ("winery", "studio", "admin"))
+    if fmt not in ("png", "pdf"):
+        raise HTTPException(404, "Formato non disponibile")
+    with pg() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            row = _owned_external(cur, qr_id, u)
+    url = _direct_public_url(request, str(row.get("slug") or ""))
+    if fmt == "png":
+        data, media, name = _qr_png(url, 30, 600), "image/png", f"qrfacile-link-{row['slug']}.png"
+    else:
+        data, media, name = _qr_pdf_a4(url, 30, 600), "application/pdf", f"qrfacile-link-{row['slug']}.pdf"
+    return Response(data, media_type=media, headers={
+        "Content-Disposition": f'attachment; filename="{name}"',
+        "Cache-Control": "no-store",
+    })
+
+
+_NOT_FOUND_HTML = (
+    "<!doctype html><html lang='it'><head><meta charset='utf-8'>"
+    "<meta name='viewport' content='width=device-width,initial-scale=1'><title>QR non attivo</title>"
+    "<link rel='stylesheet' href='/static/app.css'></head><body><main style='max-width:640px;margin:60px auto;padding:24px'>"
+    "<div class='card'><h1 class='h1'>QR non attivo</h1><p>Questo QR non è collegato a nessun contenuto.</p></div>"
+    "</main></body></html>"
+)
+
+
+@router.get("/d/{slug}")
+def direct_link_public(slug: str):
+    """Public resolver of QR Link codes: redirect to the current destination.
+
+    302 + no-store so a changed destination applies at the next scan.
+    """
+    slug = (slug or "").strip()
+    if not slug or len(slug) > 64 or "\x00" in slug:
+        return HTMLResponse(_NOT_FOUND_HTML, status_code=404)
+    with pg() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT status, payload FROM qr_items WHERE slug=%s AND qr_type='external' LIMIT 1",
+                (slug,),
+            )
+            row = cur.fetchone()
+    payload = (row or {}).get("payload") or {}
+    target = payload.get("url") if isinstance(payload, dict) else ""
+    if not row or str(row.get("status") or "").lower() != "attiva" or not _valid_target(target or ""):
+        return HTMLResponse(_NOT_FOUND_HTML, status_code=404)
+    return RedirectResponse(target, status_code=302, headers={"Cache-Control": "no-store"})

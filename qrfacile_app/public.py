@@ -1,8 +1,9 @@
 import time
+from urllib.parse import quote
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
@@ -562,6 +563,16 @@ def _render_label_page(
             else:
                 cur.execute(select_sql + " WHERE qi.slug=%s LIMIT 1", (slug,))
             row = cur.fetchone()
+
+            if not row and not preview and slug:
+                # QR Link codes created by the beta were printed as /e/<slug>:
+                # forward them to their module (/d/) instead of a 404.
+                cur.execute(
+                    "SELECT 1 FROM qr_items WHERE slug=%s AND qr_type='external' LIMIT 1",
+                    (slug,),
+                )
+                if cur.fetchone():
+                    return RedirectResponse(f"/d/{quote(slug, safe='')}", status_code=301)
 
             if not row:
                 raise HTTPException(404, "QR not found")

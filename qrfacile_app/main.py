@@ -92,6 +92,8 @@ MANDATORY_ROUTERS = frozenset(
         # Serves the QR codes printed from the old WordPress site: if it
         # failed to load, every bottle already on the market would 404.
         "qrfacile_app.legacy_routes",
+        # /d/<slug> resolver of printed QR Link codes.
+        "qrfacile_app.external_qr_ui",
     }
 )
 

@@ -55,6 +55,9 @@ def legacy_page(legacy_slug: str):
         "register-interest",
         "demo",
         "e",
+        # one-letter prefixes reserved for vertical modules (d = Link Diretto, r = Menu)
+        "d",
+        "r",
         "favicon.ico",
     }
 
