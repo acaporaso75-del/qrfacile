@@ -9,7 +9,7 @@ from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.checkout_ui import paypal_checkout_form, paypal_checkout_script
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
-from qrfacile_app.pricing_config import get_purchase_pack, list_billing_packs
+from qrfacile_app.pricing_config import LINK_PACK_KEY, get_purchase_pack, list_billing_packs
 
 router = APIRouter()
 
@@ -313,7 +313,7 @@ def _pack_card(request: Request, pack_key: str, pack: dict, recommended_pack: st
 
 @router.get("/app/billing", response_class=HTMLResponse)
 def billing(request: Request, msg: str = "", err: str = ""):
-    user = require_any_role(request, ("winery", "studio", "admin"))
+    user = require_any_role(request, ("winery", "studio", "admin", "business"))
     role = (user.get("role") or "").lower().strip()
     uid = int(user["id"])
 
@@ -328,15 +328,21 @@ def billing(request: Request, msg: str = "", err: str = ""):
             recommended_pack = _recommended_pack_from_invite(cur, user)
             annual_allowances_html = _annual_allowances(cur, uid)
 
-    actions = (
-        pill(f"QR vino disponibili: {balances.get('wine', 0)}", "green") + " " +
-        top_actions(
-            ("/app/start", "Menu"),
-            ("/app/dashboard", "Dashboard"),
-            ("/pricing", "Prezzi pubblici"),
-            ("/logout", "Logout"),
+    if role == "business":
+        actions = (
+            pill(f"QR Link disponibili: {balances.get('generic', 0)}", "green") + " " +
+            top_actions(("/app/link", "I miei QR"), ("/app/billing-profile", "Dati fattura"), ("/logout", "Logout"))
         )
-    )
+    else:
+        actions = (
+            pill(f"QR vino disponibili: {balances.get('wine', 0)}", "green") + " " +
+            top_actions(
+                ("/app/start", "Menu"),
+                ("/app/dashboard", "Dashboard"),
+                ("/pricing", "Prezzi pubblici"),
+                ("/logout", "Logout"),
+            )
+        )
 
     subscription_html = ""
     if subscription:
@@ -360,6 +366,8 @@ def billing(request: Request, msg: str = "", err: str = ""):
         for k, v in list_billing_packs()
         if not v.get("hidden_in_billing") and k not in hidden_packs
         and (not v.get("annual") or user.get("role") == "winery")
+        # Business accounts (QRFacile Link) buy only Link packs.
+        and (role != "business" or k == LINK_PACK_KEY)
     ]
 
     pack_cards = "".join(_pack_card(request, k, v, recommended_pack) for k, v in visible_packs)

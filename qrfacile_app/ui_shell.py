@@ -175,6 +175,9 @@ def _role_label(role: str) -> str:
     if role == "admin":
         return "Admin"
 
+    if role == "business":
+        return "Azienda"
+
     return role or "-"
 
 
@@ -229,6 +232,14 @@ def _sidebar(role: str, user_email: str, credits: dict | None) -> str:
         ("/app/billing", "💳", "Crediti", "Pacchetti"),
     ]
 
+    if role == "business":
+        # QRFacile Link customers: no wine entries at all.
+        nav = [
+            ("/app/link", "🔗", "I miei QR", "Link, PDF, mini-pagine"),
+            ("/app/billing", "💳", "Crediti", "Pacchetti QR Link"),
+            ("/app/billing-profile", "🧾", "Dati di fatturazione", "Per la fattura"),
+        ]
+
     if role == "winery":
         nav.append(("/app/winery/logo", "🏷️", "Logo cantina", "Pagina pubblica"))
 
@@ -256,16 +267,20 @@ def _sidebar(role: str, user_email: str, credits: dict | None) -> str:
         for (h, i, t, s) in nav
     ])
 
+    home = "/app/link" if role == "business" else "/app/start"
+    wine_credit = "" if role == "business" else f"""
+          <div class="sidebarCreditItem sidebarCreditWine">
+            <span>QR vino</span>
+            <b>{_credit_value(credits, 'wine')}</b>
+          </div>"""
+
     footer = f"""
     <div class="sidebarFooter">
       <div class="sidebarCreditBox">
         <div class="sidebarCreditTitle">QR disponibili</div>
 
         <div class="sidebarCredits">
-          <div class="sidebarCreditItem sidebarCreditWine">
-            <span>QR vino</span>
-            <b>{_credit_value(credits, 'wine')}</b>
-          </div>
+          {wine_credit}
 
           <div class="sidebarCreditItem sidebarCreditGeneric">
             <span>QR link</span>
@@ -280,7 +295,7 @@ def _sidebar(role: str, user_email: str, credits: dict | None) -> str:
       </div>
 
       <div class="sidebarButtons">
-        <a class="btn" href="/app/start">Menu</a>
+        <a class="btn" href="{home}">Menu</a>
         <a class="btn btn-danger-soft" href="/logout">Logout</a>
       </div>
     </div>
@@ -289,7 +304,7 @@ def _sidebar(role: str, user_email: str, credits: dict | None) -> str:
     return f"""
     <aside class="sidebar">
       <div class="sidebarBrand">
-        <a href="/app/start" style="display:block;text-decoration:none">
+        <a href="{home}" style="display:block;text-decoration:none">
           <img src="/static/qrfacile-wordmark.svg" alt="QRFACILE" style="
             width:100%;
             max-width:220px;

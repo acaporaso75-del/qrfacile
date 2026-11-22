@@ -76,6 +76,8 @@ CREATE INDEX IF NOT EXISTS idx_abuse_reports_open ON abuse_reports (created_at D
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check
     CHECK (role IN ('admin', 'winery', 'studio', 'collaborator', 'business'));
+-- Name of the business for 'business' accounts (no winery row for them).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT;
 
 -- QR Link beta rows become module 'link', content type 'link'. The top-level
 -- "url" stays for the beta code path.

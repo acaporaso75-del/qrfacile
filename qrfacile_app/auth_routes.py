@@ -269,6 +269,16 @@ def _reset_password_body(token: str, err: str = "") -> str:
     """
 
 
+def default_landing(role: str) -> str:
+    """First page after login when no safe ``next`` was given."""
+    role = (role or "").lower().strip()
+    if role == "winery":
+        return "/app/dashboard"
+    if role == "business":
+        return "/app/link"
+    return "/app/start"
+
+
 @router.get("/forgot-password", response_class=HTMLResponse)
 def forgot_password_get(request: Request, msg: str = "", err: str = ""):
     actions = top_actions(
@@ -760,7 +770,7 @@ def login_post(
     if not next_url.startswith("/") or next_url.startswith("//"):
         # Wineries go straight to their wines; the module chooser is for
         # studios and admins (and stays reachable from the "Menu" link).
-        next_url = "/app/dashboard" if (u.get("role") or "").lower().strip() == "winery" else "/app/start"
+        next_url = default_landing(u.get("role") or "")
 
     if (
         (u.get("role") or "").lower().strip() != "admin"

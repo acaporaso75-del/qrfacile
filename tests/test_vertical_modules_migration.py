@@ -60,7 +60,7 @@ def test_vertical_modules_migration_is_idempotent_and_keeps_beta_codes():
         assert (module, level, kind) == ("link", "none", "link")
         assert url_top == "https://example.com" and url_content == "https://example.com"
 
-        conn.execute("INSERT INTO users (email, role) VALUES ('b@example.test', 'business')")
+        conn.execute("INSERT INTO users (email, role, display_name) VALUES ('b@example.test', 'business', 'Bar')")
         with pytest.raises(psycopg.errors.CheckViolation):
             conn.execute("INSERT INTO users (email, role) VALUES ('c@example.test', 'xyz')")
         with pytest.raises(psycopg.errors.CheckViolation):
