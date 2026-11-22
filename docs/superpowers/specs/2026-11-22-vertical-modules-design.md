@@ -1,6 +1,6 @@
 # QRFacile — moduli verticali: base comune e QRFacile Link (`/d`)
 
-Data: 2026-11-22. Stato: design da approvare. Primo modulo: **QRFacile Link**.
+Data: 2026-11-22. Stato: design in approvazione. Primo modulo: **QRFacile Link**.
 
 ## Perché
 
@@ -86,6 +86,9 @@ rallentare il sito già funzionante.
   Ristorante, e così via.
 - I moduli si **attivano uno alla volta**, senza bloccare il sito funzionante;
   si può far lavorare anche Codex (collaudi su staging).
+- **Vendita online a tutti**: aziende e professionisti con Partita IVA,
+  privati e associazioni con codice fiscale, clienti UE ed extra-UE.
+- **Prezzo "QR Link 10": €29 IVA inclusa** (imponibile €23,77 con IVA 22%).
 
 ## Design
 
@@ -96,9 +99,18 @@ rallentare il sito già funzionante.
   credito, stato di attivazione. Un modulo **spento** non compare nel menu né
   nel listino, le sue pagine di gestione rispondono 404 e il suo indirizzo
   pubblico serve solo i QR già esistenti (mai rompere un QR stampato).
-- **Attivazione**: variabile d'ambiente `QRFACILE_MODULES_ENABLED`
-  (es. `link`); in staging si attivano per i collaudi, in produzione quando il
-  titolare decide. Nessun deploy necessario per spegnere un modulo.
+- **Attivazione** (scelta del costruttore, rivista dopo il controllo del
+  revisore): interruttori salvati nel database e gestiti dall'area Admin
+  (`/admin/modules`), con registro di chi li ha cambiati e quando; nessun
+  riavvio né deploy per accendere o spegnere un modulo o le sue vendite.
+  In staging si attivano per i collaudi, in produzione quando decide il titolare.
+- **Il beta QR Link attuale** (pagine `/app/new-external`, `/app/external/<id>`,
+  pacchetto `generic_10`) resta **esattamente com'è** finché Link è spento;
+  quando si accende, le vecchie pagine reindirizzano a `/app/link/...` e i QR
+  migrati compaiono nella nuova dashboard.
+- **Proprietà**: ogni QR Link appartiene all'account che lo crea
+  (`owner_user_id`), come oggi; i 3 gratuiti valgono per account; uno studio
+  crea QR Link per sé, non per conto delle cantine clienti (estensione futura).
 - **QR dei moduli**: si riusa `qr_items` (slug univoco già garantito,
   proprietario, stato). Nuova colonna `module` (es. `link`) e il contenuto
   nella colonna `payload` (JSON versionato per tipo). I QR beta
@@ -125,7 +137,30 @@ rallentare il sito già funzionante.
 - **Crediti e pagamenti**: tipo di credito `generic` già esistente; 3 QR
   gratuiti per account, poi 1 credito per QR; nessun credito per cambiare tipo
   o contenuto. Acquisto con il checkout PayPal esistente e passaggio a Danea
-  come per gli altri ordini (snapshot fiscale richiesto, come per Wine).
+  con snapshot fiscale congelato nell'ordine, come per Wine.
+- **Profilo di fatturazione per utente** (nuova tabella `billing_profiles`,
+  usata da `business` e `studio`; le cantine continuano a usare `wineries`):
+  tipo cliente (azienda/professionista con P.IVA, privato, associazione/ente),
+  paese, denominazione o nome e cognome, P.IVA e/o codice fiscale, indirizzo,
+  SDI o PEC per l'Italia, email per le fatture. Richiesto al primo acquisto.
+- **Trattamento IVA del pacchetto €29 IVA inclusa** (decisione del titolare;
+  la tabella va **confermata dal commercialista prima dell'attivazione estero**):
+
+  | Cliente | IVA | Totale | Fattura Easyfatt-Xml |
+  |---|---|---|---|
+  | Italia (P.IVA, codice fiscale, enti) | 22% inclusa | €29,00 | SDI/PEC o codice destinatario `0000000` per privati, codice fiscale |
+  | UE privato | 22% italiana sotto la soglia OSS di €10.000/anno; oltre, aliquota del paese (configurabile) | €29,00 | privato estero, codice destinatario `XXXXXXX` |
+  | UE azienda con P.IVA valida (verifica VIES) | non imponibile, inversione contabile | €23,77 | dicitura di inversione contabile, `XXXXXXX` |
+  | Extra-UE | fuori campo IVA | €23,77 | fuori campo, `XXXXXXX` |
+
+  Il calcolo è in una sola funzione con test per ogni riga; codici IVA e
+  diciture Easyfatt per i casi esteri vengono da una tabella di configurazione
+  da validare con il commercialista. Lo snapshot dell'ordine conserva categoria,
+  aliquota, base e motivo dell'esenzione.
+- **Due interruttori di vendita**: `link_sales_it` (Italia, attivabile con il
+  modulo) e `link_sales_foreign` (UE ed extra-UE, attivabile solo dopo l'ok del
+  commercialista). Quando l'estero è spento, chi non è in Italia vede
+  "Richiedi un preventivo".
 - **Export**: riuso delle funzioni di `export_qr_ui` (PNG, SVG, PDF A4) con
   l'indirizzo `/d/<slug>`.
 
@@ -163,6 +198,19 @@ rallentare il sito già funzionante.
   idempotente, con verifica dei conteggi.
 - `/e/<slug>` continua a inoltrare a `/d/<slug>` i QR Link.
 - `scripts/check_historic_qr.py` esteso ai QR dei moduli (`/d`).
+
+### Testi legali
+
+- Bozza preparata dal costruttore e approvata dal titolare prima
+  dell'attivazione: clausola nei Termini sui contenuti caricati dai clienti
+  (PDF, mini-pagine, link: responsabilità del cliente, divieto di contenuti
+  illeciti o ingannevoli, rimozione su segnalazione) e paragrafo nella Privacy
+  sulle statistiche aggregate trattate per conto del cliente.
+- Nuove versioni dei documenti legali nel sistema versionato esistente;
+  pubblicazione al momento dell'attivazione di Link; i nuovi account le
+  accettano alla registrazione, gli account esistenti al primo uso di Link.
+- Segnalazione abusi: link "Segnala contenuto" sulle mini-pagine e sulla
+  pagina "QR non attivo", con coda nell'area Admin.
 
 ### Rilascio "spento" e attivazione
 
