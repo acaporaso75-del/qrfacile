@@ -57,7 +57,8 @@ def test_run_reports_collisions_nested_paths_and_broken_pages(monkeypatch):
     }
     assert [row["it"] for row in report["wine"]] == ["ok", "shown_as_not_published"]
     assert report["summary"] == {
-        "legacy_total": 3, "legacy_broken": 2, "wine_total": 2, "wine_broken": 1, "ok": False,
+        "legacy_total": 3, "legacy_broken": 2, "wine_total": 2, "wine_broken": 1,
+        "wine_data_to_complete": 0, "ok": False,
     }
 
 
@@ -90,3 +91,20 @@ def test_load_slugs_reads_only_active_pages_and_published_wines():
     legacy, wines = chk.load_slugs(url)
     assert [row["slug"] for row in legacy] == ["vecchio"]
     assert [row["slug"] for row in wines] == ["AAA"]
+
+
+def test_page_with_continuity_notice_works_but_is_listed_to_complete(monkeypatch):
+    body = "<h1>Vino</h1> Alcune informazioni di questa etichetta sono in aggiornamento da parte del produttore."
+    assert chk.classify_wine_page(200, body) == "ok_data_being_updated"
+    monkeypatch.setattr(chk, "_fetch", lambda url, timeout: (200, body))
+    report = chk.run("http://x", 5, legacy=[], wines=[{"slug": "DBN7MEVG", "wine_id": 1}], app_segments=set())
+    assert report["summary"]["ok"] is True
+    assert report["summary"]["wine_data_to_complete"] == 1
+
+
+def test_published_qr_is_never_hidden_by_the_stricter_gate():
+    source = (ROOT / "qrfacile_app" / "public.py").read_text(encoding="utf-8")
+    assert 'continuity_notice = not preview and not _public_gate_allows(status, public_missing, compliance_report)' in source
+    assert 'if continuity_notice and status != "attiva":' in source
+    assert "in aggiornamento da parte del produttore" in source
+    assert "being updated by the producer" in source

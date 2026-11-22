@@ -34,6 +34,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 NOT_PUBLISHED_MARKERS = ("Etichetta non ancora pubblicata", "Label not yet published")
+# Continuity notice: the page works for consumers but data is missing and the
+# winery should complete it. Reported, not counted as broken.
+BEING_UPDATED_MARKERS = ("in aggiornamento da parte del produttore", "being updated by the producer")
 LEGACY_NOT_FOUND_MARKERS = ("Legacy page not found", "Contenuto legacy importato non disponibile")
 
 
@@ -53,6 +56,8 @@ def classify_wine_page(status: int, body: str) -> str:
         return f"http_{status}"
     if any(marker in body for marker in NOT_PUBLISHED_MARKERS):
         return "shown_as_not_published"
+    if any(marker in body for marker in BEING_UPDATED_MARKERS):
+        return "ok_data_being_updated"
     return "ok"
 
 
@@ -133,12 +138,15 @@ def run(base_url: str, timeout: float, legacy: list[dict], wines: list[dict], ap
             outcomes[lang] = classify_wine_page(*_fetch(f"{base}/e/{slug}?lang={lang}", timeout))
         results["wine"].append({"slug": slug, "wine_id": row.get("wine_id"), **outcomes})
     broken_legacy = [r for r in results["legacy"] if r["outcome"] != "ok"]
-    broken_wine = [r for r in results["wine"] if r["it"] != "ok" or r["en"] != "ok"]
+    working = {"ok", "ok_data_being_updated"}
+    broken_wine = [r for r in results["wine"] if r["it"] not in working or r["en"] not in working]
+    to_complete = [r for r in results["wine"] if "ok_data_being_updated" in (r["it"], r["en"])]
     results["summary"] = {
         "legacy_total": len(results["legacy"]),
         "legacy_broken": len(broken_legacy),
         "wine_total": len(results["wine"]),
         "wine_broken": len(broken_wine),
+        "wine_data_to_complete": len(to_complete),
         "ok": not broken_legacy and not broken_wine,
     }
     return results
@@ -162,13 +170,16 @@ def main(argv: list[str] | None = None) -> int:
     summary = report["summary"]
     for family in ("legacy", "wine"):
         for row in report[family]:
-            bad = row.get("outcome", "ok") != "ok" or row.get("it", "ok") != "ok" or row.get("en", "ok") != "ok"
-            if bad:
+            outcomes = {row.get("outcome", "ok"), row.get("it", "ok"), row.get("en", "ok")}
+            if outcomes - {"ok", "ok_data_being_updated"}:
                 print(f"BROKEN {family} {json.dumps(row, ensure_ascii=False)}")
+            elif "ok_data_being_updated" in outcomes:
+                print(f"TO_COMPLETE {family} {json.dumps(row, ensure_ascii=False)}")
     print(
         ("HISTORIC_QR_OK" if summary["ok"] else "HISTORIC_QR_BROKEN")
         + f" legacy={summary['legacy_total']}/broken={summary['legacy_broken']}"
         + f" wine={summary['wine_total']}/broken={summary['wine_broken']}"
+        + f"/to_complete={summary['wine_data_to_complete']}"
     )
     return 0 if summary["ok"] else 1
 

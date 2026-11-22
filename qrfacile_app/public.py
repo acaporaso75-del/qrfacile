@@ -43,6 +43,8 @@ LOCALES = {
         "no_data": "Nessun dato inserito",
         "active_page": "Pagina attiva",
         "in_completion": "In completamento",
+        "being_updated_title": "Informazioni in aggiornamento",
+        "being_updated_text": "Alcune informazioni di questa etichetta sono in aggiornamento da parte del produttore.",
         "mandatory_data_incomplete": "Dati obbligatori non ancora completi",
         "technical_verification": "Questa pagina è raggiungibile per verifica tecnica. Risultano ancora da completare:",
         "digital_product_info": "Informazioni digitali del prodotto. Pagina destinata alla consultazione dei dati obbligatori del vino.",
@@ -85,6 +87,8 @@ LOCALES = {
         "no_data": "No data entered",
         "active_page": "Active page",
         "in_completion": "In completion",
+        "being_updated_title": "Information being updated",
+        "being_updated_text": "Some information on this label is being updated by the producer.",
         "mandatory_data_incomplete": "Mandatory data not yet complete",
         "technical_verification": "This page is reachable for technical verification. The following data still needs to be completed:",
         "digital_product_info": "Digital product information. Page intended for consultation of mandatory wine data.",
@@ -711,7 +715,14 @@ def _render_label_page(
         "meta": {"extra_ingredients": extra_ing},
     }
     compliance_report = run_explainable_wine_compliance(compliance_payload)
-    if not preview and not _public_gate_allows(status, public_missing, compliance_report):
+    # Continuity for printed QR codes: a page that is published (status
+    # "attiva") is already on bottles, so it is never replaced by an error or
+    # by "Etichetta non ancora pubblicata" when data is missing or the
+    # publication rules became stricter. It shows the data it has plus a
+    # neutral notice; the winery sees what is missing in its dashboard. New
+    # publications still have to pass the full gate in secure_publish_ui.
+    continuity_notice = not preview and not _public_gate_allows(status, public_missing, compliance_report)
+    if continuity_notice and status != "attiva":
         return _not_published_page(slug)
 
     if is_draft:
@@ -833,7 +844,17 @@ def _render_label_page(
           <div class="warningText">Anteprima disponibile dopo il salvataggio. Il QR definitivo non è stato ancora creato.</div></div>
         </section>"""
 
-    if preview and is_incomplete:
+    if continuity_notice:
+        warning_html = f"""
+        <section class="warningBox continuityNotice" role="note">
+          <div class="warningIcon">i</div>
+          <div>
+            <div class="warningTitle">{ui.esc(tr(locale, "being_updated_title"))}</div>
+            <div class="warningText">{ui.esc(tr(locale, "being_updated_text"))}</div>
+          </div>
+        </section>
+        """
+    elif preview and is_incomplete:
         warning_html = f"""
         <section class="warningBox">
           <div class="warningIcon">!</div>
