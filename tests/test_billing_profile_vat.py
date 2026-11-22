@@ -82,7 +82,7 @@ def test_profile_normalization():
     association = normalize_billing_profile({"customer_type": "association", "country": "IT", "name": "Pro Loco", "fiscal_code": "92012345678"})
     assert association["fiscal_code"] == "92012345678"
     foreign = normalize_billing_profile({**DE_COMPANY, "country": "de", "address": "Hauptstr. 1"})
-    assert foreign["country"] == "DE" and foreign["vat_number"] == "DE123456789"
+    assert foreign["country"] == "DE" and foreign["vat_number"] == "DE123456789"  # pragma: allowlist secret
     bad = [
         {**IT_COMPANY, "sdi": "", "pec": ""},
         {**IT_COMPANY, "vat_number": "01234567890"},
