@@ -147,6 +147,22 @@ def _assisted_card(key: str, service: dict, icon: str) -> str:
 
 
 @router.get("/pricing", response_class=HTMLResponse)
+def _link_pricing_section() -> str:
+    from qrfacile_app.modules import switches
+
+    if not switches.is_enabled("link"):
+        return ""
+    return """
+      <section class="card" style="margin-top:24px">
+        <div class="pricingEyebrow">QRFacile Link · per tutte le attività</div>
+        <h2>QR per link, PDF e mini-pagine</h2>
+        <p>I primi 3 QR sono gratuiti. <b>QR Link 10: € 29 IVA inclusa</b> (10 QR in più, senza abbonamento).
+        Il contenuto si cambia quando vuoi, il QR stampato resta lo stesso.</p>
+        <p><a class="btn btn-primary" href="/register-business">Crea un account QRFacile Link</a></p>
+      </section>
+    """
+
+
 def pricing_page(request: Request):
     qr_cards = "".join([
         _qr_pack_card(request, key, pack)
@@ -210,6 +226,7 @@ def pricing_page(request: Request):
       <p>Studi grafici, gestione multi-cantina e grandi volumi:
       <a href="/support">richiedi un preventivo</a>.</p>
       {paypal_checkout_script()}
+      {_link_pricing_section()}
 
       <section class="assistSection">
         <div class="assistIntro">

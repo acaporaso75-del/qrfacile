@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
+from qrfacile_app.modules import switches
 from qrfacile_app.ui_shell import page_public
 
 router = APIRouter()
@@ -8,6 +9,12 @@ router = APIRouter()
 
 @router.get("/", response_class=HTMLResponse)
 def home(request: Request):
+    link_on = switches.is_enabled("link")
+    link_card_open = '<article class="moduleCard active">' if link_on else '<article class="moduleCard">'
+    link_card_status = (
+        '<span class="moduleStatus active">Attivo</span>' if link_on
+        else '<span class="moduleStatus soon">In arrivo</span>'
+    )
     actions = """
     <a class="btn" href="/wine">Etichetta vino</a>
     <a class="btn btn-primary" href="/register-winery">Prova gratis</a>
@@ -89,9 +96,9 @@ def home(request: Request):
           <a class="btn btn-primary" href="/wine">Vai al modulo</a>
         </article>
 
-        <article class="moduleCard">
+        {link_card_open}
           <div class="moduleCardTop">
-            <span class="moduleStatus soon">In arrivo</span>
+            {link_card_status}
             <b>Link Diretto</b>
           </div>
           <p>QR dinamico verso pagine, PDF, cataloghi o link esterni aggiornabili.</p>
@@ -416,6 +423,8 @@ def home(request: Request):
       </style>
     </section>
     """
+
+    body = body.replace("{link_card_open}", link_card_open).replace("{link_card_status}", link_card_status)
 
     return HTMLResponse(page_public(
         title="QRFACILE · Piattaforma QR modulare",
@@ -876,8 +885,40 @@ def wine_home(request: Request):
     ))
 
 
+def _link_home_active() -> HTMLResponse:
+    """/link once the QRFacile Link module is switched on."""
+    body = """
+    <section class="card" style="max-width:980px;margin:0 auto">
+      <p class="pill" style="display:inline-block">Attivo</p>
+      <h1 class="h1">QRFacile Link</h1>
+      <p class="p" style="font-size:18px">Un QR che apre quello che vuoi tu: un sito, un PDF o una
+      piccola pagina con i tuoi contatti. Cambi il contenuto quando vuoi, il QR stampato resta lo stesso.</p>
+      <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));margin-top:18px">
+        <div class="note"><b>Link</b><br>Sito, prenotazioni, Instagram, recensioni.</div>
+        <div class="note"><b>PDF</b><br>Menu, listino, catalogo, istruzioni.</div>
+        <div class="note"><b>Mini-pagina</b><br>Logo, testo e pulsanti: chiama, WhatsApp, mappa.</div>
+      </div>
+      <p class="p" style="margin-top:18px">I primi <b>3 QR sono gratuiti</b>. Poi <b>QR Link 10: € 29 IVA inclusa</b>,
+      10 QR in più, senza abbonamento. Statistiche delle scansioni facoltative e senza dati personali.</p>
+      <div class="row" style="gap:10px;flex-wrap:wrap;margin-top:12px">
+        <a class="btn btn-primary" href="/register-business">Crea il tuo account gratuito</a>
+        <a class="btn" href="/login">Accedi</a>
+        <a class="btn" href="/pricing">Prezzi</a>
+      </div>
+    </section>
+    """
+    return HTMLResponse(page_public(
+        title="QRFACILE Link",
+        subtitle="Link",
+        body_html=body,
+        actions_html='<a class="btn" href="/login">Accedi</a> <a class="btn btn-primary" href="/register-business">Registrati</a>',
+    ))
+
+
 @router.get("/link", response_class=HTMLResponse)
 def link_home(request: Request):
+    if switches.is_enabled("link"):
+        return _link_home_active()
     actions = """
     <a class="btn" href="/#moduli">Torna ai moduli</a>
     <a class="btn" href="/login">Accedi</a>

@@ -108,3 +108,32 @@ def test_published_qr_is_never_hidden_by_the_stricter_gate():
     assert 'if continuity_notice and status != "attiva":' in source
     assert "in aggiornamento da parte del produttore" in source
     assert "being updated by the producer" in source
+
+
+def test_historic_check_includes_link_codes(monkeypatch):
+    statuses = {"http://x/d/LNK1": 302, "http://x/d/LNK2": 200, "http://x/d/LNK3": 404}
+    monkeypatch.setattr(chk, "_fetch_status", lambda url, timeout: statuses.get(url, 0))
+    report = chk.run("http://x", 5, legacy=[], wines=[], app_segments=set(),
+                     links=[{"slug": "LNK1"}, {"slug": "LNK2"}, {"slug": "LNK3"}])
+    assert [row["outcome"] for row in report["link"]] == ["ok", "ok", "http_404"]
+    assert report["summary"]["link_total"] == 3 and report["summary"]["link_broken"] == 1
+    assert report["summary"]["ok"] is False
+    clean = chk.run("http://x", 5, legacy=[], wines=[], app_segments=set(), links=[{"slug": "LNK1"}])
+    assert clean["summary"]["ok"] is True
+
+
+@pytest.mark.integration
+def test_load_link_slugs_reads_active_link_and_beta_rows():
+    url = _database_url()
+    with psycopg.connect(url, autocommit=True) as conn:
+        conn.execute("DROP SCHEMA public CASCADE")
+        conn.execute("CREATE SCHEMA public")
+        conn.execute(
+            """
+            CREATE TABLE qr_items (id serial PRIMARY KEY, slug text, status text, qr_type text, module text);
+            INSERT INTO qr_items (slug, status, qr_type, module) VALUES
+              ('BETA', 'attiva', 'external', NULL), ('NEW', 'attiva', 'external', 'link'),
+              ('DRAFT', 'bozza', 'external', 'link'), ('WINE', 'attiva', 'wine', NULL);
+            """
+        )
+    assert [row["slug"] for row in chk.load_link_slugs(url)] == ["BETA", "NEW"]
