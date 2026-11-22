@@ -121,7 +121,7 @@ Gli altri nove slug problematici sono già `404` nella produzione attuale. Nel
 candidato non diventano pubblici: ricevono invece la pagina esplicita di vino
 non ancora pubblicato perché mancano i campi elencati sopra.
 
-## Esito
+## Esito del candidato `aef63ae`
 
 **FAIL per il go-live senza correzione dati**: i 12 QR legacy restano integri,
 ma `DBN7MEVG`, oggi raggiungibile, verrebbe oscurato dal nuovo gate di
@@ -129,3 +129,55 @@ pubblicazione. Prima del deploy occorre completare la riciclabilità di questo
 vino nel flusso autorizzato e ripetere lo stesso controllo. Gli altri nove slug
 non rappresentano regressioni rispetto a oggi, ma restano contenuti storici da
 completare se devono tornare pubblici.
+
+## Riesecuzione con la regola di continuità `6399968`
+
+Data riesecuzione: 2026-11-22 17:31 CET (`Europe/Rome`).
+
+Il commit `63999685d507063cca907e9d673c885f3cf221e5` introduce la
+continuità per i QR già stampati: se un vino storico attivo non supera ancora
+il gate dei dati obbligatori, la pagina rimane consultabile e mostra un avviso
+che i dati sono in aggiornamento. La condizione è segnalata dal controllo come
+`TO_COMPLETE`, ma non è più classificata come QR rotto.
+
+La prova è stata ripetuta dallo stesso backup produttivo verificato, ripristinato
+in un nuovo database temporaneo isolato. Sono state applicate le migrazioni del
+release gate e `sql/2026_order_invoice_handoff.sql`; il candidato è stato
+avviato con `APP_ENV=staging`, senza SMTP e senza credenziali PayPal, sulla
+porta temporanea `18082`.
+
+Output sintetico:
+
+```text
+HISTORIC_QR_OK legacy=12/broken=0 wine=24/broken=0/to_complete=10
+```
+
+| Famiglia | Totale | Broken | Da completare |
+| --- | ---: | ---: | ---: |
+| pagine legacy WordPress | 12 | 0 | 0 |
+| QR vino `/e/` | 24 | 0 | 10 |
+
+I dieci slug `TO_COMPLETE`, tutti raggiungibili sia in italiano sia in inglese
+con esito `ok_data_being_updated`, sono:
+
+- `WCFC58JM`;
+- `UVBX7HK3`;
+- `8bee926d`;
+- `9743047e`;
+- `P5P3LPGZ`;
+- `CJ3QSBNF`;
+- `GFTSFGKJ`;
+- `JHJUH6ZR`;
+- `TECJ69E5`;
+- `DBN7MEVG`.
+
+Il processo temporaneo è stato fermato, la porta `18082` è risultata chiusa,
+il database temporaneo è stato eliminato e le copie di prova sono state
+rimosse. Nessuna modifica è stata eseguita sulla produzione installata.
+
+### Esito aggiornato
+
+**PASS per la continuità dei QR stampati**: tutti i 12 percorsi legacy e tutti
+i 24 percorsi vino sopravvivono al candidato `6399968` senza `broken`. I dieci
+vini elencati restano da completare dal produttore, ma non vengono più oscurati
+durante tale completamento.
