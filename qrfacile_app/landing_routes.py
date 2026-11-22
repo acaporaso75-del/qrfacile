@@ -7,6 +7,73 @@ from qrfacile_app.ui_shell import page_public
 router = APIRouter()
 
 
+_CHOOSER_SOON = '<span class="chooserSoon">In arrivo</span>'
+
+
+def _chooser_card(icon: str, title: str, text: str, footer: str, *, big: bool, active: bool) -> str:
+    classes = "chooserCard" + (" big" if big else "") + (" active" if active else "")
+    return (
+        f'<article class="{classes}"><div class="chooserIcon" aria-hidden="true">{icon}</div>'
+        f'<h3>{title}</h3><p>{text}</p><div class="chooserFooter">{footer}</div></article>'
+    )
+
+
+def _module_chooser(link_on: bool) -> str:
+    """'Cosa vuoi fare?' tiles at the top of the home: one per vertical module."""
+    link_footer = (
+        '<span class="chooserFree">3 QR gratis</span>'
+        '<a class="btn btn-primary" href="/register-business">Inizia</a>'
+        if link_on
+        else _CHOOSER_SOON + '<a class="btn" href="/link">Scopri</a>'
+    )
+    big = [
+        _chooser_card("🍷", "Ho una cantina",
+                      "Etichetta digitale del vino: valori nutrizionali, allergeni e riciclo.",
+                      '<span class="chooserFree">3 QR gratis</span>'
+                      '<a class="btn btn-primary" href="/register-winery">Inizia</a>',
+                      big=True, active=True),
+        _chooser_card("🔗", "Ho un'attività",
+                      "Un QR verso il tuo sito, un PDF o una mini-pagina con i tuoi contatti.",
+                      link_footer, big=True, active=link_on),
+        _chooser_card("🍽️", "Ho un ristorante", "Menu digitale sempre aggiornato, anche in più lingue.",
+                      _CHOOSER_SOON + '<a class="btn" href="/menu">Scopri</a>', big=True, active=False),
+    ]
+    small = [
+        _chooser_card("🎓", "Quiz e formazione", "Domande e percorsi da un QR.",
+                      _CHOOSER_SOON + '<a class="btn" href="/quiz">Scopri</a>', big=False, active=False),
+        _chooser_card("📦", "Magazzino", "Schede e movimenti di prodotti e attrezzature.",
+                      _CHOOSER_SOON + '<a class="btn" href="/warehouse">Scopri</a>', big=False, active=False),
+        _chooser_card("🎟️", "Eventi", "Programmi, iscrizioni e votazioni.",
+                      _CHOOSER_SOON + '<a class="btn" href="/events">Scopri</a>', big=False, active=False),
+    ]
+    return f"""
+      <section class="moduleChooser" id="scegli" aria-labelledby="scegli-title">
+        <h2 id="scegli-title">Cosa vuoi fare con il tuo QR?</h2>
+        <p class="chooserLead">Un QR che stampi una volta e aggiorni quando vuoi. Scegli da dove partire.</p>
+        <div class="chooserGrid">{''.join(big)}</div>
+        <div class="chooserGrid small">{''.join(small)}</div>
+        <style>
+          .moduleChooser {{ max-width:1180px; margin:28px auto; padding:0 4px; }}
+          .moduleChooser h2 {{ font-size:clamp(26px,4vw,36px); margin:0 0 6px; text-align:center; }}
+          .chooserLead {{ text-align:center; color:#334155; margin:0 0 20px; }}
+          .chooserGrid {{ display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); }}
+          .chooserGrid.small {{ margin-top:16px; grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr)); }}
+          .chooserCard {{ background:#fff; border:1px solid rgba(15,23,42,.12); border-radius:22px; padding:20px;
+            display:flex; flex-direction:column; gap:8px; box-shadow:0 12px 30px rgba(15,23,42,.06); }}
+          .chooserCard.active {{ border-color:#0f766e; box-shadow:0 16px 40px rgba(15,118,110,.14); }}
+          .chooserCard h3 {{ margin:0; font-size:21px; }}
+          .chooserGrid.small .chooserCard h3 {{ font-size:17px; }}
+          .chooserCard p {{ margin:0; color:#334155; line-height:1.5; flex:1; }}
+          .chooserIcon {{ font-size:34px; line-height:1; }}
+          .chooserGrid.small .chooserIcon {{ font-size:26px; }}
+          .chooserFooter {{ display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-top:6px; }}
+          .chooserSoon {{ font-weight:800; color:#92400e; background:#fef3c7; border-radius:999px; padding:4px 10px; font-size:13px; }}
+          .chooserFree {{ font-weight:800; color:#0f766e; font-size:14px; }}
+        </style>
+      </section>
+    """
+
+
 @router.get("/", response_class=HTMLResponse)
 def home(request: Request):
     link_on = switches.is_enabled("link")
@@ -33,7 +100,7 @@ def home(request: Request):
             e aggiorni quando vuoi. Nessun abbonamento: 3 QR vino gratuiti per iniziare.
           </p>
           <div class="moduleHeroActions">
-            <a class="btn btn-primary" href="/register-winery">Inizia gratis, 3 QR inclusi</a>
+            <a class="btn btn-primary" href="#scegli">Scegli il tuo QR, 3 gratis</a>
             <a class="btn" href="/wine">Come funziona</a>
           </div>
           <div class="moduleHeroBadges">
@@ -44,6 +111,8 @@ def home(request: Request):
           </div>
         </div>
       </div>
+
+{module_chooser}
 
       <section class="moduleIntro">
         <div>
@@ -424,7 +493,11 @@ def home(request: Request):
     </section>
     """
 
-    body = body.replace("{link_card_open}", link_card_open).replace("{link_card_status}", link_card_status)
+    body = (
+        body.replace("{link_card_open}", link_card_open)
+        .replace("{link_card_status}", link_card_status)
+        .replace("{module_chooser}", _module_chooser(link_on))
+    )
 
     return HTMLResponse(page_public(
         title="QRFACILE · Piattaforma QR modulare",

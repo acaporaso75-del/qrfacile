@@ -44,3 +44,28 @@ def test_home_link_card_active_only_when_on(monkeypatch):
     on = landing_routes.home(_request()).body.decode()
     card_on = on.split("<b>Link Diretto</b>")[0].rsplit('<article class="moduleCard', 1)[1]
     assert "Attivo" in card_on and "In arrivo" not in card_on
+
+
+def _chooser(html: str) -> str:
+    return html.split('id="scegli"', 1)[1].split("</section>", 1)[0]
+
+
+def test_home_starts_with_module_chooser(monkeypatch):
+    monkeypatch.setattr(switches, "is_enabled", lambda key: False)
+    html = landing_routes.home(_request()).body.decode()
+    assert html.index('id="scegli"') < html.index("moduleIntro")
+    chooser = _chooser(html)
+    assert "Cosa vuoi fare con il tuo QR?" in chooser
+    for title in ("Ho una cantina", "Ho un'attività", "Ho un ristorante", "Quiz e formazione", "Magazzino", "Eventi"):
+        assert title in chooser
+    assert 'href="/register-winery"' in chooser
+    assert 'href="/register-business"' not in chooser
+    assert chooser.count("In arrivo") == 5
+    assert 'href="#scegli"' in html
+
+
+def test_home_chooser_link_card_follows_switch(monkeypatch):
+    monkeypatch.setattr(switches, "is_enabled", lambda key: True)
+    chooser = _chooser(landing_routes.home(_request()).body.decode())
+    assert 'href="/register-business"' in chooser
+    assert chooser.count("In arrivo") == 4
