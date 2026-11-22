@@ -216,6 +216,13 @@ def _credit_value(credits: dict | None, key: str) -> str:
     return str(int(credits.get(key, 0) or 0))
 
 
+def _link_home() -> str:
+    """QR Link entry: the module area when switched on, the beta page otherwise."""
+    from qrfacile_app.modules import switches
+
+    return "/app/link" if switches.is_enabled("link") else "/app/new-external"
+
+
 def _sidebar(role: str, user_email: str, credits: dict | None) -> str:
     role = (role or "").lower().strip()
     # Several pages pass None or {} instead of the balance: showing 0 made
@@ -228,7 +235,7 @@ def _sidebar(role: str, user_email: str, credits: dict | None) -> str:
         ("/app/dashboard", "📋", "Dashboard", "Etichette e lotti"),
         ("/app/new-wine-master", "🍷", "Nuova etichetta", "Prodotto"),
         ("/app/new-wine", "🍾", "Nuovo lotto", "Usa 1 QR vino"),
-        ("/app/new-external", "🔗", "QR Link", "3 gratuiti"),
+        (_link_home(), "🔗", "QR Link", "3 gratuiti"),
         ("/app/billing", "💳", "Crediti", "Pacchetti"),
     ]
 

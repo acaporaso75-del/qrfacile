@@ -10,6 +10,7 @@ from qrfacile_app.db import pg
 from qrfacile_app.csrf_core import csrf_input
 from qrfacile_app.ui_shell import esc, page
 from qrfacile_app.util import new_slug
+from qrfacile_app.modules.switches import is_enabled
 
 router = APIRouter()
 
@@ -40,6 +41,8 @@ def _balances(cur, user_id: int) -> dict:
 @router.get("/app/new-external", response_class=HTMLResponse)
 def new_external_get(request: Request, msg: str = "", err: str = ""):
     u = require_any_role(request, ("winery", "studio", "admin"))
+    if is_enabled("link"):
+        return RedirectResponse("/app/link/new", status_code=303)
     uid = int(u["id"])
     email = (u.get("email") or "").strip()
     role = (u.get("role") or "").lower().strip()
@@ -166,6 +169,8 @@ def new_external_create(request: Request, target_url: str = Form(...)):
 @router.get("/app/external/{qr_id}", response_class=HTMLResponse)
 def external_detail(request: Request, qr_id: int, msg: str = "", err: str = ""):
     u = require_any_role(request, ("winery", "studio", "admin"))
+    if is_enabled("link"):
+        return RedirectResponse(f"/app/link/{int(qr_id)}", status_code=303)
     uid = int(u["id"])
     email = (u.get("email") or "").strip()
     role = (u.get("role") or "").lower().strip()
