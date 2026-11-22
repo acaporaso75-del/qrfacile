@@ -38,6 +38,13 @@ def area(monkeypatch):
               ref_table text, ref_id bigint, created_at bigint
             );
             CREATE VIEW available_credit_ledger AS SELECT * FROM credit_ledger;
+            CREATE TABLE legal_acceptances (
+              id bigserial PRIMARY KEY, user_id bigint, document_key text NOT NULL, document_version text NOT NULL,
+              accepted_at timestamptz NOT NULL DEFAULT now(), ip_address inet, user_agent text,
+              evidence jsonb NOT NULL DEFAULT '{}'::jsonb, UNIQUE (user_id, document_key, document_version)
+            );
+            INSERT INTO legal_acceptances (user_id, document_key, document_version)
+            VALUES (1, 'terms', '2026-12-link'), (1, 'privacy', '2026-12-link');
             """
         )
         conn.execute(MIGRATION.read_text(encoding="utf-8"))
@@ -57,7 +64,7 @@ def area(monkeypatch):
             cur = conn.execute(query, params)
             return cur.fetchall() if cur.description else None
 
-    return SimpleNamespace(ui=app_ui, sql=sql, state=state)
+    return SimpleNamespace(ui=app_ui, sql=sql, state=state, url=url)
 
 
 def _request(form=None):

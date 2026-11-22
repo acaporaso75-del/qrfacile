@@ -18,6 +18,7 @@ from psycopg.rows import dict_row
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.csrf_core import csrf_input, require_csrf_or_same_origin
 from qrfacile_app.db import pg
+from qrfacile_app.legal_core import LINK_TERMS_SUMMARY, has_link_acceptance, record_link_acceptance
 from qrfacile_app.modules import switches
 from qrfacile_app.modules.content_types import CONTENT_TYPES, ContentError
 from qrfacile_app.modules.public import _content
@@ -45,6 +46,31 @@ def _user(request: Request) -> dict:
     user = require_any_role(request, ROLES)
     switches.require_module("link", user)
     return user
+
+
+def _accepted(cur, user: dict) -> bool:
+    if (user.get("role") or "").lower() == "admin":
+        return True
+    return has_link_acceptance(cur, int(user["id"]))
+
+
+def _acceptance_form(request: Request) -> str:
+    return f"""
+    <section class="card">
+      <h2 class="h2">Prima di iniziare</h2>
+      <p class="p">{esc(LINK_TERMS_SUMMARY)}</p>
+      <p class="p">Testo completo: <a href="/terms" target="_blank" rel="noopener">Termini di servizio</a> e
+      <a href="/privacy" target="_blank" rel="noopener">informativa privacy</a>.</p>
+      <form method="post" action="/app/link/accept" style="display:grid;gap:12px">
+        {csrf_input(request)}
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <input type="checkbox" id="link-accept" name="accept" value="yes" required style="margin-top:4px">
+          <label for="link-accept">Accetto le condizioni d'uso di QRFacile Link e ho letto come vengono trattate le statistiche.</label>
+        </div>
+        <button class="btn btn-primary" type="submit">Accetto e continuo</button>
+      </form>
+    </section>
+    """
 
 
 def _now() -> int:
@@ -105,6 +131,8 @@ def link_list(request: Request, msg: str = "", err: str = ""):
     user = _user(request)
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
+            if not _accepted(cur, user):
+                return _render(request, user, "I miei QR", _acceptance_form(request), msg, err)
             cur.execute(
                 """
                 SELECT q.id, q.title, q.status, q.payload, to_jsonb(q)->>'stats_level' AS stats_level,
@@ -160,6 +188,10 @@ def link_list(request: Request, msg: str = "", err: str = ""):
 @router.get("/app/link/new", response_class=HTMLResponse)
 def link_new_get(request: Request, err: str = ""):
     user = _user(request)
+    with pg() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            if not _accepted(cur, user):
+                return RedirectResponse("/app/link", status_code=303)
     options = "".join(
         f"""
         <div style="display:flex;gap:10px;align-items:flex-start;margin-top:8px">
@@ -198,6 +230,8 @@ def link_new_post(request: Request, name: str = Form(""), kind: str = Form("link
     ts = _now()
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
+            if not _accepted(cur, user):
+                return RedirectResponse("/app/link", status_code=303)
             # Serialise concurrent creations of the same user (free quota).
             cur.execute("SELECT pg_advisory_xact_lock(hashtext('link-create'), %s)", (uid,))
             cur.execute(
@@ -356,6 +390,8 @@ async def link_content_post(request: Request, qr_id: int):
         return _go(f"/app/link/{int(qr_id)}", err="Tipo di contenuto non disponibile")
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
+            if not _accepted(cur, user):
+                return RedirectResponse("/app/link", status_code=303)
             row = _owned(cur, qr_id, user)
             payload = dict(row["payload"])
             contents = dict(payload.get("content") or {})
@@ -431,3 +467,16 @@ def link_qr_file(request: Request, qr_id: int, fmt: str):
         "Content-Disposition": f'attachment; filename="qrfacile-link-{row["slug"]}.{fmt}"',
         "Cache-Control": "no-store",
     })
+
+
+@router.post("/app/link/accept")
+def link_accept_post(request: Request, accept: str = Form("")):
+    require_csrf_or_same_origin(request)
+    user = _user(request)
+    if accept != "yes":
+        return _go("/app/link", err="Per usare QRFacile Link devi accettare le condizioni.")
+    with pg() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            record_link_acceptance(cur, user_id=int(user["id"]), request=request)
+        conn.commit()
+    return _go("/app/link", msg="Condizioni accettate")
