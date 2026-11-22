@@ -158,3 +158,19 @@ def test_studio_commission_labels_are_in_italian():
     source = (ROOT / "qrfacile_app" / "studio_payout_ui.py").read_text(encoding="utf-8")
     for english in ('pill("Maturing")', 'pill("Available"', 'pill("Requested")', 'pill("Paid")'):
         assert english not in source
+
+
+def test_every_progressbar_has_an_accessible_name():
+    offenders = []
+    for path in sorted((ROOT / "qrfacile_app").glob("*.py")):
+        for match in re.finditer(r"<[^>]*role=['\"]progressbar['\"][^>]*>", path.read_text(encoding="utf-8")):
+            if "aria-label" not in match.group(0):
+                offenders.append(f"{path.name}: {match.group(0)[:80]}")
+    assert offenders == []
+
+
+def test_wine_page_uses_main_qr_status_for_published_state():
+    source = (ROOT / "qrfacile_app" / "wine_hub_ui.py").read_text(encoding="utf-8")
+    assert "qi.status AS qr_status" in source
+    assert 'main_published = str(wine.get("qr_status") or "").strip().lower() == "attiva"' in source
+    assert "is_published = pub_count > 0" not in source

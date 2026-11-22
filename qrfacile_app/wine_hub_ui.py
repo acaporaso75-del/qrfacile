@@ -73,6 +73,7 @@ def _load_wine(cur, wine_id: int) -> dict:
           qw.lot,
           qw.updated_at,
           qi.slug,
+          qi.status AS qr_status,
           w.name AS winery_name,
           w.owner_user_id
         FROM qr_wines qw
@@ -755,7 +756,11 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
             label_ids = [int(row["label_id"]) for row in labels]
             management = _label_management_map(cur, label_ids)
             connected_studios = _connected_studios(cur, int(wine["winery_id"])) if role in ("winery", "admin") else []
-            workflow = _workflow_snapshot(cur, wine, assets, pub_count > 0)
+            # The wine is published when its main QR page is active (what
+            # /e/<slug>, the dashboard and the publish button use); extra
+            # public labels are counted separately as "Pubbliche".
+            main_published = str(wine.get("qr_status") or "").strip().lower() == "attiva"
+            workflow = _workflow_snapshot(cur, wine, assets, main_published)
 
     app_base = getattr(request.app.state, "app_base_url", "").rstrip("/")
 
@@ -768,7 +773,7 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
     slug = (wine.get("slug") or "").strip()
     pub_url = _public_url(app_base, slug) if slug else ""
 
-    is_published = pub_count > 0
+    is_published = workflow["state"] == "Pubblicata"
     status_badge = pill("Pubblicato", "green") if is_published else pill("Bozza", "muted")
 
     actions = (

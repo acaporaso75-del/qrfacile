@@ -68,7 +68,7 @@ def _compact_compliance_html(report: dict, wine_id: int) -> str:
         <div class='wineComplianceScore'>
           <span>Completezza</span>
           <b>{score}<small>/100</small></b>
-          <div class='wineComplianceBar' role='progressbar' aria-valuemin='0' aria-valuemax='100' aria-valuenow='{score}'>
+          <div class='wineComplianceBar' role='progressbar' aria-label='Completezza dei dati obbligatori' aria-valuemin='0' aria-valuemax='100' aria-valuenow='{score}'>
             <i style='width:{max(0, min(score, 100))}%'></i>
           </div>
         </div>
