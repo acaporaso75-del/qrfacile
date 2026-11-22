@@ -80,6 +80,25 @@ def normalize_billing_profile(data: Mapping[str, str]) -> dict:
     return profile
 
 
+def billing_profile_from_winery(winery: Mapping[str, object]) -> dict | None:
+    """Billing profile built from a winery's fiscal profile (Italian company)."""
+    if not winery or not str(winery.get("vat") or "").strip():
+        return None
+    return {
+        "customer_type": "company",
+        "country": str(winery.get("billing_country") or "IT"),
+        "name": str(winery.get("name") or ""),
+        "vat_number": str(winery.get("vat") or ""),
+        "sdi": str(winery.get("sdi") or ""),
+        "pec": str(winery.get("pec") or ""),
+        "address": str(winery.get("billing_address") or ""),
+        "postcode": str(winery.get("billing_cap") or ""),
+        "city": str(winery.get("city") or ""),
+        "province": str(winery.get("province") or ""),
+        "vies_valid": None,
+    }
+
+
 def vies_check(country: str, vat_number: str, *, timeout: float = 8.0) -> bool | None:
     """True/False from the EU VIES service; None when it cannot be reached."""
     country = (country or "").upper()

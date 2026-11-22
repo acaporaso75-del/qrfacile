@@ -242,6 +242,7 @@ def _sidebar(role: str, user_email: str, credits: dict | None) -> str:
     if role == "business":
         # QRFacile Link customers: no wine entries at all.
         nav = [
+            ("/app/start", "🧭", "I miei moduli", "Scegli o attiva un modulo"),
             ("/app/link", "🔗", "I miei QR", "Link, PDF, mini-pagine"),
             ("/app/billing", "💳", "Crediti", "Pacchetti QR Link"),
             ("/app/billing-profile", "🧾", "Dati di fatturazione", "Per la fattura"),

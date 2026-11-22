@@ -269,13 +269,21 @@ def _reset_password_body(token: str, err: str = "") -> str:
     """
 
 
-def default_landing(role: str) -> str:
-    """First page after login when no safe ``next`` was given."""
+MODULE_HOMES = {"wine": "/app/dashboard", "link": "/app/link"}
+
+
+def default_landing(role: str, last_module: str | None = None) -> str:
+    """First page after login when no safe ``next`` was given.
+
+    The module used last wins; on the very first access a new business
+    account chooses on /app/start, while existing wineries keep landing on
+    their wines.
+    """
+    if (last_module or "") in MODULE_HOMES:
+        return MODULE_HOMES[last_module]
     role = (role or "").lower().strip()
     if role == "winery":
         return "/app/dashboard"
-    if role == "business":
-        return "/app/link"
     return "/app/start"
 
 
@@ -736,7 +744,9 @@ def login_post(
                 return login_get(request, err="Credenziali non valide", next=next)
 
             cur.execute(
-                """SELECT id, email, pass_hash, role, email_verified, email_verification_required
+                # to_jsonb: works before the vertical-modules migration adds last_module.
+                """SELECT id, email, pass_hash, role, email_verified, email_verification_required,
+                          to_jsonb(users)->>'last_module' AS last_module
                    FROM users WHERE lower(email)=lower(%s) LIMIT 1""",
                 (email,),
             )
@@ -770,7 +780,7 @@ def login_post(
     if not next_url.startswith("/") or next_url.startswith("//"):
         # Wineries go straight to their wines; the module chooser is for
         # studios and admins (and stays reachable from the "Menu" link).
-        next_url = default_landing(u.get("role") or "")
+        next_url = default_landing(u.get("role") or "", u.get("last_module"))
 
     if (
         (u.get("role") or "").lower().strip() != "admin"

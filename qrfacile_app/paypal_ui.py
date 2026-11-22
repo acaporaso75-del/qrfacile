@@ -21,7 +21,11 @@ from qrfacile_app.annual_packages import annual_quote, grant_annual_units, load_
 from qrfacile_app.fiscal_profile import normalized_italian_fiscal_profile
 from qrfacile_app.services.invoice_handoff import handoff_after_payment
 from qrfacile_app.modules.switches import is_enabled
-from qrfacile_app.services.billing_profile import load_billing_profile, normalize_billing_profile
+from qrfacile_app.services.billing_profile import (
+    billing_profile_from_winery,
+    load_billing_profile,
+    normalize_billing_profile,
+)
 from qrfacile_app.services.vat import link_quote
 
 from qrfacile_app.pricing_config import (
@@ -544,6 +548,10 @@ def paypal_start(
             total_cents = int(data['amount_cents'])
             if pack == LINK_PACK_KEY and is_enabled("link_sales_it"):
                 stored = load_billing_profile(cur, uid)
+                if not stored and role == "winery":
+                    # One account, one fiscal identity: reuse the winery's profile.
+                    cur.execute("SELECT to_jsonb(w) AS profile FROM wineries w WHERE owner_user_id=%s LIMIT 1", (uid,))
+                    stored = billing_profile_from_winery((cur.fetchone() or {}).get("profile") or {})
                 try:
                     if not stored:
                         raise HTTPException(422, "Profilo di fatturazione mancante")

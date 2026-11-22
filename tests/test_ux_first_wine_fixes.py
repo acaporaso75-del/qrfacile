@@ -103,7 +103,7 @@ def test_winery_lands_on_dashboard_after_login():
     source = (ROOT / "qrfacile_app" / "auth_routes.py").read_text(encoding="utf-8")
     from qrfacile_app.auth_routes import default_landing
 
-    assert 'next_url = default_landing(u.get("role") or "")' in source
+    assert 'next_url = default_landing(u.get("role") or "", u.get("last_module"))' in source
     assert default_landing("winery") == "/app/dashboard"
     assert "Ti abbiamo inviato un’email" in source
     assert "Ora puoi accedere.\"" not in source.split("created == \"1\"")[1].split("elif")[0]

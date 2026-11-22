@@ -8,6 +8,8 @@ from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, esc
 from qrfacile_app.ui_layout import pill
+from qrfacile_app.modules import switches
+from qrfacile_app.modules.account import modules_for, remember_module
 
 router = APIRouter()
 
@@ -168,7 +170,7 @@ def _tile(
 
 @router.get("/app/start", response_class=HTMLResponse)
 def start(request: Request, msg: str = "", err: str = ""):
-    u = require_any_role(request, ("winery", "studio", "admin"))
+    u = require_any_role(request, ("winery", "studio", "admin", "business"))
     role = (u.get("role") or "").strip().lower()
     uid = int(u["id"])
 
@@ -181,48 +183,75 @@ def start(request: Request, msg: str = "", err: str = ""):
     except Exception:
         pass
 
+    owned = modules_for(u)
+    link_on = switches.is_enabled("link")
+
     actions = ""
-    actions += pill(f"QR vino disponibili: {balances.get('wine', 0)}", "green")
-    actions += " "
+    if owned["wine"]:
+        actions += pill(f"QR vino disponibili: {balances.get('wine', 0)}", "green")
+        actions += " "
     actions += top_actions(
         ("/app/billing", "Crediti"),
-        ("/app/dashboard", "Dashboard"),
+        *((("/app/dashboard", "Dashboard"),) if owned["wine"] else ()),
         ("/logout", "Logout"),
     )
 
     tiles = []
 
-    tiles.append(_tile(
-        "dashboard",
-        "Wine Compliance",
-        "Modulo per etichette digitali vino, compliance, lotti, immagini, pubblicazione ed export QR per la stampa. 10 anni = 1 credito · 25 anni = 2 crediti.",
-        "📋",
-        "Attivo",
-        "Dashboard Wine",
-        "Crediti wine",
-        int(balances.get("wine", 0)),
-    ))
+    if owned["wine"]:
+        tiles.append(_tile(
+            "dashboard",
+            "Wine Compliance",
+            "Modulo per etichette digitali vino, compliance, lotti, immagini, pubblicazione ed export QR per la stampa. 10 anni = 1 credito · 25 anni = 2 crediti.",
+            "📋",
+            "Attivo",
+            "Dashboard Wine",
+            "Crediti wine",
+            int(balances.get("wine", 0)),
+        ))
+    else:
+        tiles.append(_tile(
+            "wine_activate",
+            "Wine · etichette digitali vino",
+            "Valori nutrizionali, ingredienti, allergeni e riciclo in un QR che stampi una volta. 3 QR vino gratuiti per iniziare.",
+            "🍷",
+            "Da attivare",
+            "Attiva Wine",
+        ))
 
-    tiles.append(_tile(
-        "qr_link",
-        "QR Link Diretto",
-        "Modulo tecnico per configurare QR dinamici verso link esterni aggiornabili. Primi 3 QR link gratuiti · dal 4° = 1 credito generic.",
-        "🔗",
-        "Beta tecnica",
-        "Configura QR Link",
-        "Crediti generic",
-        int(balances.get("generic", 0)),
-    ))
+    if link_on:
+        tiles.append(_tile(
+            "link",
+            "QRFacile Link",
+            "Un QR verso sito, PDF, mini-pagina, biglietto da visita, Wi-Fi, recensioni, WhatsApp, galleria o evento. Primi 3 QR gratuiti.",
+            "🔗",
+            "Attivo" if owned["link"] else "Da attivare",
+            "Apri QRFacile Link" if owned["link"] else "Attiva Link",
+            "QR Link",
+            int(balances.get("generic", 0)),
+        ))
+    else:
+        tiles.append(_tile(
+            "qr_link",
+            "QR Link Diretto",
+            "Modulo tecnico per configurare QR dinamici verso link esterni aggiornabili. Primi 3 QR link gratuiti · dal 4° = 1 credito generic.",
+            "🔗",
+            "Beta tecnica",
+            "Configura QR Link",
+            "Crediti generic",
+            int(balances.get("generic", 0)),
+        ))
 
-    tiles.append(_tile(
-        "vcard",
-        "vCard / Biglietto digitale",
-        "Modulo per contatti digitali, biglietti da visita e profili aggiornabili collegati a QR.",
-        "👤",
-        "In arrivo",
-        "In arrivo",
-        disabled=True,
-    ))
+    if not link_on:
+        tiles.append(_tile(
+            "vcard",
+            "vCard / Biglietto digitale",
+            "Modulo per contatti digitali, biglietti da visita e profili aggiornabili collegati a QR.",
+            "👤",
+            "In arrivo",
+            "In arrivo",
+            disabled=True,
+        ))
 
     tiles.append(_tile(
         "menu",
@@ -321,6 +350,7 @@ def start(request: Request, msg: str = "", err: str = ""):
         "winery": "Cantina",
         "studio": "Studio grafico",
         "admin": "Amministratore",
+        "business": "Azienda",
     }.get(role, role or "-")
 
     body = f"""
@@ -497,14 +527,26 @@ def menu_alias():
 @router.post("/app/start/select")
 def select_mode(request: Request, mode: str = Form(...)):
     require_csrf_or_same_origin(request)
-    u = require_any_role(request, ("winery", "studio", "admin"))
+    u = require_any_role(request, ("winery", "studio", "admin", "business"))
     role = (u.get("role") or "").strip().lower()
     mode = (mode or "").strip().lower()
+
+    if mode == "link":
+        remember_module(int(u["id"]), "link")
+        return RedirectResponse("/app/link", status_code=303)
+
+    if mode == "wine_activate":
+        return RedirectResponse("/app/modules/wine/activate", status_code=303)
+
+    if role == "business":
+        # No winery yet: Wine pages need one, so offer the activation instead.
+        return RedirectResponse("/app/start", status_code=303)
 
     if mode in ("admin_stats", "admin_payouts") and role != "admin":
         return RedirectResponse("/app/start?err=Accesso%20admin%20richiesto", status_code=303)
 
     if mode == "dashboard":
+        remember_module(int(u["id"]), "wine")
         return RedirectResponse("/app/dashboard", status_code=303)
 
     if mode == "new_wine":

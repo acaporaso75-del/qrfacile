@@ -104,7 +104,8 @@ def test_register_business_rejects_bad_input(monkeypatch, override, message):
 
 
 def test_business_login_lands_on_link():
-    assert auth_routes.default_landing("business") == "/app/link"
+    assert auth_routes.default_landing("business") == "/app/start"  # chooses on first access
+    assert auth_routes.default_landing("business", "link") == "/app/link"
     assert auth_routes.default_landing("winery") == "/app/dashboard"
     assert auth_routes.default_landing("studio") == "/app/start"
 
@@ -113,7 +114,7 @@ def test_business_sidebar_has_no_wine_entries():
     html = ui_shell._sidebar("business", "bar@example.test", {"wine": 0, "generic": 7})
     for href in ("/app/link", "/app/billing", "/app/billing-profile", "/logout"):
         assert f'href="{href}"' in html
-    for href in ("/app/dashboard", "/app/new-wine", "/app/new-wine-master", "/app/new-external", "/app/start"):
+    for href in ("/app/dashboard", "/app/new-wine", "/app/new-wine-master", "/app/new-external"):
         assert f'href="{href}"' not in html
     assert "QR vino" not in html
     assert ui_shell._role_label("business") == "Azienda"

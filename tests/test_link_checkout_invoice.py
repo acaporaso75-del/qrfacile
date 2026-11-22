@@ -147,3 +147,25 @@ def test_business_accounts_can_buy_only_link_packs(monkeypatch):
         _start("annual_start")
     assert exc.value.status_code == 403
     assert not any(sql.startswith("INSERT INTO orders") for sql, _ in state["queries"])
+
+
+def test_winery_buying_link_reuses_its_fiscal_profile(monkeypatch):
+    state = _install(monkeypatch, switches={"link_sales_it": True}, profile=None, role="winery")
+    state["profile"] = {
+        "name": "Cantina Test srl", "vat": "12345678903", "sdi": "ABC1234", "pec": "",
+        "billing_address": "Via Test 1", "city": "Benevento", "billing_cap": "82100",
+        "province": "BN", "billing_country": "IT",
+    }
+    response = _start()
+    assert response.status_code == 303 and "billing-profile" not in response.headers["location"]
+    snapshot = json.loads(_order_insert(state)[5])
+    assert snapshot["customer"]["name"] == "Cantina Test srl"
+    assert snapshot["customer"]["vat_number"] == "12345678903" and snapshot["customer"]["sdi"] == "ABC1234"
+    assert snapshot["gross_cents"] == 2900
+
+
+def test_winery_with_incomplete_fiscal_profile_goes_to_billing_profile(monkeypatch):
+    state = _install(monkeypatch, switches={"link_sales_it": True}, profile=None, role="winery")
+    state["profile"] = {"name": "Cantina", "vat": "", "billing_country": "IT"}
+    response = _start()
+    assert response.headers["location"].startswith("/app/billing-profile?next=/app/billing")

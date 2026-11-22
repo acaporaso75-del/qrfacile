@@ -22,7 +22,11 @@ produzione.** Segreti mai stampati. Ogni punto: PASS / FAIL con evidenza breve.
 
 ## 2. Switch `link` acceso (da `/admin/modules`)
 - [ ] Home: card "Link Diretto" Attivo; `/link` con CTA "Crea il tuo account gratuito"; `/pricing` con "€ 29 IVA inclusa".
-- [ ] Registrazione `/register-business` → mail di verifica → login → atterra su `/app/link`.
+- [ ] Registrazione `/register-business` → mail di verifica → primo login → atterra su "I miei moduli" (`/app/start`) con Wine "Da attivare" e Link; scelto Link, il login successivo porta diretto a `/app/link`.
+- [ ] Account Azienda → "Attiva Wine" → nome cantina → dashboard vino con 3 QR vino gratuiti; Link resta utilizzabile; ripetere l'attivazione non crea una seconda cantina né altri crediti.
+- [ ] Verificare che `wineries` accetti una riga con solo owner_user_id, name, billing_country, created_at (nessun NOT NULL che lo impedisca).
+- [ ] Cantina esistente: dopo il login continua ad atterrare sulla dashboard vino; da "Menu" apre Link e lo ritrova al login successivo.
+- [ ] Cantina con profilo fiscale completo che compra QR Link 10: nessuna richiesta di dati fattura, file Danea con i dati della cantina.
 - [ ] Primo accesso: modulo di accettazione condizioni Link; senza spunta non si prosegue.
 - [ ] Sidebar account Azienda: solo "I miei QR", "Crediti", "Dati di fatturazione"; nessuna voce vino.
 - [ ] Crea 3 QR gratis (Link, PDF, Mini-pagina); il 4° senza crediti → pagina Crediti.
