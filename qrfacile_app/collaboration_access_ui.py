@@ -53,7 +53,7 @@ def _access_html(wine_id: int, data: dict, role: str) -> str:
                 <div class='accessControls'>
                   <form method='post' action='/app/label/{label_id}/acl/assign'>
                     <label>{'Cambia studio' if assigned else 'Assegna uno studio'}</label>
-                    <select name='studio_user_id' required>{studio_options}</select>
+                    <select aria-label="{'Cambia studio' if assigned else 'Assegna uno studio'}" name='studio_user_id' required>{studio_options}</select>
                     <select name='profile'>
                       <option value='graphic' selected>Lavora su grafica e contenuti</option>
                       <option value='view'>Può soltanto vedere</option>

@@ -391,14 +391,14 @@ def _recycle_rows(recycle: dict) -> str:
           <div class="complianceRecycleGrid">
             <div>
               <label>Prodotto / materiale</label>
-              <input class="input" name="rec_{key}_product"
+              <input aria-label="Prodotto / materiale – {esc(label)}" class="input" name="rec_{key}_product"
                      value="{esc(_val(r.get('product')))}"
                      placeholder="es. vetro verde / sughero / alluminio">
             </div>
 
             <div>
               <label>Codice</label>
-              <input class="input mono" name="rec_{key}_code"
+              <input aria-label="Codice – {esc(label)}" class="input mono" name="rec_{key}_code"
                      value="{esc(_val(r.get('code')))}"
                      placeholder="es. GL 71">
             </div>
@@ -407,7 +407,7 @@ def _recycle_rows(recycle: dict) -> str:
               <label>Codice extra</label>
               <details class="qrfAdvanced"><summary>Opzioni avanzate</summary>
                 <label>Codice aggiuntivo eccezionale</label>
-                <input class="input mono" name="rec_{key}_extra"
+                <input aria-label="Codice aggiuntivo eccezionale – {esc(label)}" class="input mono" name="rec_{key}_extra"
                        value="{esc(_val(r.get('extra_code')))}"
                        placeholder="Solo se documentato dal fornitore">
                 <small>Non usare per il normale codice del materiale. Compilare solo quando il fornitore richiede un secondo riferimento documentato.</small>
@@ -416,7 +416,7 @@ def _recycle_rows(recycle: dict) -> str:
 
             <div>
               <label>Note</label>
-              <input class="input" name="rec_{key}_note"
+              <input aria-label="Note – {esc(label)}" class="input" name="rec_{key}_note"
                      value="{esc(_val(r.get('note')))}"
                      placeholder="facoltativo">
             </div>
@@ -911,8 +911,8 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
             </div>
 
             <div>
-              <label>Nota</label>
-              <input class="input" value="Lo stile modifica solo la presentazione. La pagina resta senza pubblicità." disabled>
+              <label for="public-theme-note">Nota</label>
+              <input class="input" id="public-theme-note" value="Lo stile modifica solo la presentazione. La pagina resta senza pubblicità." disabled>
             </div>
           </div>
 

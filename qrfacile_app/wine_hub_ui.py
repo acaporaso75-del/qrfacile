@@ -328,7 +328,7 @@ def _management_picker(wine_id: int, active_studio_user_id: int, studios: list[d
     <form method="post" action="/app/wine/{int(wine_id)}/management/set" class="wineHubManagementPicker">
       <input type="hidden" name="return_to" value="{esc(return_to)}">
       <label>Gestione grafica</label>
-      <select name="management_value">
+      <select aria-label="Gestione grafica" name="management_value">
         {''.join(options)}
       </select>
       <button class="btn" type="submit">Salva</button>

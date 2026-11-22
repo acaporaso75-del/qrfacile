@@ -290,8 +290,8 @@ def _image_card(wine_id: int, kind: str, asset: dict) -> str:
         <input type="hidden" name="kind" value="{esc(kind)}">
 
         <div>
-          <label>Carica nuova immagine</label>
-          <input class="input" type="file" name="image" accept="image/png,image/jpeg,image/webp" required>
+          <label for="image-upload-{esc(kind)}">Carica nuova immagine ({esc(title)})</label>
+          <input class="input" id="image-upload-{esc(kind)}" type="file" name="image" accept="image/png,image/jpeg,image/webp" required>
         </div>
 
         <button class="btn" type="submit">Carica e mostra anteprima</button>

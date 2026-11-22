@@ -66,12 +66,12 @@ def new_wine_master_get(request: Request, winery_id: int = 0, msg: str = "", err
 
     <form class="card" method="post" action="/app/new-wine-master" style="margin-top:14px;max-width:900px">
       <label>Cantina</label>
-      <select name="winery_id" required>
+      <select aria-label="Cantina" name="winery_id" required>
         {''.join([f"<option value='{int(w['winery_id'])}' {'selected' if int(w['winery_id'])==int(winery_id or 0) else ''}>{esc(w.get('name') or '')}</option>" for w in wlist])}
       </select>
 
       <label style="margin-top:12px">Nome etichetta/prodotto</label>
-      <input class="input" name="name" placeholder="es. Falanghina del Sannio DOC" required>
+      <input aria-label="Nome etichetta/prodotto" class="input" name="name" placeholder="es. Falanghina del Sannio DOC" required>
 
       <div class="note" style="margin-top:12px">
         Nota: questa è la scheda etichetta/prodotto. Ogni lotto collegato genererà il proprio QR definitivo.

@@ -310,7 +310,7 @@ def _row_card(r: dict, csrf_html: str) -> str:
           {csrf_html}
           <input type="hidden" name="sc_id" value="{sc_id}">
           <label>Gestisci permessi</label>
-          <select name="preset">
+          <select aria-label="Gestisci permessi" name="preset">
             <option value="graphic">Solo grafica</option>
             <option value="full">Collaboratore completo</option>
             <option value="view">Solo vista</option>
@@ -426,11 +426,11 @@ def _page_impl(request: Request, msg: str = "", err: str = "") -> HTMLResponse:
           <form method="post" action="/app/settings/studios/invite" class="wineryInviteForm">
             <div>
               <label>Email studio</label>
-              <input class="input" type="email" name="studio_email" placeholder="studio@grafica.it" required>
+              <input aria-label="Email studio" class="input" type="email" name="studio_email" placeholder="studio@grafica.it" required>
             </div>
             <div>
               <label>Permessi iniziali</label>
-              <select name="preset">
+              <select aria-label="Permessi iniziali" name="preset">
                 <option value="view">Solo vista</option>
                 <option value="graphic" selected>Solo grafica</option>
                 <option value="full">Collaboratore completo</option>

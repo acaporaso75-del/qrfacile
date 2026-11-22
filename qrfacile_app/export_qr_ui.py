@@ -475,12 +475,12 @@ def export_page(request: Request, wine_id: int, preset: str = "label_pro", name:
           <form method="get" action="/app/wine/{int(wine_id)}/export" class="exportForm">
             <div>
               <label>Preset tipografico</label>
-              <select name="preset" required>{preset_options}</select>
+              <select aria-label="Preset tipografico" name="preset" required>{preset_options}</select>
             </div>
 
             <div>
               <label>Nome file</label>
-              <input class="input" name="name" value="{esc(base_name)}">
+              <input aria-label="Nome file" class="input" name="name" value="{esc(base_name)}">
             </div>
 
             <button class="btn btn-primary" type="submit">Aggiorna preview</button>
@@ -531,7 +531,7 @@ def export_page(request: Request, wine_id: int, preset: str = "label_pro", name:
         <form action="/app/wine/{int(wine_id)}/export/send?name={esc(base_name)}" class="exportSendForm" data-package-send-form>
           <div>
             <label>Email destinatario</label>
-            <input class="input" name="to_email" type="email" required autocomplete="email" placeholder="tipografia@example.com">
+            <input aria-label="Email destinatario" class="input" name="to_email" type="email" required autocomplete="email" placeholder="tipografia@example.com">
           </div>
 
           <button class="btn btn-primary" type="submit" data-package-send-button>Invia alla tipografia</button>

@@ -109,10 +109,10 @@ def studio_commissions(request: Request, msg: str = "", err: str = ""):
 
             <form method="post" action="/studio/request-payout" style="margin-top:14px">
                 <label>IBAN</label>
-                <input class="input" name="iban" required>
+                <input aria-label="IBAN" class="input" name="iban" required>
 
                 <label>Beneficiario</label>
-                <input class="input" name="beneficiary" required>
+                <input aria-label="Beneficiario" class="input" name="beneficiary" required>
 
                 <div style="margin-top:14px">
                     <button class="btn btn-primary" type="submit">

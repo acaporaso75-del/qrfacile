@@ -195,11 +195,11 @@ def bulk_clone_form(request: Request, label_id: int = 0):
 
   <form class="card" method="post" action="/app/bulk/clone" style="max-width:760px">
     <label>ID etichetta sorgente</label>
-    <input class="input" name="label_id" value="{label_id or ''}" required>
+    <input aria-label="ID etichetta sorgente" class="input" name="label_id" value="{label_id or ''}" required>
 
     <div style="margin-top:12px">
       <label>Lista lotti (uno per riga)</label>
-      <textarea class="input" name="lots" rows="10" style="min-height:220px" placeholder="L24-001&#10;L24-002&#10;L24-003"></textarea>
+      <textarea aria-label="Lista lotti (uno per riga)" class="input" name="lots" rows="10" style="min-height:220px" placeholder="L24-001&#10;L24-002&#10;L24-003"></textarea>
     </div>
 
     <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">

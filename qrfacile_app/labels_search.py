@@ -349,12 +349,12 @@ def labels_search(request: Request, q: str = "", f: str = "all", winery_id: int 
       <div class="row" style="gap:10px;flex-wrap:wrap;align-items:flex-end">
         <div style="min-width:220px;flex:1">
           <label>Cerca</label>
-          <input class="input" name="q" value="{esc(q)}" placeholder="vino, lotto, cantina, titolo">
+          <input aria-label="Cerca" class="input" name="q" value="{esc(q)}" placeholder="vino, lotto, cantina, titolo">
         </div>
 
         <div style="min-width:220px">
           <label>Cantina</label>
-          <select name="winery_id" {"disabled" if role == "admin" else ""}>
+          <select aria-label="Cantina" name="winery_id" {"disabled" if role == "admin" else ""}>
             {''.join(opts)}
           </select>
           {f"<input type='hidden' name='winery_id' value='{int(wid or 0)}'>" if role == 'admin' else ""}
@@ -362,7 +362,7 @@ def labels_search(request: Request, q: str = "", f: str = "all", winery_id: int 
 
         <div style="min-width:180px">
           <label>Stato</label>
-          <select name="f">
+          <select aria-label="Stato" name="f">
             <option value="all" {'selected' if f=='all' else ''}>Tutte</option>
             <option value="draft" {'selected' if f=='draft' else ''}>Bozze</option>
             <option value="active" {'selected' if f=='active' else ''}>Pubblicate</option>
@@ -371,7 +371,7 @@ def labels_search(request: Request, q: str = "", f: str = "all", winery_id: int 
 
         <div style="min-width:210px">
           <label>Chi lavora</label>
-          <select name="work">
+          <select aria-label="Chi lavora" name="work">
             <option value="all" {'selected' if work=='all' else ''}>Tutte</option>
             <option value="self" {'selected' if work=='self' else ''}>Gestisco io</option>
             <option value="assigned" {'selected' if work=='assigned' else ''}>Studio assegnato</option>

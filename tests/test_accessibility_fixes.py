@@ -64,3 +64,33 @@ def test_dashboard_search_fields_are_labelled():
     source = (ROOT / "qrfacile_app" / "dashboard_ui.py").read_text(encoding="utf-8")
     assert 'for="dash-q"' in source and 'id="dash-q"' in source
     assert 'for="dash-work"' in source and 'id="dash-work"' in source
+
+
+def test_no_customer_form_control_without_an_accessible_name():
+    """A visible <label> right before a control must be bound to it.
+
+    Staging 0afb234/a937cc0 had file inputs and a disabled field whose label
+    was not associated; many other fields passed axe only thanks to a
+    placeholder, which is not a label for assistive technologies.
+    """
+    pattern = re.compile(
+        r'<label(?![^>]*\bfor=)[^>]*>[^<]{1,80}</label>\s*<(?:input|select|textarea)\b([^>]*)>',
+        re.S,
+    )
+    offenders = []
+    for path in sorted((ROOT / "qrfacile_app").glob("*.py")):
+        if path.name.startswith("admin_"):
+            continue
+        for match in pattern.finditer(path.read_text(encoding="utf-8")):
+            attrs = match.group(1)
+            if " id=" not in attrs and "aria-label" not in attrs:
+                offenders.append(f"{path.name}: {match.group(0)[:80]}")
+    assert offenders == []
+
+
+def test_image_upload_inputs_are_labelled_per_side():
+    source = (ROOT / "qrfacile_app" / "wine_images_ui.py").read_text(encoding="utf-8")
+    assert '<label for="image-upload-{esc(kind)}">' in source
+    assert 'id="image-upload-{esc(kind)}" type="file"' in source
+    compliance = (ROOT / "qrfacile_app" / "wine_compliance_ui.py").read_text(encoding="utf-8")
+    assert '<label for="public-theme-note">Nota</label>' in compliance

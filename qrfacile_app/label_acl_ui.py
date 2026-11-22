@@ -327,7 +327,7 @@ def label_acl(request: Request, label_id: int, msg: str = "", err: str = ""):
                 {csrf_input(request)}
                 <input type="hidden" name="profile" value="graphic">
                 <label>Studio</label>
-                <select name="studio_user_id" required>
+                <select aria-label="Studio" name="studio_user_id" required>
                   {''.join(opts)}
                 </select>
 

@@ -144,12 +144,12 @@ def send_form(request: Request, slug: str = "", back: str = "/app/dashboard"):
   <form method="post" action="/app/print/send">
     <input type="hidden" name="back" value="{esc(back)}">
     <label>Slug</label>
-    <input name="slug" value="{esc(slug)}" readonly>
+    <input aria-label="Slug" name="slug" value="{esc(slug)}" readonly>
 
     <div class="grid2">
       <div>
         <label>Formato</label>
-        <select name="fmt">
+        <select aria-label="Formato" name="fmt">
           <option value="png">PNG</option>
           <option value="jpg">JPG</option>
           <option value="svg">SVG (vettoriale)</option>
@@ -157,12 +157,12 @@ def send_form(request: Request, slug: str = "", back: str = "/app/dashboard"):
       </div>
       <div>
         <label>Email tipografia</label>
-        <input name="to_email" type="email" required placeholder="tipografia@...">
+        <input aria-label="Email tipografia" name="to_email" type="email" required placeholder="tipografia@...">
       </div>
     </div>
 
     <label>Note (opzionale)</label>
-    <input name="note" placeholder="es. stampa 10k pezzi, back IT lotto L24-001">
+    <input aria-label="Note (opzionale)" name="note" placeholder="es. stampa 10k pezzi, back IT lotto L24-001">
 
     <div style="margin-top:14px">
       <button class="btn" type="submit">Invia</button>

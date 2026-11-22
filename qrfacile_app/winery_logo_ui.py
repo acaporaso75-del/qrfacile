@@ -177,7 +177,7 @@ def winery_logo_page(request: Request, msg: str = "", err: str = ""):
                 class="logoUploadForm">
             <div>
               <label>File logo</label>
-              <input class="input" type="file" name="logo" accept="image/png,image/jpeg,image/webp" required>
+              <input aria-label="File logo" class="input" type="file" name="logo" accept="image/png,image/jpeg,image/webp" required>
             </div>
 
             <button class="btn btn-primary" type="submit">Salva logo</button>

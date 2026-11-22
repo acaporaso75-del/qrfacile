@@ -66,7 +66,7 @@ def new_external_get(request: Request, msg: str = "", err: str = ""):
 
       <form method="post" action="/app/new-external/create" style="margin-top:14px">
         <label>URL destinazione</label>
-        <input class="input" name="target_url" placeholder="https://..." required>
+        <input aria-label="URL destinazione" class="input" name="target_url" placeholder="https://..." required>
 
         <div class="row" style="margin-top:14px">
           <button class="btn btn-primary" type="submit">Crea QR Link</button>
