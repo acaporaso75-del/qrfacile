@@ -322,26 +322,3 @@ _NOT_FOUND_HTML = (
     "<div class='card'><h1 class='h1'>QR non attivo</h1><p>Questo QR non è collegato a nessun contenuto.</p></div>"
     "</main></body></html>"
 )
-
-
-@router.get("/d/{slug}")
-def direct_link_public(slug: str):
-    """Public resolver of QR Link codes: redirect to the current destination.
-
-    302 + no-store so a changed destination applies at the next scan.
-    """
-    slug = (slug or "").strip()
-    if not slug or len(slug) > 64 or "\x00" in slug:
-        return HTMLResponse(_NOT_FOUND_HTML, status_code=404)
-    with pg() as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(
-                "SELECT status, payload FROM qr_items WHERE slug=%s AND qr_type='external' LIMIT 1",
-                (slug,),
-            )
-            row = cur.fetchone()
-    payload = (row or {}).get("payload") or {}
-    target = payload.get("url") if isinstance(payload, dict) else ""
-    if not row or str(row.get("status") or "").lower() != "attiva" or not _valid_target(target or ""):
-        return HTMLResponse(_NOT_FOUND_HTML, status_code=404)
-    return RedirectResponse(target, status_code=302, headers={"Cache-Control": "no-store"})

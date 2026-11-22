@@ -10,6 +10,7 @@ import pytest
 
 from qrfacile_app import external_qr_ui as ext, main
 from qrfacile_app import public
+from qrfacile_app.modules import public as resolver
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -57,13 +58,16 @@ def test_resolver_redirects_active_codes_without_caching(monkeypatch):
         "OFF": {"status": "bozza", "payload": {"url": "https://example.com"}},
         "BAD": {"status": "attiva", "payload": {"url": "javascript:alert(1)"}},
     }
-    monkeypatch.setattr(ext, "pg", lambda: _Conn(rows))
-    response = ext.direct_link_public("AAA")
+    for row in rows.values():
+        row.update(id=1, module=None, stats_level=None)
+    monkeypatch.setattr(resolver, "pg", lambda: _Conn(rows))
+    request = SimpleNamespace(headers={})
+    response = resolver.resolve_module_qr(request, "AAA")
     assert response.status_code == 302
     assert response.headers["location"] == "https://example.com/listino.pdf"
     assert response.headers["cache-control"] == "no-store"
     for slug in ("OFF", "BAD", "MISSING", ""):
-        assert ext.direct_link_public(slug).status_code == 404
+        assert resolver.resolve_module_qr(request, slug).status_code == 404
 
 
 def test_printed_beta_codes_under_e_forward_to_d():
@@ -76,6 +80,7 @@ def test_new_codes_use_d_prefix_and_resolver_is_mandatory():
     source = (ROOT / "qrfacile_app" / "external_qr_ui.py").read_text(encoding="utf-8")
     assert 'public_path = f"/d/{slug}"' in source
     assert "qrfacile_app.external_qr_ui" in main.MANDATORY_ROUTERS
+    assert "qrfacile_app.modules.public" in main.MANDATORY_ROUTERS
     legacy = (ROOT / "qrfacile_app" / "legacy_routes.py").read_text(encoding="utf-8")
     assert '"d",' in legacy and '"r",' in legacy
 
