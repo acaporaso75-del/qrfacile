@@ -22,6 +22,8 @@
   --warn:#fff3cf;
   --danger:#ffe0e6;
   --blue:#e8f1ff;
+  /* White text on the previous teal was 3.28:1. This darker teal keeps the
+     brand colour while meeting WCAG AA for normal-size button text. */
   --accent:#0f766e;
   --accent2:#2563eb;
   --sans:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,"Apple Color Emoji","Segoe UI Emoji";
@@ -312,6 +314,8 @@ img{ max-width:100%; }
 .sidebarCreditWine{ background:#ecfdf5; }
 
 .sidebarCreditGeneric{ background:#eff6ff; }
+
+.sidebarCreditGeneric span{ color:#475569; }
 
 .sidebarUser{
   border:1px solid var(--line);

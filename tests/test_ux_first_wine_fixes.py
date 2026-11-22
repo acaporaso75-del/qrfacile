@@ -214,3 +214,28 @@ def test_compliance_page_shows_one_section_at_a_time():
     assert 'data-tab="nutrition" class="done"' in html
     assert "__TABS__" not in html and "__BUTTONS__" not in html
     assert ">Dati obbligatori</a>" in source and ">Compliance</a>" not in source
+
+
+def test_accessibility_names_and_tab_structure_are_present():
+    premium = (ROOT / "qrfacile_app" / "premium_ui.py").read_text(encoding="utf-8")
+    for field_id, name in (
+        ("wine-master-id", "wine_master_id"),
+        ("wine-volume-ml", "volume_ml"),
+        ("wine-qr-duration", "qr_duration_years"),
+    ):
+        assert f'for="{field_id}"' in premium
+        assert f'id="{field_id}" name="{name}"' in premium
+
+    compliance = (ROOT / "qrfacile_app" / "wine_compliance_ui.py").read_text(encoding="utf-8")
+    assert 'role="tablist"' in compliance
+    assert "['ArrowLeft', 'ArrowRight', 'Home', 'End']" in compliance
+    for name in ("energy_kj", "energy_kcal", "fat", "saturates", "carbs", "sugars", "protein", "salt"):
+        field_id = "nutrition-" + name.replace("_", "-")
+        assert f'for="{field_id}"' in compliance
+        assert f'id="{field_id}" name="{name}"' in compliance
+
+
+def test_primary_button_and_credit_contrast_use_accessible_colours():
+    css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
+    assert "--accent:#0f766e" in css
+    assert ".sidebarCreditGeneric span{ color:#475569; }" in css
