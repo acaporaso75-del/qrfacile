@@ -42,6 +42,12 @@ class PdfType:
         target.write_bytes(data)
         return {"file": relative, "name": _safe_name(upload.filename), "size": len(data), "sha256": digest}
 
+    def is_complete(self, content: dict) -> bool:
+        return bool(content.get("file"))
+
+    def files(self, content: dict) -> set[str]:
+        return {content["file"]} if content.get("file") else set()
+
     def public_response(self, content: dict, *, slug: str) -> Response:
         path = Path(get_uploads_dir()) / content["file"]
         if not path.is_file():

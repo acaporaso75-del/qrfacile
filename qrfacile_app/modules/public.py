@@ -18,7 +18,6 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
 from qrfacile_app.modules.content_types import CONTENT_TYPES
-from qrfacile_app.modules.content_types.link import valid_url
 from qrfacile_app.modules.stats import record_scan
 from qrfacile_app.modules.switches import is_enabled  # noqa: F401 - re-exported for callers/tests
 from qrfacile_app.services.storage import get_uploads_dir
@@ -59,11 +58,7 @@ def _content(payload: dict) -> tuple[str, dict] | None:
         content = {"url": payload.get("url") or ""}
     if kind not in CONTENT_TYPES or not isinstance(content, dict):
         return None
-    if kind == "link" and not valid_url(content.get("url") or ""):
-        return None
-    if kind == "pdf" and not content.get("file"):
-        return None
-    if kind == "minipage" and not content.get("title"):
+    if not CONTENT_TYPES[kind].is_complete(content):
         return None
     return kind, content
 
@@ -124,6 +119,19 @@ def module_logo(request: Request, slug: str, *, module: str = "link") -> Respons
     })
 
 
+def module_asset(request: Request, slug: str, name: str, *, module: str = "link") -> Response:
+    """Files of an active QR (gallery photos, calendar file): never public under /uploads."""
+    row = _active_row(slug, module)
+    payload = (row or {}).get("payload") if isinstance((row or {}).get("payload"), dict) else {}
+    resolved = _content(payload or {}) if row else None
+    if resolved is None:
+        return not_found()
+    kind, content = resolved
+    serve = getattr(CONTENT_TYPES[kind], "asset_response", None)
+    response = serve(content, name) if serve else None
+    return response if response is not None else not_found()
+
+
 def resolve_module_qr(request: Request, slug: str, *, module: str = "link") -> Response:
     slug = (slug or "").strip()
     if not slug or len(slug) > 64 or "\x00" in slug:
@@ -151,6 +159,11 @@ def resolve_module_qr(request: Request, slug: str, *, module: str = "link") -> R
 @router.get("/d/{slug}")
 def link_public(request: Request, slug: str):
     return resolve_module_qr(request, slug, module="link")
+
+
+@router.get("/d/{slug}/a/{name}")
+def link_asset(request: Request, slug: str, name: str):
+    return module_asset(request, slug, name, module="link")
 
 
 @router.get("/d/{slug}/logo")

@@ -36,6 +36,12 @@ TYPE_HELP = {
     "link": "Il QR apre un indirizzo web: sito, prenotazioni, Instagram.",
     "pdf": "Il QR apre un documento: listino, menu, catalogo, istruzioni.",
     "minipage": "Il QR apre una piccola pagina con logo, testo e pulsanti (chiama, WhatsApp, mappa...).",
+    "vcard": "Chi inquadra salva il tuo contatto in rubrica con un tocco.",
+    "wifi": "Mostra nome rete e password del Wi-Fi ai clienti.",
+    "review": "Porta i clienti dritti alla pagina per lasciarti una recensione su Google.",
+    "whatsapp": "Apre una chat WhatsApp con te, con il messaggio già scritto.",
+    "gallery": "Una pagina con fino a 12 foto e i link ai tuoi video.",
+    "event": "Data, luogo e descrizione dell'evento, con “Aggiungi al calendario”.",
 }
 STATS_HELP = {
     "none": ("Nessuna statistica", "Non contiamo le scansioni."),
@@ -344,6 +350,10 @@ def link_detail(request: Request, qr_id: int, msg: str = "", err: str = ""):
     </form>
     """
     try_link = f'<a class="btn" href="/d/{esc(row["slug"])}" target="_blank" rel="noopener">Prova il QR</a>' if active else ""
+    if contents.get("wifi"):
+        try_link += (
+            f'<a class="btn" href="/app/link/{qid}/wifi-qr.png" download>QR Wi-Fi diretto (si collega da solo, non modificabile)</a>'
+        )
     body = f"""
     <section class="card">
       <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap">
@@ -426,11 +436,13 @@ async def link_content_post(request: Request, qr_id: int):
 
 def _stored_files(payload: dict) -> set[str]:
     contents = (payload or {}).get("content") or {}
-    files = {
-        str((contents.get("pdf") or {}).get("file") or ""),
-        str((contents.get("minipage") or {}).get("logo") or ""),
-    }
-    return {f for f in files if f}
+    files: set[str] = set()
+    for key, content in contents.items():
+        ctype = CONTENT_TYPES.get(key)
+        collect = getattr(ctype, "files", None)
+        if collect and isinstance(content, dict):
+            files |= {str(f) for f in collect(content) if f}
+    return files
 
 
 def _delete_files(paths: set[str], qr_item_id: int) -> None:
@@ -513,3 +525,22 @@ def link_accept_post(request: Request, accept: str = Form("")):
             record_link_acceptance(cur, user_id=int(user["id"]), request=request)
         conn.commit()
     return _go("/app/link", msg="Condizioni accettate")
+
+
+@router.get("/app/link/{qr_id}/wifi-qr.png")
+def link_wifi_qr(request: Request, qr_id: int):
+    """Static Wi-Fi QR (WIFI: payload): joins automatically, cannot change after printing."""
+    from qrfacile_app import export_qr_ui
+    from qrfacile_app.modules.content_types.wifi import wifi_qr_payload
+
+    user = _user(request)
+    with pg() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            row = _owned(cur, qr_id, user)
+    wifi = ((row["payload"].get("content") or {}).get("wifi")) or {}
+    if not wifi.get("ssid"):
+        raise HTTPException(404, "Wi-Fi non configurato")
+    return Response(export_qr_ui._qr_png(wifi_qr_payload(wifi), 30, 600), media_type="image/png", headers={
+        "Content-Disposition": f'attachment; filename="qrfacile-wifi-{row["slug"]}.png"',
+        "Cache-Control": "no-store",
+    })

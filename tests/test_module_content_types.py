@@ -31,8 +31,8 @@ def _pdf_bytes(size: int = 2000) -> bytes:
     return head + b"0" * (size - len(head))
 
 
-def test_registry_has_three_types():
-    assert list(CONTENT_TYPES) == ["link", "pdf", "minipage"]
+def test_registry_starts_with_the_three_original_types():
+    assert list(CONTENT_TYPES)[:3] == ["link", "pdf", "minipage"]
     with pytest.raises(KeyError):
         get_type("video")
 

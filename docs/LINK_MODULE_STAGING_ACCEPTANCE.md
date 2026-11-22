@@ -30,6 +30,11 @@ produzione.** Segreti mai stampati. Ogni punto: PASS / FAIL con evidenza breve.
 - [ ] `/uploads/modules/...` risponde 404: PDF e loghi si aprono solo da `/d/<slug>` (e `/d/<slug>/logo`) finché il QR è attivo.
 - [ ] PDF: file non PDF rinominato `.pdf` rifiutato; PDF > 10 MB rifiutato; PDF valido si apre inline.
 - [ ] Mini-pagina: titolo obbligatorio; pulsanti tel/WhatsApp/email/mappa/sito corretti; testo con `<script>` mostrato come testo; nessun `<script>` nella pagina pubblica.
+- [ ] Nuovi tipi, uno per uno, da telefono vero (iPhone e Android):
+      Biglietto da visita → "Aggiungi contatto"; Wi-Fi → pagina con rete e password + "QR Wi-Fi diretto" scaricato che collega da solo;
+      Recensioni → pagina di recensione Google; WhatsApp → chat con messaggio già scritto;
+      Galleria → foto visibili da `/d/<slug>/a/img-N`, foto non immagine rifiutata, 13ª foto rifiutata;
+      Evento → "Aggiungi al calendario" apre il file .ics con data e ora giuste (Europe/Rome).
 - [ ] Cambio tipo (Link → PDF → Link): il link precedente è ancora compilato.
 - [ ] Download PNG/SVG/PDF: il QR contiene `https://<host>/d/<slug>`.
 - [ ] Statistiche: livello "Solo numero" → 10 scansioni = una riga con `scans=10`; livello "Dettagliate" → righe per ora/dispositivo/lingua; nessuna colonna con IP o user agent (`\d qr_scan_daily`).

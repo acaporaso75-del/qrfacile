@@ -32,6 +32,9 @@ class LinkType:
             raise ContentError("Inserisci un indirizzo web valido che inizi con https:// (massimo 2000 caratteri).")
         return {"url": url}
 
+    def is_complete(self, content: dict) -> bool:
+        return valid_url(content.get("url") or "")
+
     def public_response(self, content: dict, *, slug: str) -> Response:
         return RedirectResponse(content["url"], status_code=302, headers={"Cache-Control": "no-store"})
 

@@ -117,6 +117,12 @@ class MiniPageType:
             content["logo"] = previous["logo"]
         return content
 
+    def is_complete(self, content: dict) -> bool:
+        return bool(content.get("title"))
+
+    def files(self, content: dict) -> set[str]:
+        return {content["logo"]} if content.get("logo") else set()
+
     def public_response(self, content: dict, *, slug: str) -> Response:
         logo = ""
         if content.get("logo"):
