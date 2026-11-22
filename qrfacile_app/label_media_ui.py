@@ -181,7 +181,7 @@ def label_image_page(request: Request, label_id: int, msg: str = ""):
 
   <div class="section" style="margin-top:16px">
     <div class="section-title">Anteprime</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px">
       {img_block(thumb, "Thumbnail")}
       {img_block(opt, "Ottimizzata")}
     </div>

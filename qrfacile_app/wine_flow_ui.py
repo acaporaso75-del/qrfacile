@@ -91,8 +91,8 @@ def review(request: Request, wine_id: int, msg: str = ""):
       {render_guided_stepper(wine_id, "review", completed_steps(int(wine_id)))}
       {f'<div class="note note-ok">{esc(msg)}</div>' if msg else ''}
         <div class="card"><div class="h2">Stato: {esc(status_label)}</div><p>{'Tutti i dati obbligatori sono presenti: puoi pubblicare.' if not blocking else 'Prima di pubblicare correggi i punti indicati qui sotto.'}</p><ul>{result_rows}</ul><div style="margin-top:12px">{primary}</div></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">{_image_preview(assets.get('front') or {}, 'Immagine fronte')}{_image_preview(assets.get('back') or {}, 'Immagine retro')}</div>
-      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:16px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:16px;margin-top:16px">{_image_preview(assets.get('front') or {}, 'Immagine fronte')}{_image_preview(assets.get('back') or {}, 'Immagine retro')}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:16px;margin-top:16px">
         <div class="card"><div class="h2">Ingredienti</div>{_list(payload.get('ingredients') or [], 'Nessun ingrediente')}</div>
         <div class="card"><div class="h2">Allergeni</div>{_list(payload.get('allergens') or [], 'Nessun allergene dichiarato')}</div>
         <div class="card"><div class="h2">Nutrizione per 100 ml</div>{f"<p>{esc(str(nut.get('energy_kj')))} kJ · {esc(str(nut.get('energy_kcal')))} kcal</p>" if nut.get('energy_kj') is not None and nut.get('energy_kcal') is not None else '<p>Valori nutrizionali non completati</p>'}</div>

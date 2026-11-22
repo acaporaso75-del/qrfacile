@@ -396,7 +396,7 @@ def start(request: Request, msg: str = "", err: str = ""):
                 Crediti disponibili
               </div>
 
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:10px;margin-top:12px">
                 <div style="
                   padding:12px;
                   border-radius:16px;

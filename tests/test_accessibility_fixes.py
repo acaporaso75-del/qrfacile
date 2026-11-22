@@ -126,3 +126,35 @@ def test_every_customer_form_control_has_an_accessible_name():
                 continue
             offenders.append(f"{path.name}:{before.count(chr(10)) + 1} <{tag}{attrs[:60]}>")
     assert offenders == []
+
+
+def test_customer_pages_have_no_inline_fixed_column_grids():
+    """WCAG 1.4.10 reflow: inline grid columns override the phone media
+    queries. /studio/commissions measured 522-562 px in a 342 px viewport
+    (400 % zoom) because of repeat(4,1fr) in a style attribute."""
+    fixed = re.compile(
+        r'style="[^"]*grid-template-columns:\s*(?:repeat\(\d+,\s*1fr\)|\d*\.?\d*fr\s+\d*\.?\d*fr)'
+    )
+    offenders = []
+    for path in sorted((ROOT / "qrfacile_app").glob("*.py")):
+        if path.name.startswith("admin_"):
+            continue
+        source = path.read_text(encoding="utf-8")
+        for match in fixed.finditer(source):
+            # Allowed only when the element's class collapses to one column
+            # on phones with an !important rule in the same module.
+            tag = source[source.rfind("<", 0, match.start()):match.end()]
+            classes = re.search(r'class="([^"]+)"', tag)
+            collapses = classes and any(
+                re.search(rf"\.{re.escape(name)}\s*\{{+\s*grid-template-columns:\s*1fr\s*!important", source)
+                for name in classes.group(1).split()
+            )
+            if not collapses:
+                offenders.append(f"{path.name}: {match.group(0)[:90]}")
+    assert offenders == []
+
+
+def test_studio_commission_labels_are_in_italian():
+    source = (ROOT / "qrfacile_app" / "studio_payout_ui.py").read_text(encoding="utf-8")
+    for english in ('pill("Maturing")', 'pill("Available"', 'pill("Requested")', 'pill("Paid")'):
+        assert english not in source

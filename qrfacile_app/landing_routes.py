@@ -2073,7 +2073,7 @@ body {
         per 10 o 25 anni, anche senza rinnovi o nuovi acquisti.
       </p>
 
-      <div class="credit-strip" style="margin-top:18px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+      <div class="credit-strip" style="margin-top:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px">
         <div style="border:1px solid rgba(2,8,23,.10);background:rgba(255,255,255,.82);border-radius:18px;padding:12px">
           <b style="display:block;font-size:18px">1 credito</b>
           <span style="display:block;margin-top:4px;color:#64748b;font-size:12px;font-weight:850">QR vino 10 anni</span>

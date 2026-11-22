@@ -65,31 +65,31 @@ def studio_commissions(request: Request, msg: str = "", err: str = ""):
     <div class="card" style="margin-top:14px">
         <div class="h2">Riepilogo Commissioni</div>
 
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:14px" class="grid2">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:14px;margin-top:14px">
 
             <div class="card">
-                {pill("Maturing")}
+                {pill("In maturazione")}
                 <div style="font-size:22px;font-weight:900;margin-top:10px">
                     {balances["maturing"]:.2f}€
                 </div>
             </div>
 
             <div class="card">
-                {pill("Available","green")}
+                {pill("Disponibile","green")}
                 <div style="font-size:22px;font-weight:900;margin-top:10px">
                     {balances["available"]:.2f}€
                 </div>
             </div>
 
             <div class="card">
-                {pill("Requested")}
+                {pill("Richiesto")}
                 <div style="font-size:22px;font-weight:900;margin-top:10px">
                     {balances["requested"]:.2f}€
                 </div>
             </div>
 
             <div class="card">
-                {pill("Paid")}
+                {pill("Pagato")}
                 <div style="font-size:22px;font-weight:900;margin-top:10px">
                     {balances["paid"]:.2f}€
                 </div>
