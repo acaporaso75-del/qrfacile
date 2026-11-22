@@ -89,6 +89,9 @@ MANDATORY_ROUTERS = frozenset(
         "qrfacile_app.wine_hub_ui",
         "qrfacile_app.wine_images_ui",
         "qrfacile_app.wine_compliance_ui",
+        # Serves the QR codes printed from the old WordPress site: if it
+        # failed to load, every bottle already on the market would 404.
+        "qrfacile_app.legacy_routes",
     }
 )
 
