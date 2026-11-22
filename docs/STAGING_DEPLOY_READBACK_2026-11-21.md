@@ -544,7 +544,7 @@ produzione o PayPal.
 ## Deploy staging e verifica Home Chooser — 2026-11-22
 
 - SHA staging prima: `abecf547c6b1ff09ee4b79e01c40492c76715d91`.
-- SHA staging dopo e head PR #12 (Draft):
+- SHA installato su staging e candidato del collaudo (PR #12 Draft):
   `30c985f6786670f85177f9a332a9767fafea1d45`.
 - Fetch esplicito: SHA verificato, remoto invariato. Diff `sql/` vuoto.
 - Backup: tag creato, SHA-256 di dump e archivio verificati, indice
@@ -558,8 +558,19 @@ produzione o PayPal.
   Zoom nativo del browser non verificato. Axe 4.10.2: 0 serious/critical.
   Screenshot desktop e mobile acquisiti.
 - QR storici: `HISTORIC_QR_OK legacy=12/broken=0 wine=29/broken=0/to_complete=10`.
-  Nessun QR rotto, ma lo staging ha 29 QR vino nel controllo invece dei
-  24 attesi. Collaudo interrotto al passo 5; Link beta e pagine Wine non
-  collaudati.
-- Esito complessivo: `STAGING_HOME_CHOOSER: FAIL` per conteggio inatteso
-  e collaudo non concluso. Nessun deploy in produzione.
+- **5a PASS:** presenti tutti i 24 slug precedenti. I cinque aggiuntivi sono
+  di test: `4WY2JH8G`, `HLLGGPLR`, `N9JG3GUC`, `Q3X8HKWY` e
+  `XWNGBN76` (test interno confermato dal titolare). Tutti HTTP 200 in
+  italiano e inglese; date di pubblicazione non registrate nelle fonti
+  consultate.
+- **5b PASS:** sul medesimo QR Link beta, `/d/<slug>` risponde HTTP 302
+  verso la destinazione configurata e `/e/<slug>` risponde HTTP 301 verso
+  `/d/<slug>`.
+- **6 PASS:** `/wine`, `/pricing` (Start, Cantina e Business), `/login` e
+  `/register-winery` verificati con HTTP 200 e contenuto atteso. Verifica
+  autenticata eseguita dal titolare con l'account QA: `/app/dashboard`
+  mostra etichette e saldo crediti; Crediti (`/app/billing`) e la prima
+  etichetta si aprono senza errori. Status HTTP delle viste autenticate
+  non misurato separatamente.
+- Esito complessivo: `STAGING_HOME_CHOOSER: PASS`. Nessun deploy in
+  produzione; gate di go-live invariati.
