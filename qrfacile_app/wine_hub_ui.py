@@ -916,7 +916,7 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
       <div class="wineHubTabs">
         <a class="wineHubTab active" href="/app/wine/{int(wine_id)}">Overview</a>
         <a class="wineHubTab" href="/app/wine/{int(wine_id)}/images">Immagini</a>
-        <a class="wineHubTab" href="/app/wine/{int(wine_id)}/compliance">Compliance</a>
+        <a class="wineHubTab" href="/app/wine/{int(wine_id)}/compliance">Dati obbligatori</a>
         <a class="wineHubTab" href="/app/wine/{int(wine_id)}/export">Export</a>
       </div>
 
@@ -944,7 +944,7 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
 
         <a href="/app/wine/{int(wine_id)}/compliance">
           <span>2</span>
-          <b>Compliance</b>
+          <b>Dati obbligatori</b>
           <small>Compila dati obbligatori</small>
         </a>
 
@@ -980,7 +980,7 @@ def wine_hub(request: Request, wine_id: int, tab: str | None = None):
       </div>
 
       <div class="note" style="margin-top:18px">
-        Flusso consigliato: <b>Immagini → Compliance → Export</b>.
+        Flusso consigliato: <b>Immagini → Dati obbligatori → Export</b>.
         La pubblicazione la fa sempre la cantina o l’admin.
       </div>
 

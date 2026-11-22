@@ -302,7 +302,7 @@ def _summary_html(ingredients: list[str], allergens: list[str], nut: dict, recyc
     checks = [
         ("Ingredienti", ingredient_ok),
         ("Allergeni", allergen_ok),
-        ("Energia kJ/kcal", nutrition_ok),
+        ("Valori nutrizionali", nutrition_ok),
         ("Riciclabilità", recycle_ok),
     ]
 
@@ -314,7 +314,7 @@ def _summary_html(ingredients: list[str], allergens: list[str], nut: dict, recyc
         detail = "Completa i campi mancanti prima di considerare pronta l’etichetta digitale."
         box_cls = "todo"
     else:
-        title = "Compliance principale completa"
+        title = "Dati obbligatori completi"
         detail = "I dati obbligatori principali risultano compilati."
         box_cls = "ok"
 
@@ -674,7 +674,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
     <section class="complianceWrap">
       <div class="complianceHero">
         <div>
-          <div class="complianceEyebrow">Compliance vino</div>
+          <div class="complianceEyebrow">Etichetta digitale</div>
           <div class="h1">Dati obbligatori</div>
           <div class="p">
             Compila ingredienti, allergeni, valori nutrizionali, riciclabilità e contenuti pubblici
@@ -695,12 +695,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
 
       {render_guided_stepper(int(wine_id), "ingredients", completed_steps(int(wine_id)))}
 
-      <div class="complianceTabs">
-        <a class="complianceTab" href="/app/wine/{int(wine_id)}">Scheda vino</a>
-        <a class="complianceTab" href="/app/wine/{int(wine_id)}/images">Immagini</a>
-        <a class="complianceTab active" href="/app/wine/{int(wine_id)}/compliance">Dati obbligatori</a>
-        <a class="complianceTab" href="/app/wine/{int(wine_id)}/export">Export</a>
-      </div>
+      <!-- page tabs removed: the guided stepper above links every page -->
 
       <div class="complianceFlow" style="display:none">
         <a href="/app/wine/{int(wine_id)}/images">
@@ -711,7 +706,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
 
         <a class="active" href="/app/wine/{int(wine_id)}/compliance">
           <span>2</span>
-          <b>Compliance</b>
+          <b>Dati obbligatori</b>
           <small>Compila i dati obbligatori</small>
         </a>
 
@@ -1465,8 +1460,8 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
     """
 
     return HTMLResponse(page(
-        title="QRFACILE · Compliance",
-        subtitle="Compliance lotto",
+        title="QRFACILE · Dati obbligatori",
+        subtitle="Dati obbligatori del lotto",
         body_html=body,
         actions_html=actions,
         user_email=user.get("email", ""),

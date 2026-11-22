@@ -591,7 +591,7 @@ def new_wine_get(
           <span>2</span>
           <div>
             <b>Dati lotto</b>
-            <small>Compila i dati principali. Potrai completare compliance e immagini dopo la creazione.</small>
+            <small>Compila i dati principali. Potrai completare i dati obbligatori e le immagini dopo la creazione.</small>
           </div>
         </div>
 

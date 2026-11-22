@@ -213,7 +213,8 @@ def test_compliance_page_shows_one_section_at_a_time():
     assert "Avanti: " in html and "qrfSectionHidden" in html
     assert 'data-tab="nutrition" class="done"' in html
     assert "__TABS__" not in html and "__BUTTONS__" not in html
-    assert ">Dati obbligatori</a>" in source and ">Compliance</a>" not in source
+    # the page-tabs bar was removed (the stepper links every page): one nav less
+    assert 'class="complianceTabs"' not in source and ">Compliance</a>" not in source
 
 
 def test_accessibility_names_and_tab_structure_are_present():
@@ -239,3 +240,38 @@ def test_primary_button_and_credit_contrast_use_accessible_colours():
     css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
     assert "--accent:#0f766e" in css
     assert ".sidebarCreditGeneric span{ color:#475569; }" in css
+
+
+def test_score_widget_speaks_plain_italian():
+    text = (ROOT / "qrfacile_app" / "compliance_score_middleware.py").read_text(encoding="utf-8")
+    for jargon in ("Compliance Score", "<span>PASS</span>", "<span>WARNING</span>", "<span>ERROR</span>", "Compliance Engine"):
+        assert jargon not in text
+    assert "Tutti i dati obbligatori sono presenti" in text
+    assert "suggerimenti facoltativi" in text
+
+
+def test_published_lot_counts_as_complete_even_without_back_image():
+    from qrfacile_app.dashboard_ui import _compliance_badge_html, _dashboard_counts, _next_step
+
+    published = {
+        "wine_id": 3, "wine_name": "Falanghina", "winery_name": "Cantina", "slug": "S1",
+        "status": "attiva", "ingredient_count": 1, "allergen_count": 1, "nutrition_ok": True,
+        "recycle_count": 4, "front_thumb": "f.webp", "back_thumb": "",
+    }
+    counts = _dashboard_counts([published])
+    assert (counts["complete"], counts["incomplete"], counts["published"]) == (1, 0, 1)
+    badge = _compliance_badge_html(published)
+    assert "Dati obbligatori completi" in badge and "foto del retro" in badge
+    label, _text, _href = _next_step([published], "winery")
+    assert label == "Tutto pronto"
+
+    draft = dict(published, status="bozza", recycle_count=0, front_thumb="")
+    assert _dashboard_counts([draft])["incomplete"] == 1
+    assert _next_step([draft], "winery")[0] == "Completa i dati obbligatori"
+
+
+def test_winery_pages_say_dati_obbligatori_not_compliance():
+    for name in ("wine_hub_ui.py", "wine_images_ui.py", "wine_compliance_ui.py", "label_hub_ui.py", "dashboard_ui.py"):
+        source = (ROOT / "qrfacile_app" / name).read_text(encoding="utf-8")
+        assert ">Compliance</a>" not in source and "<b>Compliance</b>" not in source, name
+        assert "Completa compliance" not in source and "Compliance cantina" not in source, name

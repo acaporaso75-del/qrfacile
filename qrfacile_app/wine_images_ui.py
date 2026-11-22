@@ -391,7 +391,7 @@ def images_page(request: Request, wine_id: int, msg: str = ""):
       <div class="imagesTabs">
         <a class="imagesTab" href="/app/wine/{int(wine_id)}">Overview</a>
         <a class="imagesTab active" href="/app/wine/{int(wine_id)}/images">Immagini</a>
-        <a class="imagesTab" href="/app/wine/{int(wine_id)}/compliance">Compliance</a>
+        <a class="imagesTab" href="/app/wine/{int(wine_id)}/compliance">Dati obbligatori</a>
         <a class="imagesTab" href="/app/wine/{int(wine_id)}/export">Export</a>
       </div>
 
@@ -404,7 +404,7 @@ def images_page(request: Request, wine_id: int, msg: str = ""):
 
         <a href="/app/wine/{int(wine_id)}/compliance">
           <span>2</span>
-          <b>Compliance</b>
+          <b>Dati obbligatori</b>
           <small>Compila dati obbligatori</small>
         </a>
 

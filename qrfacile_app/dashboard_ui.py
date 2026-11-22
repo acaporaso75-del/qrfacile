@@ -225,7 +225,7 @@ def _compliance_state(r: dict) -> tuple[str, list[str], list[str]]:
         missing.append("cantina")
 
     if not slug:
-        missing.append("slug pubblico")
+        missing.append("codice pagina")
 
     if ingredient_count <= 0 and not extra_ingredients:
         missing.append("ingredienti")
@@ -234,7 +234,7 @@ def _compliance_state(r: dict) -> tuple[str, list[str], list[str]]:
         missing.append("allergeni")
 
     if not nutrition_ok:
-        missing.append("energia kJ/kcal")
+        missing.append("valori nutrizionali")
 
     if recycle_count <= 0:
         missing.append("riciclabilità")
@@ -262,14 +262,25 @@ def _compliance_badge_html(r: dict) -> str:
         <div class="dashboardCompliance dashboardComplianceGreen">
           <span class="dashboardComplianceDot"></span>
           <div>
-            <b>Compliance OK</b>
-            <small>Dati principali completi</small>
+            <b>Dati obbligatori completi</b>
+            <small>Pronto per la pubblicazione</small>
           </div>
         </div>
         """
 
     if state == "yellow":
-        detail = ", ".join(warnings[:3])
+        if warnings == ["retro etichetta"]:
+            # Only the optional back image is missing: the lot is complete.
+            return """
+            <div class="dashboardCompliance dashboardComplianceGreen">
+              <span class="dashboardComplianceDot"></span>
+              <div>
+                <b>Dati obbligatori completi</b>
+                <small>Facoltativo: aggiungi la foto del retro</small>
+              </div>
+            </div>
+            """
+        detail = ", ".join("foto del fronte" if w == "fronte etichetta" else "foto del retro" for w in warnings[:3])
         return f"""
         <div class="dashboardCompliance dashboardComplianceYellow">
           <span class="dashboardComplianceDot"></span>
@@ -354,7 +365,13 @@ def _dashboard_counts(rows: list[dict]) -> dict:
         if (r.get("status") or "").strip().lower() == "attiva":
             published += 1
 
-        if state == "green" and not missing and not warnings:
+        # A published lot passed the publication gate; otherwise a lot is
+        # complete when no mandatory data is missing and the front image
+        # exists. The back image is optional and never makes a lot
+        # "incomplete" (it showed "0 complete / 0%" for a published wine).
+        is_published = (r.get("status") or "").strip().lower() == "attiva"
+        front_ok = bool((r.get("front_thumb") or "").strip())
+        if is_published or (not missing and front_ok):
             complete += 1
         else:
             incomplete += 1
@@ -395,10 +412,10 @@ def _primary_lot_cta(r: dict, role: str) -> str:
     is_published = (r.get("status") or "").strip().lower() == "attiva"
 
     if missing:
-        return f'<a class="btn btn-primary" href="/app/wine/{wine_id}?tab=compliance">Completa compliance</a>'
+        return f'<a class="btn btn-primary" href="/app/wine/{wine_id}/compliance">Completa i dati obbligatori</a>'
 
-    if warnings:
-        return f'<a class="btn btn-primary" href="/app/wine/{wine_id}?tab=images">Completa compliance</a>'
+    if "fronte etichetta" in warnings and not is_published:
+        return f'<a class="btn btn-primary" href="/app/wine/{wine_id}/images">Carica la foto dell’etichetta</a>'
 
     if is_published and slug:
         return f'<a class="btn btn-primary" href="/e/{slug}" target="_blank">Apri pagina pubblica</a>'
@@ -426,10 +443,11 @@ def _next_step(rows: list[dict], role: str) -> tuple[str, str, str]:
         name = (r.get("wine_name") or "lotto").strip()
 
         if missing:
-            return ("Completa compliance", f"Riparti da {name}: mancano dati obbligatori.", f"/app/wine/{wine_id}?tab=compliance")
+            return ("Completa i dati obbligatori", f"Riparti da {name}: mancano {', '.join(missing)}.", f"/app/wine/{wine_id}/compliance")
 
-        if warnings:
-            return ("Completa compliance", f"Controlla immagini e dettagli di {name}.", f"/app/wine/{wine_id}?tab=images")
+        published_row = (r.get("status") or "").strip().lower() == "attiva"
+        if "fronte etichetta" in warnings and not published_row:
+            return ("Carica la foto dell’etichetta", f"Per {name} manca la foto del fronte.", f"/app/wine/{wine_id}/images")
 
     for r in rows:
         if (r.get("status") or "").strip().lower() != "attiva":
@@ -437,12 +455,12 @@ def _next_step(rows: list[dict], role: str) -> tuple[str, str, str]:
             name = (r.get("wine_name") or "lotto").strip()
             if role in ("winery", "admin"):
                 return ("Pubblica pagina ufficiale", f"{name} è completo: puoi procedere alla pubblicazione.", f"/app/wine/{wine_id}?tab=export")
-            return ("Preview tecnica", f"{name} è completo: verifica la preview prima della consegna.", f"/app/wine/{wine_id}?tab=export")
+            return ("Anteprima", f"{name} è completo: controlla l’anteprima prima della consegna.", f"/app/wine/{wine_id}?tab=export")
 
     first = rows[0]
     slug = (first.get("slug") or "").strip()
     if slug:
-        return ("Preview tecnica", "Tutti i lotti visibili sono pronti: controlla l’esperienza finale.", f"/preview/{_h(slug)}")
+        return ("Tutto pronto", "I tuoi vini sono online. Quando hai un nuovo lotto, crealo da qui.", "/app/new-wine")
 
     return ("Nuovo lotto", "Aggiungi un nuovo lotto quando hai una nuova etichetta da preparare.", "/app/new-wine")
 
@@ -527,10 +545,10 @@ def _onboarding_html(rows: list[dict], role: str) -> str:
     <section class="dashboardOnboarding card">
       <div class="dashboardOnboardingHead">
         <div>
-          <div class="dashboardSectionKicker">Percorso guidato</div>
-          <div class="h2">Compliance cantina</div>
+          <div class="dashboardSectionKicker">I tuoi vini</div>
+          <div class="h2">Cosa è pronto e cosa manca</div>
           <div class="p">
-            Una vista unica per capire cosa è pronto, cosa manca e qual è la prossima azione utile.
+            Per ogni dato obbligatorio vedi quanti lotti sono a posto, e qual è la prossima cosa utile da fare.
           </div>
         </div>
 
@@ -545,20 +563,6 @@ def _onboarding_html(rows: list[dict], role: str) -> str:
         </div>
       </div>
 
-      <div class="dashboardGlobalState">
-        <div>
-          <span>Lotti completi</span>
-          <b>{counts["complete"]}</b>
-        </div>
-        <div>
-          <span>Incompleti</span>
-          <b>{counts["incomplete"]}</b>
-        </div>
-        <div>
-          <span>Pubblicati</span>
-          <b>{counts["published"]}</b>
-        </div>
-      </div>
 
       <div class="dashboardOnboardingGrid">
         <div class="dashboardChecklist">
@@ -571,8 +575,6 @@ def _onboarding_html(rows: list[dict], role: str) -> str:
           <small>{_h(next_text)}</small>
           <div class="dashboardNextActions">
             <a class="btn btn-primary" href="{_h(next_href)}">{_h(next_label)}</a>
-            <a class="btn" href="/app/new-wine-master">Nuova etichetta</a>
-            <a class="btn" href="/app/new-wine">Nuovo lotto</a>
           </div>
         </div>
       </div>
@@ -654,8 +656,8 @@ def _wine_card(r: dict, role: str = "", labels_by_wine: dict[int, list[dict]] | 
           </div>
 
           <div class="dashboardWineFooter" onclick="event.stopPropagation()">
-            <a class="dashboardInlineLink" href="/app/wine/{wine_id}?tab=compliance">
-              Compliance
+            <a class="dashboardInlineLink" href="/app/wine/{wine_id}/compliance">
+              Dati obbligatori
             </a>
             <a class="dashboardInlineLink" href="/app/wine/{wine_id}?tab=export">
               Esportazione QR

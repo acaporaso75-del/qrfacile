@@ -302,7 +302,7 @@ def label_hub(request: Request, label_id: int):
     <div class="card" style="margin-top:14px">
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <a class="btn" href="/app/wine/{int(label['wine_id'])}/images">Immagini</a>
-        <a class="btn" href="/app/wine/{int(label['wine_id'])}/compliance">Compliance</a>
+        <a class="btn" href="/app/wine/{int(label['wine_id'])}/compliance">Dati obbligatori</a>
         <a class="btn" href="/app/label/{int(label_id)}/history">Storico</a>
         {'' if role == 'studio' else f'<a class="btn" href="/app/label/{int(label_id)}/acl">Studio assegnato</a>'}
         {open_public_btn}
@@ -314,7 +314,7 @@ def label_hub(request: Request, label_id: int):
     {studio_box}
 
     <div class="note" style="margin-top:16px">
-      Flusso consigliato: <b>Immagine → Compliance → Export</b>.
+      Flusso consigliato: <b>Immagine → Dati obbligatori → Export</b>.
       La pubblicazione è gestita da Cantina/Admin.
     </div>
     """
