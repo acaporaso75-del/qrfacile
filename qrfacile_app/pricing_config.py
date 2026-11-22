@@ -221,6 +221,9 @@ LEGACY_PACKS = {
         "generic_credits": 10,
         "desc": "10 crediti per QR link esterni/generici.",
         "kind": "generic_credits",
+        # QRFacile Link is sold to everyone, consumers included: the price is
+        # VAT included (net 23.77 + VAT 22% 5.23 in Italy).
+        "prices_include_vat": True,
     },
 
     "assistenza_continuativa": {
@@ -381,3 +384,48 @@ def list_billing_packs() -> list[tuple[str, dict]]:
 
     return out
 
+
+
+# =========================================================
+# QRFACILE LINK: VAT INCLUDED, ITALY + FOREIGN CUSTOMERS
+# =========================================================
+
+LINK_PACK_KEY = "generic_10"
+
+# EU-wide yearly threshold (EUR 10,000) for B2C electronic services: under it
+# Italian VAT applies to EU consumers, over it the destination rate (OSS).
+OSS_THRESHOLD_CENTS = 1_000_000
+
+# Standard VAT rates by ISO country code. Validate with accountant before
+# enabling foreign sales: rates change (e.g. FI 25.5 from 9/2024, RO 21 from
+# 8/2025, EE 24 from 7/2025, SK 23 from 2025).
+EU_VAT_RATES: dict[str, str] = {
+    "AT": "20", "BE": "21", "BG": "20", "CY": "19", "CZ": "21", "DE": "19",
+    "DK": "25", "EE": "24", "GR": "24", "ES": "21", "FI": "25.5", "FR": "20",
+    "HR": "25", "HU": "27", "IE": "23", "IT": "22", "LT": "21", "LU": "17",
+    "LV": "21", "MT": "18", "NL": "21", "PL": "23", "PT": "23", "RO": "21",
+    "SE": "25", "SI": "22", "SK": "23",
+}
+
+# Danea Easyfatt VAT codes for foreign sales. Placeholder values: validate
+# with accountant (nature codes and wording of the invoice note).
+FOREIGN_VAT_CODES: dict[str, dict] = {
+    "eu_reverse_charge": {
+        "perc": 0,
+        "class": "Non imponibile",
+        "description": "N2.1 - Non soggetta art. 7-ter DPR 633/72",
+        "note": "Reverse charge - art. 196 Direttiva 2006/112/CE",
+    },
+    "extra_eu": {
+        "perc": 0,
+        "class": "Non imponibile",
+        "description": "N2.1 - Non soggetta art. 7-ter / 7-septies DPR 633/72",
+        "note": "Operazione non soggetta a IVA in Italia (art. 7-ter / 7-septies DPR 633/72)",
+    },
+    "eu_consumer_oss": {
+        "perc": 0,
+        "class": "Escluso",
+        "description": "OSS - IVA del Paese del consumatore",
+        "note": "IVA assolta nel Paese del consumatore tramite regime OSS",
+    },
+}
