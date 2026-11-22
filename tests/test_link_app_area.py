@@ -54,6 +54,7 @@ def area(monkeypatch):
 
     state = {"enabled": True}
     monkeypatch.setattr(switches, "is_enabled", lambda key: state["enabled"])
+    monkeypatch.setattr(switches, "migration_applied", lambda: True)
     monkeypatch.setattr(app_ui, "pg", lambda: psycopg.connect(url, row_factory=dict_row))
     monkeypatch.setattr(app_ui, "require_any_role", lambda *a, **k: dict(USER))
     monkeypatch.setattr(app_ui, "csrf_input", lambda request: "<input type='hidden' name='csrf_token' value='t'>")

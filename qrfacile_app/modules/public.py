@@ -11,7 +11,9 @@ import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, Response
+from pathlib import Path
+
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
@@ -19,6 +21,7 @@ from qrfacile_app.modules.content_types import CONTENT_TYPES
 from qrfacile_app.modules.content_types.link import valid_url
 from qrfacile_app.modules.stats import record_scan
 from qrfacile_app.modules.switches import is_enabled  # noqa: F401 - re-exported for callers/tests
+from qrfacile_app.services.storage import get_uploads_dir
 from qrfacile_app.ui_shell import esc
 
 router = APIRouter()
@@ -65,8 +68,14 @@ def _content(payload: dict) -> tuple[str, dict] | None:
     return kind, content
 
 
+# Our own monitoring (scripts/check_historic_qr.py) must not inflate statistics.
+_INTERNAL_PROBES = ("qrfacile-historic-qr-check",)
+
+
 def _record(request: Request, qr_item_id: int, level: str) -> None:
     if level not in ("counts", "detailed"):
+        return
+    if request.headers.get("user-agent", "") in _INTERNAL_PROBES:
         return
     try:
         with pg() as conn:
@@ -84,6 +93,35 @@ def _record(request: Request, qr_item_id: int, level: str) -> None:
             conn.commit()
     except Exception:  # noqa: BLE001 - statistics must never block a scan
         log.warning("module scan statistics not recorded", exc_info=True)
+
+
+def _active_row(slug: str, module: str) -> dict | None:
+    slug = (slug or "").strip()
+    if not slug or len(slug) > 64 or "\x00" in slug:
+        return None
+    with pg() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(_LOOKUP, (slug, module))
+            row = cur.fetchone()
+    if not row or str(row.get("status") or "").lower() != "attiva":
+        return None
+    return row
+
+
+def module_logo(request: Request, slug: str, *, module: str = "link") -> Response:
+    """Logo of an active mini-page. Module files are never public under /uploads."""
+    row = _active_row(slug, module)
+    payload = (row or {}).get("payload") if isinstance((row or {}).get("payload"), dict) else {}
+    logo = str(((payload.get("content") or {}).get("minipage") or {}).get("logo") or "")
+    expected_prefix = f"modules/{module}/{int(row['id'])}/" if row else ""
+    if not row or not logo.startswith(expected_prefix) or ".." in logo:
+        return not_found()
+    path = Path(get_uploads_dir()) / logo
+    if not path.is_file():
+        return not_found()
+    return FileResponse(path, media_type="image/png", headers={
+        "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+    })
 
 
 def resolve_module_qr(request: Request, slug: str, *, module: str = "link") -> Response:
@@ -113,3 +151,8 @@ def resolve_module_qr(request: Request, slug: str, *, module: str = "link") -> R
 @router.get("/d/{slug}")
 def link_public(request: Request, slug: str):
     return resolve_module_qr(request, slug, module="link")
+
+
+@router.get("/d/{slug}/logo")
+def link_logo(request: Request, slug: str):
+    return module_logo(request, slug, module="link")

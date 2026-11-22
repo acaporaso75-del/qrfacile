@@ -27,6 +27,7 @@ produzione.** Segreti mai stampati. Ogni punto: PASS / FAIL con evidenza breve.
 - [ ] Sidebar account Azienda: solo "I miei QR", "Crediti", "Dati di fatturazione"; nessuna voce vino.
 - [ ] Crea 3 QR gratis (Link, PDF, Mini-pagina); il 4° senza crediti → pagina Crediti.
 - [ ] Link: `javascript:` rifiutato; URL valido → pubblica → "Prova il QR" apre la destinazione.
+- [ ] `/uploads/modules/...` risponde 404: PDF e loghi si aprono solo da `/d/<slug>` (e `/d/<slug>/logo`) finché il QR è attivo.
 - [ ] PDF: file non PDF rinominato `.pdf` rifiutato; PDF > 10 MB rifiutato; PDF valido si apre inline.
 - [ ] Mini-pagina: titolo obbligatorio; pulsanti tel/WhatsApp/email/mappa/sito corretti; testo con `<script>` mostrato come testo; nessun `<script>` nella pagina pubblica.
 - [ ] Cambio tipo (Link → PDF → Link): il link precedente è ancora compilato.

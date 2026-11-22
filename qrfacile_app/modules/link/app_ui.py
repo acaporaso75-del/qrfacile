@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -24,6 +25,7 @@ from qrfacile_app.modules.content_types import CONTENT_TYPES, ContentError
 from qrfacile_app.modules.public import _content
 from qrfacile_app.modules.stats import STATS_LEVELS, summary
 from qrfacile_app.ui_shell import esc, page, pill
+from qrfacile_app.services.storage import get_uploads_dir
 from qrfacile_app.util import new_slug
 
 router = APIRouter()
@@ -44,6 +46,8 @@ STATS_HELP = {
 
 def _user(request: Request) -> dict:
     user = require_any_role(request, ROLES)
+    if not switches.migration_applied():
+        raise HTTPException(404, "Not found")
     switches.require_module("link", user)
     return user
 
@@ -410,12 +414,35 @@ async def link_content_post(request: Request, qr_id: int):
             payload["content"] = contents
             if contents.get("link"):
                 payload["url"] = contents["link"]["url"]
+            replaced = _stored_files(row["payload"]) - _stored_files(payload)
             cur.execute(
                 "UPDATE qr_items SET payload=%s::jsonb, module='link', updated_at=%s WHERE id=%s",
                 (json.dumps(payload), _now(), int(row["id"])),
             )
         conn.commit()
+    _delete_files(replaced, int(row["id"]))
     return _go(f"/app/link/{int(qr_id)}", msg="Contenuto salvato")
+
+
+def _stored_files(payload: dict) -> set[str]:
+    contents = (payload or {}).get("content") or {}
+    files = {
+        str((contents.get("pdf") or {}).get("file") or ""),
+        str((contents.get("minipage") or {}).get("logo") or ""),
+    }
+    return {f for f in files if f}
+
+
+def _delete_files(paths: set[str], qr_item_id: int) -> None:
+    """Remove files no longer referenced; only inside this QR's own folder."""
+    base = (Path(get_uploads_dir()) / "modules" / "link" / str(int(qr_item_id))).resolve()
+    for relative in paths:
+        target = (Path(get_uploads_dir()) / relative).resolve()
+        if target.parent == base and target.is_file():
+            try:
+                target.unlink()
+            except OSError:
+                pass
 
 
 @router.post("/app/link/{qr_id}/stats")

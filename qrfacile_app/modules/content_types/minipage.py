@@ -19,6 +19,8 @@ MAX_TITLE = 80
 MAX_TEXT = 600
 MAX_BUTTONS = 6
 MAX_LOGO_BYTES = 5 * 1024 * 1024
+# A small file can still decode to a huge bitmap: refuse before decoding.
+MAX_LOGO_PIXELS = 25_000_000
 BUTTON_KINDS = {
     "call": "Chiama",
     "whatsapp": "WhatsApp",
@@ -69,8 +71,12 @@ def _save_logo(upload, qr_item_id: int) -> str:
         raise ContentError("Il logo deve essere un'immagine JPG, PNG o WebP.") from exc
     if fmt not in ("JPEG", "PNG", "WEBP"):
         raise ContentError("Il logo deve essere un'immagine JPG, PNG o WebP.")
-    image = Image.open(io.BytesIO(data)).convert("RGBA")
+    width, height = Image.open(io.BytesIO(data)).size
+    if width * height > MAX_LOGO_PIXELS:
+        raise ContentError("Il logo è troppo grande: usa un'immagine sotto i 5000 × 5000 pixel.")
+    image = Image.open(io.BytesIO(data))
     image.thumbnail((512, 512))
+    image = image.convert("RGBA")
     digest = hashlib.sha256(data).hexdigest()[:16]
     relative = f"modules/link/{int(qr_item_id)}/logo-{digest}.png"
     target = Path(get_uploads_dir()) / relative
@@ -114,7 +120,7 @@ class MiniPageType:
     def public_response(self, content: dict, *, slug: str) -> Response:
         logo = ""
         if content.get("logo"):
-            logo = f'<img class="logo" src="/uploads/{esc(content["logo"])}" alt="Logo {esc(content["title"])}">'
+            logo = f'<img class="logo" src="/d/{esc(slug)}/logo" alt="Logo {esc(content["title"])}">'
         buttons = "".join(
             f'<a class="button" href="{esc(b["href"])}" rel="noopener">{esc(BUTTON_KINDS.get(b["kind"], b["kind"]))}</a>'
             for b in content.get("buttons") or []

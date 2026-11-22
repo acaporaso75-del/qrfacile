@@ -60,6 +60,24 @@ def set_enabled(key: str, enabled: bool, *, user_id: int) -> None:
     clear_cache()
 
 
+def migration_applied() -> bool:
+    """True once sql/2026_vertical_modules_base.sql has created module_switches."""
+    cached = _cache.get("__migration__")
+    now = time.monotonic()
+    if cached and now - cached[0] < _CACHE_SECONDS:
+        return cached[1]
+    try:
+        with pg() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT to_regclass('module_switches') IS NOT NULL")
+                row = cur.fetchone()
+        value = bool(row[0] if not isinstance(row, dict) else next(iter(row.values())))
+    except Exception:
+        value = False
+    _cache["__migration__"] = (now, value)
+    return value
+
+
 def require_module(key: str, user: dict) -> None:
     """Hide a switched-off module (404) from everyone but admins."""
     if (user.get("role") or "").lower().strip() == "admin":

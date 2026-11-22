@@ -103,6 +103,9 @@ def new_external_get(request: Request, msg: str = "", err: str = ""):
 def new_external_create(request: Request, target_url: str = Form(...)):
     require_csrf_or_same_origin(request)
     u = require_any_role(request, ("winery", "studio", "admin"))
+    if is_enabled("link"):
+        # With the module on, new QR codes go through /app/link (terms, types).
+        return RedirectResponse("/app/link/new", status_code=303)
     uid = int(u["id"])
 
     target_url = (target_url or "").strip()

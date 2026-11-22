@@ -23,6 +23,18 @@ RUNTIME_CONFIG = get_runtime_config(validate=True)
 app = FastAPI(title="QRFACILE")
 app.state.app_base_url = RUNTIME_CONFIG.app_base_url
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+@app.middleware("http")
+async def _private_module_files(request, call_next):
+    """Module files (PDF, logos) are served only through /d/<slug> while active."""
+    if request.url.path.startswith("/uploads/modules/"):
+        from fastapi.responses import PlainTextResponse
+
+        return PlainTextResponse("Not found", status_code=404)
+    return await call_next(request)
+
+
 app.add_middleware(PublicRecyclingCatalogMiddleware)
 app.add_middleware(ComplianceScoreMiddleware)
 
