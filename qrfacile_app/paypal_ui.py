@@ -65,6 +65,48 @@ def _base_url(request: Request) -> str:
     return f"{request.url.scheme}://{host}"
 
 
+_sleep = time.sleep
+_RETRY_DELAYS = (0.5, 1.5)
+_NOT_SENT_MARKERS = ("Failed to resolve", "NameResolutionError", "NewConnectionError",
+                     "Name or service not known", "Temporary failure in name resolution")
+
+
+def _request_not_sent(exc: requests.RequestException) -> bool:
+    """True only when the request never reached PayPal (DNS or connect failure)."""
+    if isinstance(exc, requests.exceptions.ConnectTimeout):
+        return True
+    if not isinstance(exc, requests.exceptions.ConnectionError):
+        return False
+    reason = getattr(exc.args[0], "reason", None) if exc.args else None
+    try:
+        from urllib3.exceptions import NewConnectionError
+
+        if isinstance(reason, NewConnectionError):
+            return True
+    except ImportError:  # pragma: no cover - urllib3 always ships with requests
+        pass
+    text = f"{exc} {reason}"
+    return any(marker in text for marker in _NOT_SENT_MARKERS)
+
+
+def _paypal_post(url: str, **kwargs):
+    """requests.post with up to 3 attempts when the server could not reach PayPal at all.
+
+    Intermittent DNS on the host must not cancel a checkout. A request that
+    may have reached PayPal is never repeated here (create and capture carry a
+    PayPal-Request-Id anyway, so PayPal would not duplicate them).
+    """
+    for attempt in range(len(_RETRY_DELAYS) + 1):
+        try:
+            return requests.post(url, **kwargs)
+        except requests.RequestException as exc:
+            if attempt == len(_RETRY_DELAYS) or not _request_not_sent(exc):
+                raise
+            logger.warning("PayPal non raggiungibile (tentativo %s), nuovo tentativo", attempt + 1)
+            _sleep(_RETRY_DELAYS[attempt])
+    raise RuntimeError("unreachable")  # pragma: no cover
+
+
 def _paypal_token() -> str:
     if not PAYPAL_CLIENT_ID or not PAYPAL_SECRET:
         raise HTTPException(
@@ -73,7 +115,7 @@ def _paypal_token() -> str:
         )
 
     try:
-        r = requests.post(
+        r = _paypal_post(
             f"{PAYPAL_BASE}/v1/oauth2/token",
             auth=(PAYPAL_CLIENT_ID, PAYPAL_SECRET),
             data={"grant_type": "client_credentials"},
@@ -328,7 +370,7 @@ def _verify_paypal_webhook(event: dict, headers) -> bool:
 
     token = _paypal_token()
     try:
-        response = requests.post(
+        response = _paypal_post(
             f"{PAYPAL_BASE}/v1/notifications/verify-webhook-signature",
             headers={
                 "Authorization": f"Bearer {token}",
@@ -636,7 +678,7 @@ def paypal_start(
         token = _paypal_token()
         return_url = f"{base}/paypal/return?order_id={order_id}"
         cancel_url = f"{base}/app/billing?err=Pagamento%20annullato"
-        r = requests.post(
+        r = _paypal_post(
             f"{PAYPAL_BASE}/v2/checkout/orders",
             headers={
                 "Authorization": f"Bearer {token}",
@@ -777,7 +819,7 @@ def paypal_return(
 
     try:
         token_api = _paypal_token()
-        r = requests.post(
+        r = _paypal_post(
             f"{PAYPAL_BASE}/v2/checkout/orders/{paypal_order_id}/capture",
             headers={
                 "Authorization": f"Bearer {token_api}",
