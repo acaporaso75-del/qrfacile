@@ -83,9 +83,9 @@ def home(request: Request):
         else '<span class="moduleStatus soon">In arrivo</span>'
     )
     actions = """
-    <a class="btn" href="/wine">Etichetta vino</a>
-    <a class="btn btn-primary" href="/register-winery">Prova gratis</a>
-    <a class="btn" href="/login">Login</a>
+    <a class="btn" href="/pricing">Prezzi</a>
+    <a class="btn" href="/login">Accedi</a>
+    <a class="btn btn-primary" href="#scegli">Prova gratis</a>
     """
 
     body = """
@@ -648,7 +648,7 @@ def wine_home(request: Request):
         <div>
           <div class="moduleEyebrow">Accesso Wine</div>
           <h2>Porta i tuoi QR vino su pagine sempre aggiornabili.</h2>
-          <p>Registrati come cantina oppure accedi se hai gia un account QRFACILE.</p>
+          <p>Registrati come cantina oppure accedi se hai già un account QRFACILE.</p>
         </div>
         <div class="moduleFinalActions">
           <a class="btn btn-primary" href="/register-winery">Registrati come Cantina</a>
@@ -1022,7 +1022,7 @@ def link_home(request: Request):
           <div class="linkEyebrow">Modulo Link Diretto</div>
           <h2>Un QR, destinazioni aggiornabili.</h2>
           <p>
-            QRFACILE Link sara pensato per chi vuole collegare un QR a contenuti
+            QRFACILE Link sarà pensato per chi vuole collegare un QR a contenuti
             digitali semplici, senza vincolarsi a una destinazione fissa stampata
             per sempre.
           </p>
@@ -1042,11 +1042,11 @@ def link_home(request: Request):
 
       <section class="linkNote">
         <div>
-          <div class="linkEyebrow">Niente pricing ancora</div>
-          <h2>Il modulo non e ancora attivo.</h2>
+          <div class="linkEyebrow">In arrivo</div>
+          <h2>Il modulo non è ancora attivo.</h2>
           <p>
-            QRFACILE Link e in arrivo: non ci sono prezzi reali, crediti dedicati
-            o onboarding pubblico specifico per questo modulo.
+            QRFACILE Link sarà disponibile a breve, con prezzi e registrazione dedicati.
+            Scrivici per sapere quando parte o per provarlo in anteprima.
           </p>
         </div>
         <div class="linkActions">
@@ -1481,7 +1481,7 @@ def menu_home(request: Request):
         module_label="Modulo Menu Ristorante",
         intro_title="Carte digitali pronte per tavoli, sale e asporto.",
         intro_copy=(
-            "QRFACILE Menu sara pensato per gestire menu, listini, allergeni, "
+            "QRFACILE Menu sarà pensato per gestire menu, listini, allergeni, "
             "proposte stagionali e contenuti collegati senza ristampare materiali."
         ),
         examples=[
@@ -1507,7 +1507,7 @@ def quiz_home(request: Request):
         module_label="Modulo Quiz/Formazione",
         intro_title="Coinvolgi persone e raccogli risposte da QR.",
         intro_copy=(
-            "QRFACILE Quiz sara pensato per creare esperienze formative e "
+            "QRFACILE Quiz sarà pensato per creare esperienze formative e "
             "interattive accessibili con un QR, con contenuti aggiornabili nel tempo."
         ),
         examples=[
@@ -1515,7 +1515,7 @@ def quiz_home(request: Request):
             ("Quiz", "Domande, verifiche rapide e contenuti interattivi."),
             ("Feedback", "Raccolta risposte dopo eventi, corsi o visite."),
             ("Onboarding", "Guide e controlli per nuovi collaboratori."),
-            ("Scuole", "Attivita e approfondimenti collegati a materiali fisici."),
+            ("Scuole", "Attività e approfondimenti collegati a materiali fisici."),
             ("Campagne", "Esperienze educative o promozionali misurabili."),
         ],
     )
@@ -1533,7 +1533,7 @@ def warehouse_home(request: Request):
         module_label="Modulo QR Magazzino",
         intro_title="Informazioni operative dove servono.",
         intro_copy=(
-            "QRFACILE Magazzino sara pensato per collegare oggetti, aree e "
+            "QRFACILE Magazzino sarà pensato per collegare oggetti, aree e "
             "materiali a pagine pratiche, istruzioni, schede e riferimenti rapidi."
         ),
         examples=[
@@ -1559,7 +1559,7 @@ def events_home(request: Request):
         module_label="Modulo Eventi/Votazioni",
         intro_title="Pagine QR per partecipanti, pubblico e staff.",
         intro_copy=(
-            "QRFACILE Eventi sara pensato per gestire contenuti pubblici e "
+            "QRFACILE Eventi sarà pensato per gestire contenuti pubblici e "
             "interazioni leggere durante manifestazioni, incontri e iniziative."
         ),
         examples=[

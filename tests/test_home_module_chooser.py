@@ -25,3 +25,19 @@ def test_home_starts_with_module_chooser():
     assert 'href="/register-winery"' in chooser and 'href="/register-business"' not in chooser
     assert chooser.count("In arrivo") == 5
     assert 'href="#scegli"' in html
+
+
+def test_home_header_leads_to_the_module_choice():
+    header = _home().split('class="row topbar-actions"', 1)[1].split("</div>", 1)[0]
+    assert 'href="#scegli"' in header and "Prova gratis" in header
+    assert 'href="/login"' in header and 'href="/pricing"' in header
+    assert 'href="/register-winery"' not in header
+
+
+def test_mobile_topbar_buttons_are_compact_but_tappable():
+    from pathlib import Path
+
+    css = (Path(__file__).resolve().parents[1] / "static" / "app.css").read_text(encoding="utf-8")
+    mobile = css.split("@media(max-width:560px){", 1)[1].split("\n}\n", 1)[0]
+    rule = mobile.split(".topbar .row .btn{", 1)[1].split("}", 1)[0]
+    assert "width:auto" in rule and "min-height:44px" in rule
