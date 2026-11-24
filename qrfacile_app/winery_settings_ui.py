@@ -45,7 +45,7 @@ def _preset_name(can_view: bool, can_edit: bool, can_create: bool) -> str:
 
 def _access_mode(can_view: bool, can_edit: bool, can_create: bool) -> str:
     if can_edit or can_create:
-        return "Puo modificare"
+        return "Può modificare"
     if can_view:
         return "Solo vedere"
     return "Collegato senza operativita"
@@ -102,13 +102,13 @@ def _workflow_state(rows: list[dict], invites: list[dict]) -> tuple[str, str, in
     if any(bool(r.get("can_edit")) or bool(r.get("can_create")) for r in rows):
         return (
             "Studio operativo",
-            "Almeno uno studio collegato puo lavorare sulle etichette.",
+            "Almeno uno studio collegato può lavorare sulle etichette.",
             4,
         )
     if any(bool(r.get("can_view")) for r in rows):
         return (
             "Permessi attivi",
-            "Lo studio collegato puo vedere le informazioni consentite.",
+            "Lo studio collegato può vedere le informazioni consentite.",
             3,
         )
     return (
@@ -295,12 +295,12 @@ def _row_card(r: dict, csrf_html: str) -> str:
         </div>
 
         <div class="wineryPermBox">
-          <div class="wineryBoxTitle">Cosa puo fare lo studio</div>
+          <div class="wineryBoxTitle">Cosa può fare lo studio</div>
           <div class="wineryPermGrid">
             {perms_html}
           </div>
           <div class="wineryControlNote">
-            La cantina mantiene il controllo finale e puo revocare l'accesso in qualsiasi momento.
+            La cantina mantiene il controllo finale e può revocare l'accesso in qualsiasi momento.
           </div>
         </div>
       </div>
@@ -386,7 +386,7 @@ def _page_impl(request: Request, msg: str = "", err: str = "") -> HTMLResponse:
         subtitle = "Cantina · Studi grafici autorizzati"
         intro = f"""
         <div class="p">
-          La cantina <b>{esc(winery_name or '-')}</b> decide chi entra, cosa puo fare e puo
+          La cantina <b>{esc(winery_name or '-')}</b> decide chi entra, cosa può fare e può
           revocare sempre l'accesso. Lo studio collabora, la cantina mantiene il controllo finale.
         </div>
         """
@@ -501,12 +501,12 @@ def _page_impl(request: Request, msg: str = "", err: str = "") -> HTMLResponse:
           Nome studio, email e data sono sempre visibili nella card del collegamento.
         </div>
         <div class="note">
-          <b>Cosa puo fare</b><br>
+          <b>Cosa può fare</b><br>
           I permessi distinguono chiaramente vedere, modificare e creare.
         </div>
         <div class="note">
           <b>Revoca sempre disponibile</b><br>
-          La cantina puo interrompere il collegamento in qualsiasi momento.
+          La cantina può interrompere il collegamento in qualsiasi momento.
         </div>
       </div>
 
