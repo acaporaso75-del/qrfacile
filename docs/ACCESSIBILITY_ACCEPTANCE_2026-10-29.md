@@ -111,3 +111,32 @@ i controlli automatici. La decisione storica sopra resta riferita al suo SHA:
   Crediti su mobile, 200% e 400% richiede una sessione QA già autenticata.
 - Nessun account creato, nessuna modifica allo staging e nessun checkout
   avviato durante questi controlli.
+
+### Controllo autenticato Crediti e link Prezzi — 21:26–21:28 CET
+
+`GET /healthz` alle 21:26:29 e alle 21:28:51 conferma lo stesso
+SHA `a50b03acb4861e46a74ea640a56fc9b0bae1626d` su staging.
+È stata usata una sessione QA già attiva. Nessun dato di account è
+riportato e nessun modulo d'acquisto è stato attivato.
+
+- **Crediti, `/app/billing`:** misure DOM di `clientWidth` e
+  `scrollWidth` a 390 px CSS (mobile), 640 e 320 px CSS (reflow
+  equivalente al 200% e al 400% da 1280): le due misure coincidono
+  in tutti i casi. I sette pulsanti d'acquisto restano entro la
+  larghezza visibile. Non è una prova dello zoom nativo del browser.
+- **Tastiera mobile:** a 300 px CSS effettivi, dal link per saltare
+  al contenuto, 33 tappe Tab osservate (16 controlli nei moduli).
+  Tutte con indicatore di focus visibile e dentro la larghezza della
+  pagina. Nell'albero accessibile risultano nominati i tre checkbox
+  di conferma e i sette pulsanti d'acquisto.
+- **A11Y-03, MEDIUM, aperto — `/pricing`:** il link nel paragrafo
+  «richiedi un preventivo» ha lo stesso colore e peso del testo
+  circostante, senza sottolineatura, bordo o altro segno visibile a
+  riposo. Il focus da tastiera resta visibile e tre pulsanti offrono
+  la stessa destinazione. Proposta al referente del rilascio: aggiungere
+  una sottolineatura persistente e riprovare prima del GO, oppure
+  documentare la decisione sul difetto.
+
+Restano da verificare zoom nativo, lettore di schermo, contrasto manuale
+non risolto e i rimanenti percorsi autenticati. L'esito complessivo resta
+`NOT_VERIFIED`; nessuna modifica al runtime.
