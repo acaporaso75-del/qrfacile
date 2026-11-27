@@ -107,10 +107,12 @@ def _module_chooser(link_on: bool) -> str:
           .chooserCard.active {{ border-color:#0f766e; background:#f0fdfa; }}
           .chooserCard h2 {{ margin:0; font-size:clamp(1rem,1.25vw,1.6rem); line-height:1.2; overflow-wrap:anywhere; }}
           .chooserArt {{
-            height:clamp(55px,7vw,100px); display:grid; place-items:center;
+            position:relative; flex:none; height:clamp(55px,5.2vw,84px); overflow:hidden;
             border-radius:12px; background:linear-gradient(125deg,#f8fafc,#eef6f5);
           }}
-          .chooserArt img {{ display:block; width:auto; height:100%; max-width:100%; object-fit:contain; }}
+          .chooserArt img {{
+            position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:contain;
+          }}
           .chooserCard p {{
             margin:0; max-width:48ch; color:#334155; font-size:clamp(.94rem,1vw,1.15rem); line-height:1.4; flex:1;
           }}
