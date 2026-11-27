@@ -127,7 +127,7 @@ def test_public_offer_leads_with_no_mandatory_subscription():
     home_html = home(request).body.decode()
     wine_html = wine_home(request).body.decode()
 
-    assert "Wine Compliance · senza canone annuale" in home_html
+    assert "Etichette digitali del vino, senza canone annuale." in home_html
     assert "Nessun abbonamento obbligatorio" in wine_html
     assert "nessun rinnovo automatico" in wine_html
     assert "anche senza altri acquisti" in wine_html

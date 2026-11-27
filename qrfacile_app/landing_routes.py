@@ -9,65 +9,104 @@ router = APIRouter()
 _CHOOSER_SOON = '<span class="chooserSoon">In arrivo</span>'
 
 
-def _chooser_card(icon: str, title: str, text: str, footer: str, *, big: bool, active: bool) -> str:
-    classes = "chooserCard" + (" big" if big else "") + (" active" if active else "")
+def _chooser_card(icon: str, title: str, text: str, footer: str, *, active: bool = False) -> str:
+    classes = "chooserCard active" if active else "chooserCard"
     return (
-        f'<article class="{classes}"><div class="chooserIcon" aria-hidden="true">{icon}</div>'
-        f'<h3>{title}</h3><p>{text}</p><div class="chooserFooter">{footer}</div></article>'
+        f'<article class="{classes}"><div class="chooserCardTitle">'
+        f'<span class="chooserIcon" aria-hidden="true">{icon}</span><h2>{title}</h2></div>'
+        f'<p>{text}</p><div class="chooserFooter">{footer}</div></article>'
     )
 
 
+def _chooser_discovery(path: str, module: str) -> str:
+    return _CHOOSER_SOON + f'<a class="btn" href="{path}" aria-label="Scopri {module}">Scopri</a>'
+
+
 def _module_chooser(link_on: bool) -> str:
-    """'Cosa vuoi fare?' tiles at the top of the home: one per vertical module."""
+    """One entry point per module, before any explanatory content."""
     link_footer = (
         '<span class="chooserFree">3 QR gratis</span>'
         '<a class="btn btn-primary" href="/register-business">Inizia</a>'
         if link_on
-        else _CHOOSER_SOON + '<a class="btn" href="/link">Scopri</a>'
+        else _chooser_discovery("/link", "Link")
     )
-    big = [
+    cards = [
         _chooser_card("🍷", "Ho una cantina",
-                      "Etichetta digitale del vino: valori nutrizionali, allergeni e riciclo.",
+                      "Etichette digitali del vino, senza canone annuale.",
                       '<span class="chooserFree">3 QR gratis</span>'
-                      '<a class="btn btn-primary" href="/register-winery">Inizia</a>',
-                      big=True, active=True),
+                      '<a class="btn btn-primary" href="/register-winery" aria-label="Inizia con Wine">Inizia</a>'
+                      '<a class="btn" href="/wine">Scopri Wine</a>',
+                      active=True),
         _chooser_card("🔗", "Ho un'attività",
-                      "Un QR verso il tuo sito, un PDF o una mini-pagina con i tuoi contatti.",
-                      link_footer, big=True, active=link_on),
-        _chooser_card("🍽️", "Ho un ristorante", "Menu digitale sempre aggiornato, anche in più lingue.",
-                      _CHOOSER_SOON + '<a class="btn" href="/menu">Scopri</a>', big=True, active=False),
-    ]
-    small = [
+                      "Un QR per il tuo sito, un PDF o i tuoi contatti.",
+                      link_footer, active=link_on),
+        _chooser_card("🍽️", "Ho un ristorante", "Menu digitale aggiornabile in più lingue.",
+                      _chooser_discovery("/menu", "Menu")),
         _chooser_card("🎓", "Quiz e formazione", "Domande e percorsi da un QR.",
-                      _CHOOSER_SOON + '<a class="btn" href="/quiz">Scopri</a>', big=False, active=False),
-        _chooser_card("📦", "Magazzino", "Schede e movimenti di prodotti e attrezzature.",
-                      _CHOOSER_SOON + '<a class="btn" href="/warehouse">Scopri</a>', big=False, active=False),
+                      _chooser_discovery("/quiz", "Quiz e formazione")),
+        _chooser_card("📦", "Magazzino", "Schede e movimenti di prodotti e materiali.",
+                      _chooser_discovery("/warehouse", "Magazzino")),
         _chooser_card("🎟️", "Eventi", "Programmi, iscrizioni e votazioni.",
-                      _CHOOSER_SOON + '<a class="btn" href="/events">Scopri</a>', big=False, active=False),
+                      _chooser_discovery("/events", "Eventi")),
     ]
     return f"""
       <section class="moduleChooser" id="scegli" aria-labelledby="scegli-title">
-        <h2 id="scegli-title">Cosa vuoi fare con il tuo QR?</h2>
-        <p class="chooserLead">Un QR che stampi una volta e aggiorni quando vuoi. Scegli da dove partire.</p>
-        <div class="chooserGrid">{''.join(big)}</div>
-        <div class="chooserGrid small">{''.join(small)}</div>
+        <div class="chooserHeading" id="moduli">
+          <p class="chooserEyebrow">Piattaforma QR modulare</p>
+          <h1 id="scegli-title">Cosa vuoi fare con il tuo QR?</h1>
+          <p class="chooserLead">Scegli il modulo adatto alla tua attività.</p>
+        </div>
+        <div class="chooserGrid">{''.join(cards)}</div>
         <style>
-          .moduleChooser {{ max-width:1180px; margin:28px auto; padding:0 4px; }}
-          .moduleChooser h2 {{ font-size:clamp(26px,4vw,36px); margin:0 0 6px; text-align:center; }}
-          .chooserLead {{ text-align:center; color:#334155; margin:0 0 20px; }}
-          .chooserGrid {{ display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); }}
-          .chooserGrid.small {{ margin-top:16px; grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr)); }}
-          .chooserCard {{ background:#fff; border:1px solid rgba(15,23,42,.12); border-radius:22px; padding:20px;
-            display:flex; flex-direction:column; gap:8px; box-shadow:0 12px 30px rgba(15,23,42,.06); }}
-          .chooserCard.active {{ border-color:#0f766e; box-shadow:0 16px 40px rgba(15,118,110,.14); }}
-          .chooserCard h3 {{ margin:0; font-size:21px; }}
-          .chooserGrid.small .chooserCard h3 {{ font-size:17px; }}
-          .chooserCard p {{ margin:0; color:#334155; line-height:1.5; flex:1; }}
-          .chooserIcon {{ font-size:34px; line-height:1; }}
-          .chooserGrid.small .chooserIcon {{ font-size:26px; }}
-          .chooserFooter {{ display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-top:6px; }}
-          .chooserSoon {{ font-weight:800; color:#92400e; background:#fef3c7; border-radius:999px; padding:4px 10px; font-size:13px; }}
-          .chooserFree {{ font-weight:800; color:#0f766e; font-size:14px; }}
+          .moduleChooser {{
+            padding:clamp(14px,3vw,28px);
+            border:1px solid #d5e5e5;
+            border-radius:24px;
+            background:linear-gradient(135deg,#eff9f7,#f8fafc 68%);
+          }}
+          .chooserHeading {{ margin:0 0 18px; }}
+          .chooserEyebrow {{
+            margin:0 0 5px; color:#0f766e; font-size:.78rem; font-weight:850;
+            letter-spacing:.06em; text-transform:uppercase;
+          }}
+          .chooserHeading h1 {{
+            margin:0; color:#0f172a; font-size:clamp(1.65rem,4vw,2.85rem);
+            line-height:1.12; letter-spacing:-.025em; overflow-wrap:anywhere;
+          }}
+          .chooserLead {{ color:#334155; margin:7px 0 0; line-height:1.45; }}
+          .chooserGrid {{ display:grid; gap:12px; grid-template-columns:repeat(3,minmax(0,1fr)); }}
+          .chooserCard {{
+            background:#fff; border:1px solid #d5e5e5; border-radius:16px;
+            padding:clamp(12px,2vw,17px); display:flex; flex-direction:column; gap:9px;
+          }}
+          .chooserCard.active {{ border-color:#0f766e; background:#f0fdfa; }}
+          .chooserCardTitle {{ display:flex; align-items:center; gap:9px; }}
+          .chooserCard h2 {{ margin:0; font-size:clamp(1rem,2vw,1.2rem); line-height:1.2; overflow-wrap:anywhere; }}
+          .chooserIcon {{
+            flex:none; width:32px; height:32px; border-radius:9px;
+            display:grid; place-items:center; font-size:20px; background:#eaf3f3;
+          }}
+          .chooserCard p {{ margin:0; color:#334155; font-size:.94rem; line-height:1.4; flex:1; }}
+          .chooserFooter {{ display:flex; gap:6px 8px; align-items:center; flex-wrap:wrap; }}
+          .chooserFooter .btn {{ width:auto; min-height:44px; padding:7px 11px; font-size:.94rem; }}
+          .chooserSoon, .chooserFree {{
+            font-weight:800; border-radius:999px; padding:4px 8px; font-size:.8rem;
+          }}
+          .chooserSoon {{ color:#78350f; background:#fef3c7; }}
+          .chooserFree {{ color:#115e59; background:#ccfbf1; }}
+          @media(max-width:850px) {{
+            .chooserGrid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }}
+          }}
+          @media(max-width:560px) {{
+            .chooserGrid {{ gap:8px; }}
+            .chooserCard {{ padding:10px; gap:6px; }}
+            .chooserCardTitle {{ align-items:flex-start; gap:6px; }}
+            .chooserIcon {{ width:25px; height:25px; font-size:16px; }}
+            .chooserCard p {{ font-size:.88rem; }}
+          }}
+          @media(max-width:350px) {{
+            .chooserGrid {{ grid-template-columns:minmax(0,1fr); }}
+          }}
         </style>
       </section>
     """
@@ -78,142 +117,29 @@ def home(request: Request):
     actions = """
     <a class="btn" href="/pricing">Prezzi</a>
     <a class="btn" href="/login">Accedi</a>
-    <a class="btn btn-primary" href="#scegli">Prova gratis</a>
+    <a class="btn btn-primary" href="#scegli">Scegli il tuo QR</a>
     """
 
     body = """
-    <section class="modularHome">
-      <div class="moduleHero">
-        <div class="moduleHeroOverlay">
-          <div class="moduleEyebrow">Piattaforma QR modulare</div>
-          <h1>QRFACILE</h1>
-          <p>
-            Etichetta digitale del vino pronta in pochi minuti: ingredienti,
-            valori nutrizionali, allergeni e riciclo in un QR che stampi una volta
-            e aggiorni quando vuoi. Nessun abbonamento: 3 QR vino gratuiti per iniziare.
-          </p>
-          <div class="moduleHeroActions">
-            <a class="btn btn-primary" href="#scegli">Scegli il tuo QR, 3 gratis</a>
-            <a class="btn" href="/wine">Come funziona</a>
+    <div class="modularHome">
+      {module_chooser}
+
+      <section class="moduleIntro" aria-labelledby="come-funziona-title">
+        <h2 id="come-funziona-title">Stampi il QR una volta. Lo aggiorni quando vuoi.</h2>
+        <p>Gestisci il contenuto dal tuo pannello, senza cambiare il codice che hai già stampato.</p>
+        <div class="moduleActiveGrid">
+          <div class="moduleFeature">
+            <b>Contenuti aggiornabili</b>
+            <span>Il codice rimanda a una pagina pubblica che puoi modificare.</span>
           </div>
-          <div class="moduleHeroBadges">
-            <span>Moduli attivabili</span>
-            <span>QR dinamici</span>
-            <span>Console operativa</span>
-            <span>Export stampa</span>
+          <div class="moduleFeature">
+            <b>Pannello riservato</b>
+            <span>Chi scansiona il QR vede la pagina pubblica, non il tuo pannello di gestione.</span>
           </div>
-        </div>
-      </div>
-
-{module_chooser}
-
-      <section class="moduleIntro">
-        <div>
-          <div class="moduleEyebrow">Piattaforma generale</div>
-          <h2>QR dinamici per esigenze diverse.</h2>
-          <p>
-            Un'unica piattaforma per creare QR dinamici, contenuti aggiornabili
-            e pagine dedicate. Parti dal modulo più adatto e attiva nuovi usi QR
-            quando ti servono.
-          </p>
-        </div>
-        <div class="moduleStatus active">Attivo</div>
-      </section>
-
-      <section class="moduleActiveGrid">
-        <div class="moduleFeature">
-          <b>QR dinamici</b>
-          <span>Ogni modulo gestisce contenuti aggiornabili collegati a QR pubblici.</span>
-        </div>
-        <div class="moduleFeature">
-          <b>Pagine pubbliche</b>
-          <span>Esperienze verticali per consultazione, informazione, raccolta dati o operatività.</span>
-        </div>
-        <div class="moduleFeature">
-          <b>Console riservata</b>
-          <span>Accesso operativo separato dalla pagina pubblica mostrata tramite QR.</span>
-        </div>
-        <div class="moduleFeature">
-          <b>Piani chiari</b>
-          <span>Scegli il percorso più adatto al tuo uso, dal primo progetto alla crescita.</span>
-        </div>
-      </section>
-
-      <section class="moduleCatalogHead" id="moduli">
-        <div class="moduleEyebrow">Roadmap modulare</div>
-        <h2>Una base, più moduli verticali.</h2>
-        <p>
-          QRFACILE nasce come piattaforma generale: ogni modulo mantiene lo stesso
-          approccio operativo, con QR dinamici, pagine pubbliche e pannello di gestione.
-        </p>
-      </section>
-
-      <section class="moduleCatalog">
-        <article class="moduleCard active">
-          <div class="moduleCardTop">
-            <span class="moduleStatus active">Attivo</span>
-            <b>Wine Compliance · senza canone annuale</b>
+          <div class="moduleFeature">
+            <b>Pronto da stampare</b>
+            <span>Scarica il codice per etichette, confezioni o materiali promozionali.</span>
           </div>
-          <p>Acquisti crediti quando servono; i QR restano online 10 o 25 anni senza rinnovi obbligatori.</p>
-          <a class="btn btn-primary" href="/wine">Vai al modulo</a>
-        </article>
-
-        <article class="moduleCard">
-          <div class="moduleCardTop">
-            <span class="moduleStatus soon">In arrivo</span>
-            <b>Link Diretto</b>
-          </div>
-          <p>QR dinamico verso pagine, PDF, cataloghi o link esterni aggiornabili.</p>
-          <a class="btn" href="/link">Scopri modulo</a>
-        </article>
-
-        <article class="moduleCard">
-          <div class="moduleCardTop">
-            <span class="moduleStatus soon">In arrivo</span>
-            <b>Menu Ristorante</b>
-          </div>
-          <p>Menu digitale aggiornabile per sale, tavoli, asporto e carte stagionali.</p>
-          <a class="btn" href="/menu">Scopri modulo</a>
-        </article>
-
-        <article class="moduleCard">
-          <div class="moduleCardTop">
-            <span class="moduleStatus soon">In arrivo</span>
-            <b>Quiz / Formazione</b>
-          </div>
-          <p>QR per percorsi formativi, quiz, raccolta risposte e contenuti didattici.</p>
-          <a class="btn" href="/quiz">Scopri modulo</a>
-        </article>
-
-        <article class="moduleCard">
-          <div class="moduleCardTop">
-            <span class="moduleStatus soon">In arrivo</span>
-            <b>QR Magazzino</b>
-          </div>
-          <p>Schede operative per prodotti, scaffali, materiali e inventari leggeri.</p>
-          <a class="btn" href="/warehouse">Scopri modulo</a>
-        </article>
-
-        <article class="moduleCard">
-          <div class="moduleCardTop">
-            <span class="moduleStatus soon">In arrivo</span>
-            <b>Eventi / Votazioni</b>
-          </div>
-          <p>QR per eventi, raccolta preferenze, votazioni, accesso rapido e feedback.</p>
-          <a class="btn" href="/events">Scopri modulo</a>
-        </article>
-      </section>
-
-      <section class="moduleFinal">
-        <div>
-          <div class="moduleEyebrow">Moduli e piani</div>
-          <h2>Trova il modulo giusto per il tuo prossimo QR.</h2>
-          <p>Inizia da un uso concreto e aggiungi nuove esperienze QR quando la tua attività cresce.</p>
-        </div>
-        <div class="moduleFinalActions">
-          <a class="btn btn-primary" href="/register-winery">Prova gratis QRFACILE Wine</a>
-          <a class="btn" href="/wine">Scopri il modulo Wine</a>
-          <a class="btn" href="/login">Login</a>
         </div>
       </section>
 
@@ -223,267 +149,44 @@ def home(request: Request):
           margin:0 auto;
         }
 
-        .moduleHero {
-          min-height:560px;
-          border-radius:30px;
-          overflow:hidden;
-          position:relative;
-          display:flex;
-          align-items:flex-end;
-          background:
-            linear-gradient(90deg,rgba(8,47,73,.90),rgba(15,118,110,.62),rgba(255,255,255,.06)),
-            url('/static/qr3d.png') center right / contain no-repeat,
-            linear-gradient(135deg,#0f766e,#f8fafc);
-          box-shadow:0 28px 90px rgba(2,8,23,.14);
-        }
-
-        .moduleHeroOverlay {
-          width:100%;
-          min-height:560px;
-          padding:44px;
-          display:flex;
-          flex-direction:column;
-          justify-content:flex-end;
-          background:linear-gradient(180deg,rgba(2,8,23,.08),rgba(2,8,23,.42));
-        }
-
-        .moduleEyebrow {
-          display:inline-flex;
-          width:max-content;
-          padding:8px 13px;
-          border-radius:999px;
-          background:rgba(236,253,245,.92);
-          color:#0f766e;
-          font-size:12px;
-          font-weight:950;
-          letter-spacing:.04em;
-          text-transform:uppercase;
-        }
-
-        .moduleHero h1 {
-          margin-top:16px;
-          margin-bottom:0;
-          font-size:clamp(48px,8vw,96px);
-          line-height:.95;
-          font-weight:950;
-          letter-spacing:0;
-          color:white;
-        }
-
-        .moduleHero p {
-          margin-top:18px;
-          max-width:720px;
-          color:#ecfeff;
-          font-size:18px;
-          font-weight:720;
-          line-height:1.55;
-        }
-
-        .moduleHeroActions,
-        .moduleFinalActions {
-          margin-top:24px;
-          display:flex;
-          gap:12px;
-          flex-wrap:wrap;
-        }
-
-        .moduleHeroBadges {
-          margin-top:20px;
-          display:flex;
-          gap:9px;
-          flex-wrap:wrap;
-        }
-
-        .moduleHeroBadges span {
-          display:inline-flex;
-          padding:8px 11px;
-          border-radius:999px;
-          background:rgba(255,255,255,.18);
-          border:1px solid rgba(255,255,255,.28);
-          color:white;
-          font-size:12px;
-          font-weight:900;
-        }
-
-        .moduleIntro,
-        .moduleFeature,
-        .moduleCard,
-        .moduleAudience > div,
-        .moduleFinal {
-          border:1px solid rgba(2,8,23,.08);
-          border-radius:22px;
-          background:rgba(255,255,255,.84);
-          box-shadow:0 18px 55px rgba(2,8,23,.06);
-        }
-
         .moduleIntro {
-          margin-top:22px;
-          padding:26px;
-          display:grid;
-          grid-template-columns:minmax(0,1fr) auto;
-          gap:18px;
-          align-items:start;
+          margin:26px 0 0;
+          padding:clamp(16px,3vw,26px);
+          border:1px solid #dce5e6;
+          border-radius:22px;
+          background:#fff;
         }
 
-        .moduleIntro h2,
-        .moduleCatalogHead h2,
-        .moduleAudience h2,
-        .moduleFinal h2 {
-          margin:10px 0 0;
-          font-size:clamp(28px,4vw,46px);
-          line-height:1.05;
-          font-weight:950;
-          letter-spacing:0;
+        .moduleIntro h2 {
+          margin:0;
+          font-size:clamp(22px,3vw,30px);
+          line-height:1.2;
           color:#0f172a;
         }
 
         .moduleIntro p,
-        .moduleCatalogHead p,
-        .moduleAudience p,
-        .moduleFinal p,
-        .moduleCard p,
-        .moduleFeature span {
-          color:#475569;
-          font-weight:730;
-          line-height:1.55;
-        }
+        .moduleFeature span { color:#475569; line-height:1.5; }
 
-        .moduleStatus {
-          display:inline-flex;
-          width:max-content;
-          padding:7px 11px;
-          border-radius:999px;
-          font-size:12px;
-          font-weight:950;
-          text-transform:uppercase;
-        }
-
-        .moduleStatus.active {
-          color:#0f766e;
-          background:rgba(236,253,245,.95);
-          border:1px solid rgba(20,184,166,.16);
-        }
-
-        .moduleStatus.soon {
-          color:#7c2d12;
-          background:rgba(255,247,237,.96);
-          border:1px solid rgba(251,146,60,.20);
-        }
-
-        .moduleActiveGrid,
-        .moduleCatalog {
-          margin-top:18px;
+        .moduleActiveGrid {
+          margin-top:16px;
           display:grid;
-          grid-template-columns:repeat(4,minmax(0,1fr));
-          gap:14px;
-        }
-
-        .moduleFeature,
-        .moduleCard {
-          padding:20px;
-        }
-
-        .moduleFeature b,
-        .moduleCard b {
-          display:block;
-          color:#0f172a;
-          font-size:17px;
-          font-weight:950;
-        }
-
-        .moduleFeature span {
-          display:block;
-          margin-top:8px;
-          font-size:14px;
-        }
-
-        .moduleCatalogHead {
-          margin-top:36px;
-        }
-
-        .moduleCatalog {
-          grid-template-columns:repeat(3,minmax(0,1fr));
-        }
-
-        .moduleCard {
-          min-height:190px;
-          display:flex;
-          flex-direction:column;
-          justify-content:space-between;
-          gap:18px;
-        }
-
-        .moduleCard.active {
-          background:linear-gradient(135deg,rgba(236,253,245,.96),rgba(255,255,255,.92));
-          border-color:rgba(20,184,166,.18);
-        }
-
-        .moduleCardTop {
-          display:grid;
+          grid-template-columns:repeat(auto-fit,minmax(min(100%,235px),1fr));
           gap:12px;
         }
 
-        .moduleAudience {
-          margin-top:22px;
-          display:grid;
-          grid-template-columns:1fr 1fr;
-          gap:16px;
+        .moduleFeature {
+          padding:14px;
+          border:1px solid #dce5e6;
+          border-radius:14px;
+          background:#f8fafc;
         }
 
-        .moduleAudience > div {
-          padding:26px;
-        }
+        .moduleFeature b,
+        .moduleFeature span { display:block; }
 
-        .moduleAudience .btn {
-          margin-top:18px;
-        }
-
-        .moduleFinal {
-          margin-top:24px;
-          padding:28px;
-          display:flex;
-          justify-content:space-between;
-          align-items:center;
-          gap:20px;
-          background:
-            radial-gradient(circle at 0% 0%, rgba(191,245,230,.50), transparent 34%),
-            rgba(255,255,255,.88);
-        }
-
-        @media(max-width:1050px) {
-          .moduleActiveGrid,
-          .moduleCatalog,
-          .moduleAudience,
-          .moduleIntro {
-            grid-template-columns:1fr;
-          }
-
-          .moduleFinal {
-            flex-direction:column;
-            align-items:flex-start;
-          }
-        }
-
-        @media(max-width:560px) {
-          .moduleHero,
-          .moduleHeroOverlay {
-            min-height:620px;
-          }
-
-          .moduleHeroOverlay,
-          .moduleIntro,
-          .moduleAudience > div,
-          .moduleFinal {
-            padding:24px;
-          }
-
-          .moduleHeroActions .btn,
-          .moduleFinalActions .btn {
-            width:100%;
-          }
-        }
+        .moduleFeature span { margin-top:4px; font-size:14px; }
       </style>
-    </section>
+    </div>
     """
 
     # QRFacile Link is not released yet: its tile shows "In arrivo".
@@ -494,7 +197,7 @@ def home(request: Request):
         subtitle="Home",
         body_html=body,
         actions_html=actions,
-        description="QRFACILE è la piattaforma Enolab per QR dinamici. Il modulo Wine gestisce etichette digitali vino, dati obbligatori e file QR per la stampa.",
+        description="Scegli il QR adatto alla tua attività. Con QRFacile Wine crei etichette digitali per il vino e scarichi il QR per la stampa.",
         canonical_path="/",
         structured_data={
             "@context": "https://schema.org",
@@ -1025,10 +728,7 @@ def link_home(request: Request):
           padding:44px;
           display:flex;
           align-items:flex-end;
-          background:
-            linear-gradient(90deg,rgba(15,23,42,.90),rgba(15,118,110,.55)),
-            url('/static/qr3d.png') center right / contain no-repeat,
-            linear-gradient(135deg,#0f172a,#f8fafc);
+          background:linear-gradient(135deg,#0f172a,#0f766e);
           box-shadow:0 28px 90px rgba(2,8,23,.14);
           overflow:hidden;
         }
@@ -1264,10 +964,7 @@ def _coming_soon_module_page(
           padding:44px;
           display:flex;
           align-items:flex-end;
-          background:
-            linear-gradient(90deg,rgba(15,23,42,.90),rgba(15,118,110,.58)),
-            url('/static/qr3d.png') center right / contain no-repeat,
-            linear-gradient(135deg,#0f172a,#f8fafc);
+          background:linear-gradient(135deg,#0f172a,#0f766e);
           box-shadow:0 28px 90px rgba(2,8,23,.14);
           overflow:hidden;
         }}
