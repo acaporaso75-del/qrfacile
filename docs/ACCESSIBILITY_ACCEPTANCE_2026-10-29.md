@@ -140,3 +140,39 @@ riportato e nessun modulo d'acquisto è stato attivato.
 Restano da verificare zoom nativo, lettore di schermo, contrasto manuale
 non risolto e i rimanenti percorsi autenticati. L'esito complessivo resta
 `NOT_VERIFIED`; nessuna modifica al runtime.
+
+### Retest del link e zoom nativo — 27 novembre 2026, Europe/Rome
+
+Staging `192.168.1.139:8001`, SHA `deb457815211f176032b845b506329eb2ee630ba`.
+Compliance CI [46065082538](https://github.com/acaporaso75-del/qrfacile/actions/runs/46065082538):
+618 test superati. Alle 21:41 CET, `RELEASE_HEALTH_OK` e `GET /healthz`
+confermano lo stesso SHA e database OK. Checkout staging pulito e hash
+SHA-256 dei file verificati contro il commit. Nessuna migrazione.
+Backup verificato `/opt/qrfacile-backups/staging/20261127_214035_staging_700cf959c779`;
+albero di rollback conservato `/opt/qrfacile-staging.rollback-20261127_214035-700cf959c779`.
+
+- **A11Y-03 — PASS:** in Prezzi e Crediti il link «richiedi un preventivo»
+  verso `/support` è sottolineato a riposo dopo un normale ricaricamento,
+  anche con il CSS precedente in cache. Al 400% entrambe le istanze
+  mostrano al focus da tastiera un contorno solido di 3 px.
+- **Zoom nativo Chrome — PASS sulle viste provate.** Percentuali lette
+  dall'interfaccia di Chrome; nessuna emulazione della larghezza o modifica CSS.
+
+  | Zoom | `clientWidth` | `scrollWidth` | Scorrimento orizzontale |
+  | --- | ---: | ---: | --- |
+  | 200% | 935 px CSS | 935 px CSS | 0 su 14 viste |
+  | 400% | 467 px CSS | 467 px CSS | 0 su 14 viste |
+
+  Viste: home, Wine, Prezzi, Supporto, registrazioni Cantina e Studio,
+  accesso, recupero password, Privacy, Cookie, Termini, policy AI, Dashboard
+  e Crediti. Le ultime due usano una sessione QA già attiva. In Crediti
+  restano visibili entro la larghezza utile i sette pulsanti d'acquisto;
+  i tre checkbox di conferma hanno una label. Ripristinato lo zoom iniziale.
+- **Lettore di schermo — NOT_VERIFIED:** l'Assistente vocale di Windows
+  si è avviato ma si è chiuso prima di poter acquisire la trascrizione
+  del parlato. L'albero di accessibilità di Chrome non sostituisce questa
+  prova. Resta da osservare l'annuncio del link e dei controlli con il lettore
+  in esecuzione; non viene aggiornata la decisione del gate sullo SHA corrente.
+
+Nessun invio di moduli, reinvio, nuovo ordine o pagamento. Nessun
+intervento in produzione o su PayPal Live.
