@@ -84,3 +84,30 @@ Decisione: [ ] PASS  [x] PASS CON LIMITI  [ ] FAIL
 - Limiti residui: il controllo semantico ha usato Chrome Accessibility Tree/CDP, non una sessione umana con Windows Narrator; account Studio privo di etichetta assegnata; area admin verificata come diniego e tramite CI, senza sessione admin interattiva. Riesame manuale raccomandato al GO, non risultano BLOCKER/HIGH aperti.
 - Riferimenti alle evidenze: CI 45001043128; axe-core 4.10.2 su 33 viste senza finding; reflow 200%/400% senza overflow; backup staging `20261122_090509_staging_18013b4371a5`; rollback `/opt/qrfacile-staging.rollback-20261122_090509-18013b4371a5`.
 - Firma o evidenza equivalente: commit documentale sul branch della PR #12 e autorizzazione del titolare nella chat QRFacile del 2026-11-22
+
+## Readback parziale del 2026-11-27 sul candidato attuale
+
+Staging `192.168.1.139:8001`, ore 20:24–20:27 CET (Europe/Rome),
+SHA `a50b03acb4861e46a74ea640a56fc9b0bae1626d`, Compliance CI
+`46056205589` verde. `GET /healthz` ha confermato lo SHA prima e dopo
+i controlli automatici. La decisione storica sopra resta riferita al suo SHA:
+**il gate accessibilità sul candidato attuale è NOT_VERIFIED**.
+
+- Chrome 158.0.8127.38 con axe-core 4.10.2, regole WCAG 2.0/2.1 A/AA.
+  Quindici viste pubbliche a 1280, 390 (mobile) e 320 px: 45 risposte HTTP
+  200, nessuna violazione automatica, nessuno scorrimento orizzontale
+  della pagina e nessun errore JavaScript rilevato. Le viste comprendono
+  home, Wine, prezzi, cinque pagine legali/di supporto, registrazione
+  Cantina e Studio, login e recupero, QR pubblico IT/EN.
+- Controlli Browser Use: primo focus visibile su home, Wine, prezzi e viste
+  legali/di supporto; link per saltare al contenuto visibile al focus in home.
+  Misure di reflow alle larghezze equivalenti al 200%/400%, non prova
+  manuale dello zoom effettivo. I campi visibili delle registrazioni, di
+  login e di recupero risultano etichettati; non sono stati inviati moduli.
+- Restano da verificare manualmente i casi segnalati come inconcludenti da
+  axe (`color-contrast` e `link-in-text-block`), il lettore di schermo, gli
+  errori, lo zoom effettivo e i percorsi autenticati. In particolare
+  `GET /app/billing` nel browser di prova rimanda a `/login`: il controllo
+  Crediti su mobile, 200% e 400% richiede una sessione QA già autenticata.
+- Nessun account creato, nessuna modifica allo staging e nessun checkout
+  avviato durante questi controlli.
