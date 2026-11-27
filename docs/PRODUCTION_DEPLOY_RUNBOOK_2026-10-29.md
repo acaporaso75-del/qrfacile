@@ -95,6 +95,14 @@ python scripts/check_release_preflight.py \
 
 Il comando verifica identità del checkout e del runtime, configurazione senza mostrarla, approvazioni esterne, accettazione accessibilità, prova reale SMTP/alert, collaudo webhook PayPal Sandbox firmato e prova di restore isolata per lo SHA funzionale/PR e il backup esatti, destinatario alert, modalità e configurazione webhook PayPal, database produttivo, set delle 19 migrazioni, backup recente (massimo 24 ore) con almeno due artefatti verificati dal relativo `SHA256SUMS`, percorso rollback e spazio disco. Sono ammessi dopo lo SHA approvato soltanto commit che modificano i documenti di evidenza o gli esatti validatori/test di release elencati nell'allowlist; qualunque modifica successiva al runtime, alle migrazioni o alla configurazione invalida il gate. Qualunque esito diverso da `RELEASE_PREFLIGHT_OK` impedisce lo swap. I validatori stampano soltanto nomi di sezioni/campi mancanti, mai i contenuti compilati.
 
+`--expected-environment production` indica l'ambiente da rilasciare: governa
+la verifica della configurazione runtime, il verbale operativo SMTP/alert e
+quello del restore del backup. I verbali di accessibilità e di webhook PayPal
+Sandbox devono invece attestare collaudi su **staging**, entrambi sullo stesso
+SHA esatto di `--expected-release`. Un ambiente mancante, ambiguo o errato per
+uno di questi verbali blocca il preflight. Le prove di staging non sostituiscono
+lo smoke test di produzione dopo il rilascio.
+
 ## Migrazioni
 
 Applicare, sotto il ruolo applicativo e nell’ordine registrato in `PRODUCTION_RELEASE_GATE_2026-10-29.md`, esclusivamente le migrazioni non ancora presenti nel database effettivo.

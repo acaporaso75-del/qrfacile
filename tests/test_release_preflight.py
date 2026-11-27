@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+from runpy import run_path
 
 import pytest
 
@@ -340,6 +341,83 @@ def test_preflight_rejects_missing_runtime_directory_without_exposing_database_u
 
     assert errors == ["directory runtime o persistenti non disponibili"]
     assert "test-only" not in " ".join(errors)
+
+
+def _completed_acceptance_documents(backup: Path) -> dict[str, str]:
+    def fixture(test_file: str, name: str, *args) -> str:
+        return run_path(str(Path(__file__).with_name(f"test_{test_file}.py")))[name](*args)
+
+    staging = "[x] staging  [ ] produzione"
+    production = "[ ] staging  [x] produzione"
+    return {
+        "approvals": fixture("production_approvals", "_complete_document"),
+        "accessibility": fixture("accessibility_acceptance", "_complete_document")
+        .replace(production, staging)
+        .replace("https://www.qrfacile.it", "https://staging.example.test"),
+        "operational-acceptance": fixture("operational_acceptance", "_complete")
+        .replace(staging, production)
+        .replace("https://staging.example.test", "https://www.qrfacile.it"),
+        "paypal-sandbox-acceptance": fixture("paypal_sandbox_acceptance", "_complete"),
+        "restore-acceptance": fixture("restore_acceptance", "_complete_document", backup),
+    }
+
+
+@pytest.mark.parametrize(("document", "before", "after", "error"), [
+    (None, "", "", None),
+    ("accessibility", "[x] staging  [ ] produzione", "[ ] staging  [x] produzione",
+     "accettazione accessibilità incompleta o incoerente"),
+    ("paypal-sandbox-acceptance", "[x] staging  [ ] produzione", "[ ] staging  [x] produzione",
+     "accettazione webhook PayPal Sandbox incompleta o incoerente"),
+    ("paypal-sandbox-acceptance", SHA, "b" * 40,
+     "accettazione webhook PayPal Sandbox incompleta o incoerente"),
+    ("operational-acceptance", "[ ] staging  [x] produzione", "[x] staging  [ ] produzione",
+     "accettazione SMTP/alert incompleta o incoerente"),
+    ("restore-acceptance", "[ ] staging  [x] produzione", "[x] staging  [ ] produzione",
+     "accettazione restore incompleta o incoerente"),
+    ("approvals", "Esito finale: [x] GO  [ ] NO-GO", "Esito finale: [ ] GO  [x] NO-GO",
+     "approvazioni produzione incomplete o incoerenti"),
+])
+def test_production_preflight_validates_rehearsals_without_relaxing_release_gates(
+    tmp_path, monkeypatch, capsys, document, before, after, error
+):
+    candidate = tmp_path / "candidate"
+    rollback = tmp_path / "rollback"
+    backup = tmp_path / "backup"
+    _release_tree(candidate)
+    _release_tree(rollback)
+    _verified_backup(backup)
+    for name, value in _production_source(tmp_path / "runtime").items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(check_release_preflight, "_git_head", lambda _root: SHA)
+
+    documents = _completed_acceptance_documents(backup)
+    if document is not None:
+        assert before in documents[document]
+        documents[document] = documents[document].replace(before, after)
+    args = [
+        "--candidate-root", str(candidate),
+        "--backup-path", str(backup),
+        "--rollback-path", str(rollback),
+        "--expected-environment", "production",
+        "--expected-release", SHA,
+        "--expected-paypal-mode", "sandbox",
+        "--expected-pr", "12",
+        "--min-free-gb", "0.001",
+    ]
+    for name, content in documents.items():
+        path = tmp_path / f"{name}.md"
+        path.write_text(content, encoding="utf-8")
+        args.extend([f"--{name}-path", str(path)])
+
+    exit_code = check_release_preflight.main(args)
+    output = capsys.readouterr()
+    if error is None:
+        assert exit_code == 0, output.err
+        assert f"RELEASE_PREFLIGHT_OK environment=production release={SHA}" in output.out
+    else:
+        assert exit_code == 1
+        assert output.err.splitlines() == [f"RELEASE_PREFLIGHT_MISMATCH {error}"]
+        assert "RELEASE_PREFLIGHT_OK" not in output.out
 
 
 def test_preflight_never_reports_sensitive_configuration(tmp_path, monkeypatch, capsys):

@@ -29,6 +29,8 @@ from scripts.run_operational_monitor import load_alert_recipient
 
 FULL_GIT_SHA = re.compile(r"[0-9a-f]{40}")
 PRODUCTION_ORIGINS = {"https://qrfacile.it", "https://www.qrfacile.it"}
+# These rehearsals are run on the exact candidate in staging, before any swap.
+PREDEPLOY_REHEARSAL_ENVIRONMENT = "staging"
 REQUIRED_MIGRATIONS = (
     "2026_legal_ai_compliance.sql",
     "2026_legal_acceptance_constraints.sql",
@@ -221,7 +223,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--candidate-root", type=Path, required=True)
     parser.add_argument("--backup-path", type=Path, required=True)
     parser.add_argument("--rollback-path", type=Path, required=True)
-    parser.add_argument("--expected-environment", choices=("staging", "production"), required=True)
+    parser.add_argument(
+        "--expected-environment",
+        choices=("staging", "production"),
+        required=True,
+        help="Ambiente di destinazione; i collaudi accessibilità e webhook Sandbox si eseguono su staging.",
+    )
     parser.add_argument("--expected-release", required=True)
     parser.add_argument("--expected-paypal-mode", choices=("sandbox", "live"), required=True)
     parser.add_argument("--approvals-path", type=Path, required=True)
@@ -289,7 +296,7 @@ def main(argv: list[str] | None = None) -> int:
         accessibility_errors=validate_accessibility_acceptance(
             accessibility_text,
             expected_release=expected_release,
-            expected_environment=args.expected_environment,
+            expected_environment=PREDEPLOY_REHEARSAL_ENVIRONMENT,
         ),
         operational_errors=validate_operational_acceptance(
             operational_text,
@@ -299,7 +306,7 @@ def main(argv: list[str] | None = None) -> int:
         paypal_sandbox_errors=validate_paypal_sandbox_acceptance(
             paypal_sandbox_text,
             expected_release=expected_release,
-            expected_environment=args.expected_environment,
+            expected_environment=PREDEPLOY_REHEARSAL_ENVIRONMENT,
         ),
         restore_errors=validate_restore_acceptance(
             restore_text,
