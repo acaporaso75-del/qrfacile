@@ -1,10 +1,11 @@
+import asyncio
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from fastapi import HTTPException, Request
 
 from qrfacile_app import paypal_ui
 from qrfacile_app.services import invoice_handoff
@@ -71,10 +72,25 @@ def _sandbox(monkeypatch):
     monkeypatch.setattr(paypal_ui, "_paypal_token", lambda: "not-logged-token")
 
 
-def _webhook_client():
-    app = FastAPI()
-    app.include_router(paypal_ui.router)
-    return TestClient(app)
+def _post_webhook(event, headers):
+    body = json.dumps(event).encode("utf-8")
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/paypal/webhook",
+        "headers": [(key.encode("ascii"), value.encode("ascii")) for key, value in headers.items()],
+    }
+
+    async def receive():
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    async def invoke():
+        response = await paypal_ui.paypal_webhook(Request(scope, receive))
+        if response.background is not None:
+            await response.background()
+        return response
+
+    return asyncio.run(invoke())
 
 
 @pytest.mark.parametrize("cert_url", [
@@ -149,10 +165,10 @@ def test_paypal_signature_failure_returns_400_without_ledger_or_handoff(monkeypa
         paypal_ui, "handoff_after_payment", lambda *a: pytest.fail("Unverified event triggered Danea")
     )
 
-    with _webhook_client() as client:
-        response = client.post("/paypal/webhook", json=_event(), headers=_headers())
+    with pytest.raises(HTTPException) as rejected_webhook:
+        _post_webhook(_event(), _headers())
 
-    assert response.status_code == 400
+    assert rejected_webhook.value.status_code == 400
     assert caplog.messages == ["paypal_webhook_signature_rejected: verification_failed"]
 
 
@@ -193,13 +209,12 @@ def test_sandbox_order_72_already_paid_does_not_credit_or_send_danea_again(monke
         handoff_results.append((order_id, invoice_handoff.handoff_after_payment(order_id)))
 
     monkeypatch.setattr(paypal_ui, "handoff_after_payment", record_handoff)
-    with _webhook_client() as client:
-        first = client.post("/paypal/webhook", json=_event(), headers=_headers())
-        duplicate = client.post("/paypal/webhook", json=_event(), headers=_headers())
+    first = _post_webhook(_event(), _headers())
+    duplicate = _post_webhook(_event(), _headers())
 
     assert first.status_code == duplicate.status_code == 200
-    assert first.json() == {"ok": True, "status": "processed"}
-    assert duplicate.json() == {"ok": True, "status": "duplicate"}
+    assert json.loads(first.body) == {"ok": True, "status": "processed"}
+    assert json.loads(duplicate.body) == {"ok": True, "status": "duplicate"}
     assert handoff_results == [(72, "already_sent")]
     statements = [(" ".join(call.args[0].split()), call.args[1]) for call in webhook_cur.execute.call_args_list]
     assert len(statements) == 5
