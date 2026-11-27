@@ -29,6 +29,17 @@ def test_primary_buttons_and_muted_text_meet_wcag_aa_contrast():
         assert _ratio(_css_var("muted"), background) >= 4.5, background
 
 
+def test_pricing_quote_link_is_underlined_without_hover_or_focus():
+    from starlette.requests import Request
+
+    from qrfacile_app.pricing_ui import pricing_page
+
+    request = Request({"type": "http", "method": "GET", "path": "/pricing", "headers": [], "query_string": b""})
+    html = pricing_page(request).body.decode()
+    assert '<a class="pricingQuoteLink" href="/support">richiedi un preventivo</a>' in html
+    assert re.search(r"\.pricingPage \.pricingQuoteLink\s*\{\s*text-decoration:\s*underline\s*!important;", html)
+
+
 def test_white_numbers_on_teal_badges_meet_contrast():
     for name in ("dashboard_ui.py", "guided_flow.py", "wine_compliance_ui.py"):
         source = (ROOT / "qrfacile_app" / name).read_text(encoding="utf-8")
