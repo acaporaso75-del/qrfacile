@@ -12,6 +12,7 @@ from fastapi import HTTPException, Request
 from psycopg.conninfo import conninfo_to_dict
 from psycopg.types.json import Jsonb
 
+from qrfacile_app import admin_paypal_webhooks_ui
 from qrfacile_app import paypal_ui
 from qrfacile_app.services import invoice_handoff
 
@@ -264,7 +265,8 @@ def webhook_postgres(monkeypatch):
                 payment_environment text NOT NULL, verification_status text NOT NULL,
                 order_id bigint REFERENCES orders(id), resource_id text, paypal_order_id text,
                 paypal_capture_id text, payload_sha256 char(64) NOT NULL, failure_code text,
-                verified_at timestamptz, processed_at timestamptz
+                verified_at timestamptz, processed_at timestamptz, reviewed_at timestamptz,
+                reviewed_by_user_id bigint, review_resolution text, review_notes text
             );
             CREATE TEMP TABLE audit_log (
                 user_id bigint, role text, action text NOT NULL, entity_type text, entity_id bigint,
@@ -365,6 +367,61 @@ def test_paid_sandbox_webhook_persists_audit_and_deduplicates_on_postgres(webhoo
         SELECT status, paypal_capture_id, invoice_handoff_sent_at, invoice_handoff_attempts
         FROM orders WHERE id = 72
     """).fetchone() == ("paid", "CAP-1", sent_at, 1)
+
+
+@pytest.mark.integration
+def test_admin_closes_manual_webhook_review_once_on_postgres(webhook_postgres, monkeypatch):
+    conn = webhook_postgres
+    monkeypatch.setattr(
+        paypal_ui, "handoff_after_payment", lambda *a: pytest.fail("Manual review triggered Danea")
+    )
+    conn.execute("""
+        INSERT INTO orders (id, user_id, status, payment_environment, paypal_order_id, amount_cents, currency)
+        VALUES (77, 21, 'pending', 'sandbox', 'PP-77', 12078, 'EUR')
+    """)
+    conn.commit()
+    event = _post_webhook(_event(amount="99.00"), _headers())
+    assert json.loads(event.body) == {"ok": True, "status": "manual_review"}
+    event_id, status, failure = conn.execute("""
+        SELECT id, verification_status, failure_code FROM paypal_webhook_events
+    """).fetchone()
+    assert (status, failure) == ("manual_review", "capture_mismatch")
+
+    def admin_user(_request, roles):
+        assert roles == ("admin",)
+        return {"id": 42}
+
+    monkeypatch.setattr(admin_paypal_webhooks_ui, "pg", lambda: nullcontext(conn))
+    monkeypatch.setattr(admin_paypal_webhooks_ui, "require_any_role", admin_user)
+    request = Request({
+        "type": "http",
+        "method": "POST",
+        "scheme": "https",
+        "path": f"/admin/paypal-webhooks/{event_id}/review",
+        "headers": [(b"host", b"app.example.test"), (b"origin", b"https://app.example.test")],
+    })
+    result = admin_paypal_webhooks_ui.review_paypal_webhook(
+        request, event_id, resolution="false_positive", notes="Synthetic review"
+    )
+    assert result.status_code == 303
+    with pytest.raises(HTTPException) as duplicate:
+        admin_paypal_webhooks_ui.review_paypal_webhook(
+            request, event_id, resolution="resolved_external", notes="Second review"
+        )
+    assert duplicate.value.status_code == 404
+    assert conn.execute("""
+        SELECT verification_status, reviewed_at IS NOT NULL, reviewed_by_user_id, review_resolution, review_notes
+        FROM paypal_webhook_events
+    """).fetchall() == [("manual_review", True, 42, "false_positive", "Synthetic review")]
+    assert conn.execute("""
+        SELECT user_id, entity_id, meta FROM audit_log WHERE action='paypal_webhook_reviewed'
+    """).fetchall() == [(42, 77, {
+        "event_id": "WH-1",
+        "event_type": "PAYMENT.CAPTURE.COMPLETED",
+        "resolution": "false_positive",
+    })]
+    assert conn.execute("SELECT status, paypal_capture_id FROM orders WHERE id = 77").fetchone() == ("pending", None)
+    assert conn.execute("SELECT COUNT(*) FROM credit_ledger").fetchone() == (0,)
 
 
 def test_webhook_migration_is_transactional_idempotent_and_minimizes_payloads():

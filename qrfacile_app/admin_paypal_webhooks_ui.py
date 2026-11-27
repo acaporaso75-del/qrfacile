@@ -152,9 +152,9 @@ def review_paypal_webhook(
                     %s, 'admin', 'paypal_webhook_reviewed', 'orders', %s,
                     NULL, 'admin-paypal-webhooks',
                     jsonb_build_object(
-                        'event_id', %s,
-                        'event_type', %s,
-                        'resolution', %s
+                        'event_id', %s::text,
+                        'event_type', %s::text,
+                        'resolution', %s::text
                     ), now()
                 )
                 """,
