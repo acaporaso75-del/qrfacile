@@ -10,6 +10,7 @@ import psycopg
 import pytest
 from fastapi import HTTPException, Request
 from psycopg.conninfo import conninfo_to_dict
+from psycopg.types.json import Jsonb
 
 from qrfacile_app import paypal_ui
 from qrfacile_app.services import invoice_handoff
@@ -231,8 +232,8 @@ def test_sandbox_order_72_already_paid_does_not_credit_or_send_danea_again(monke
     assert (order["invoice_handoff_sent_at"], order["invoice_handoff_attempts"]) == (sent_at, 1)
 
 
-@pytest.mark.integration
-def test_paid_sandbox_webhook_persists_audit_and_deduplicates_on_postgres(monkeypatch):
+@pytest.fixture
+def webhook_postgres(monkeypatch):
     url = os.getenv("QRFACILE_TEST_DATABASE_URL", "").strip()
     if not url:
         pytest.skip("QRFACILE_TEST_DATABASE_URL is not configured")
@@ -244,23 +245,19 @@ def test_paid_sandbox_webhook_persists_audit_and_deduplicates_on_postgres(monkey
 
     _sandbox(monkeypatch)
     monkeypatch.setattr(paypal_ui, "_paypal_post", lambda *a, **k: _Response())
-    monkeypatch.setattr(
-        paypal_ui, "grant_annual_units", lambda *a, **k: pytest.fail("Paid order received more credits")
-    )
-    monkeypatch.setenv("QRFACILE_INVOICE_TO", "billing@example.test")
-    monkeypatch.setattr(
-        invoice_handoff, "send_email_message", lambda *a: pytest.fail("Danea was sent twice")
-    )
-    sent_at = datetime(2026, 11, 27, 17, 48, tzinfo=timezone.utc)
-
     with psycopg.connect(url, hostaddr=loopback[host], connect_timeout=5) as conn:
         # Share session-local tables across both handlers without changing the test DB's public schema.
         conn.execute("""
             SET search_path TO pg_temp;
             CREATE TEMP TABLE orders (
-                id bigint PRIMARY KEY, status text, payment_environment text,
+                id bigint PRIMARY KEY, user_id bigint, pack text, status text, payment_environment text,
                 paypal_order_id text, paypal_capture_id text, amount_cents integer,
-                currency text, invoice_handoff_sent_at timestamptz, invoice_handoff_attempts integer
+                currency text, paid_at bigint, commercial_snapshot jsonb, invoice_handoff_sent_at timestamptz,
+                invoice_handoff_attempts integer
+            );
+            CREATE TEMP TABLE credit_ledger (
+                user_id bigint, credit_type text, delta integer, reason text,
+                ref_table text, ref_id bigint, created_at bigint, expires_at bigint
             );
             CREATE TEMP TABLE paypal_webhook_events (
                 id bigserial PRIMARY KEY, event_id text NOT NULL UNIQUE, event_type text NOT NULL,
@@ -274,47 +271,100 @@ def test_paid_sandbox_webhook_persists_audit_and_deduplicates_on_postgres(monkey
                 ip text, user_agent text, meta jsonb NOT NULL, created_at timestamptz NOT NULL
             );
         """)
-        conn.execute("""
-            INSERT INTO orders (
-                id, status, payment_environment, paypal_order_id, paypal_capture_id, amount_cents,
-                currency, invoice_handoff_sent_at, invoice_handoff_attempts
-            ) VALUES (72, 'paid', 'sandbox', 'PP-77', 'CAP-1', 12078, 'EUR', %s, 1)
-        """, (sent_at,))
         conn.commit()
         monkeypatch.setattr(paypal_ui, "pg", lambda: nullcontext(conn))
         monkeypatch.setattr(invoice_handoff, "pg", lambda: nullcontext(conn))
-        handoff_results = []
+        yield conn
 
-        def record_handoff(order_id):
-            handoff_results.append((order_id, invoice_handoff.handoff_after_payment(order_id)))
 
-        monkeypatch.setattr(paypal_ui, "handoff_after_payment", record_handoff)
+@pytest.mark.integration
+def test_pending_sandbox_webhook_grants_annual_credits_once_on_postgres(webhook_postgres, monkeypatch):
+    conn = webhook_postgres
+    paid_at = 1795798138
+    monkeypatch.setattr(paypal_ui, "now", lambda: paid_at)
+    handoff_calls = []
+    monkeypatch.setattr(paypal_ui, "handoff_after_payment", handoff_calls.append)
+    snapshot = Jsonb({"pack": "annual_start", "annual": True, "wine_credits": 15, "gross_cents": 12078})
+    conn.execute("""
+        INSERT INTO orders (
+            id, user_id, pack, status, payment_environment, paypal_order_id, amount_cents,
+            currency, commercial_snapshot
+        ) VALUES (77, 21, 'annual_start', 'pending', 'sandbox', 'PP-77', 12078, 'EUR', %s)
+    """, (snapshot,))
+    conn.commit()
 
-        first = _post_webhook(_event(), _headers())
-        duplicate = _post_webhook(_event(), _headers())
+    first = _post_webhook(_event(), _headers())
+    duplicate = _post_webhook(_event(), _headers())
 
-        assert first.status_code == duplicate.status_code == 200
-        assert json.loads(first.body) == {"ok": True, "status": "processed"}
-        assert json.loads(duplicate.body) == {"ok": True, "status": "duplicate"}
-        assert handoff_results == [(72, "already_sent")]
-        assert conn.execute("""
-            SELECT event_id, order_id, verification_status, verified_at IS NOT NULL,
-                   processed_at IS NOT NULL, failure_code
-            FROM paypal_webhook_events
-        """).fetchall() == [("WH-1", 72, "processed", True, True, None)]
-        assert conn.execute("SELECT action, entity_id, meta FROM audit_log").fetchall() == [
-            ("paypal_webhook_processed", 72, {
-                "event_id": "WH-1",
-                "event_type": "PAYMENT.CAPTURE.COMPLETED",
-                "payment_environment": "sandbox",
-                "status": "processed",
-                "failure_code": None,
-            }),
-        ]
-        assert conn.execute("""
-            SELECT status, paypal_capture_id, invoice_handoff_sent_at, invoice_handoff_attempts
-            FROM orders WHERE id = 72
-        """).fetchone() == ("paid", "CAP-1", sent_at, 1)
+    assert first.status_code == duplicate.status_code == 200
+    assert json.loads(first.body) == {"ok": True, "status": "processed"}
+    assert json.loads(duplicate.body) == {"ok": True, "status": "duplicate"}
+    assert conn.execute("""
+        SELECT status, payment_environment, paypal_capture_id, paid_at FROM orders WHERE id = 77
+    """).fetchone() == ("paid", "sandbox", "CAP-1", paid_at)
+    assert conn.execute("""
+        SELECT user_id, credit_type, delta, reason, ref_table, ref_id, created_at, expires_at > created_at
+        FROM credit_ledger
+    """).fetchall() == [(21, "wine", 15, "annual_purchase", "orders", 77, paid_at, True)]
+    assert conn.execute("""
+        SELECT order_id, verification_status, verified_at IS NOT NULL FROM paypal_webhook_events
+    """).fetchall() == [(77, "processed", True)]
+    assert handoff_calls == [77]
+
+
+@pytest.mark.integration
+def test_paid_sandbox_webhook_persists_audit_and_deduplicates_on_postgres(webhook_postgres, monkeypatch):
+    conn = webhook_postgres
+    monkeypatch.setenv("QRFACILE_INVOICE_TO", "billing@example.test")
+    monkeypatch.setattr(
+        invoice_handoff, "send_email_message", lambda *a: pytest.fail("Danea was sent twice")
+    )
+    sent_at = datetime(2026, 11, 27, 17, 48, tzinfo=timezone.utc)
+    conn.execute("""
+        INSERT INTO orders (
+            id, user_id, pack, status, payment_environment, paypal_order_id, paypal_capture_id,
+            amount_cents, currency, invoice_handoff_sent_at, invoice_handoff_attempts
+        ) VALUES (72, 21, 'annual_start', 'paid', 'sandbox', 'PP-77', 'CAP-1', 12078, 'EUR', %s, 1)
+    """, (sent_at,))
+    conn.execute("""
+        INSERT INTO credit_ledger (user_id, credit_type, delta, reason, ref_table, ref_id)
+        VALUES (21, 'wine', 15, 'annual_purchase', 'orders', 72)
+    """)
+    conn.commit()
+    handoff_results = []
+
+    def record_handoff(order_id):
+        handoff_results.append((order_id, invoice_handoff.handoff_after_payment(order_id)))
+
+    monkeypatch.setattr(paypal_ui, "handoff_after_payment", record_handoff)
+    first = _post_webhook(_event(), _headers())
+    duplicate = _post_webhook(_event(), _headers())
+
+    assert first.status_code == duplicate.status_code == 200
+    assert json.loads(first.body) == {"ok": True, "status": "processed"}
+    assert json.loads(duplicate.body) == {"ok": True, "status": "duplicate"}
+    assert handoff_results == [(72, "already_sent")]
+    assert conn.execute("SELECT user_id, credit_type, delta, ref_id FROM credit_ledger").fetchall() == [
+        (21, "wine", 15, 72)
+    ]
+    assert conn.execute("""
+        SELECT event_id, order_id, verification_status, verified_at IS NOT NULL,
+               processed_at IS NOT NULL, failure_code
+        FROM paypal_webhook_events
+    """).fetchall() == [("WH-1", 72, "processed", True, True, None)]
+    assert conn.execute("SELECT action, entity_id, meta FROM audit_log").fetchall() == [
+        ("paypal_webhook_processed", 72, {
+            "event_id": "WH-1",
+            "event_type": "PAYMENT.CAPTURE.COMPLETED",
+            "payment_environment": "sandbox",
+            "status": "processed",
+            "failure_code": None,
+        }),
+    ]
+    assert conn.execute("""
+        SELECT status, paypal_capture_id, invoice_handoff_sent_at, invoice_handoff_attempts
+        FROM orders WHERE id = 72
+    """).fetchone() == ("paid", "CAP-1", sent_at, 1)
 
 
 def test_webhook_migration_is_transactional_idempotent_and_minimizes_payloads():
