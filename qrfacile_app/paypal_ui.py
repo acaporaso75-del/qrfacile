@@ -4,6 +4,7 @@ import logging
 import hashlib
 import json
 import os
+import re
 import time
 import requests
 from decimal import Decimal, InvalidOperation
@@ -340,6 +341,30 @@ def _webhook_capture_identity(event: dict, order: dict) -> tuple[str, str]:
         raise RuntimeError("Evento capture PayPal non coerente con ordine") from exc
 
 
+_PAYPAL_WEBHOOK_CERT_HOSTS = {
+    "sandbox": frozenset({"api-m.sandbox.paypal.com", "api.sandbox.paypal.com"}),
+    "live": frozenset({"api-m.paypal.com"}),
+}
+_PAYPAL_WEBHOOK_CERT_PATH = re.compile(r"/v1/notifications/certs/[A-Za-z0-9_-]+")
+
+
+def _cert_url_allowed(value: str, mode: str) -> bool:
+    if "?" in value or "#" in value or any(c.isspace() or ord(c) < 32 for c in value):
+        return False
+    try:
+        cert = urlsplit(value)
+    except ValueError:
+        return False
+    return (
+        cert.scheme == "https"
+        and any(
+            cert.netloc.lower() in (host, f"{host}:443")
+            for host in _PAYPAL_WEBHOOK_CERT_HOSTS.get(mode, ())
+        )
+        and _PAYPAL_WEBHOOK_CERT_PATH.fullmatch(cert.path) is not None
+    )
+
+
 def _verify_paypal_webhook(event: dict, headers) -> bool:
     if not PAYPAL_WEBHOOK_ID:
         raise HTTPException(503, "Webhook PayPal non configurato")
@@ -353,11 +378,11 @@ def _verify_paypal_webhook(event: dict, headers) -> bool:
     }
     values = {key: str(headers.get(name) or "").strip() for key, name in names.items()}
     if any(not value for value in values.values()):
+        logger.warning("paypal_webhook_signature_rejected: missing_headers")
         return False
 
-    cert = urlsplit(values["cert_url"])
-    expected_host = urlsplit(PAYPAL_BASE).hostname
-    if cert.scheme != "https" or cert.hostname != expected_host:
+    if not _cert_url_allowed(values["cert_url"], PAYPAL_MODE):
+        logger.warning("paypal_webhook_signature_rejected: cert_host_not_allowed")
         return False
 
     token = _paypal_token()
@@ -383,7 +408,10 @@ def _verify_paypal_webhook(event: dict, headers) -> bool:
         result = response.json()
     except ValueError as exc:
         raise HTTPException(503, "Risposta verifica webhook non valida") from exc
-    return str(result.get("verification_status") or "").upper() == "SUCCESS"
+    if not isinstance(result, dict) or str(result.get("verification_status") or "").upper() != "SUCCESS":
+        logger.warning("paypal_webhook_signature_rejected: verification_failed")
+        return False
+    return True
 
 
 _PAYPAL_MANUAL_REVIEW_EVENTS = {

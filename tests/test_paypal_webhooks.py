@@ -1,9 +1,13 @@
-from decimal import Decimal
+from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from qrfacile_app import paypal_ui
+from qrfacile_app.services import invoice_handoff
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -50,43 +54,162 @@ class _Response:
         return {"verification_status": "SUCCESS"}
 
 
-def test_signature_verification_posts_required_fields_to_paypal(monkeypatch):
-    posted = {}
+def _headers(cert_url="https://api.sandbox.paypal.com/v1/notifications/certs/CERT-1"):
+    return {
+        "paypal-transmission-id": "T-1",
+        "paypal-transmission-time": "2026-10-29T12:00:00Z",
+        "paypal-cert-url": cert_url,
+        "paypal-auth-algo": "SHA256withRSA",
+        "paypal-transmission-sig": "signature-value",
+    }
+
+
+def _sandbox(monkeypatch):
+    monkeypatch.setattr(paypal_ui, "PAYPAL_MODE", "sandbox")
+    monkeypatch.setattr(paypal_ui, "PAYPAL_BASE", "https://api-m.sandbox.paypal.com")
     monkeypatch.setattr(paypal_ui, "PAYPAL_WEBHOOK_ID", "WH-CONFIGURED")
     monkeypatch.setattr(paypal_ui, "_paypal_token", lambda: "not-logged-token")
+
+
+def _webhook_client():
+    app = FastAPI()
+    app.include_router(paypal_ui.router)
+    return TestClient(app)
+
+
+@pytest.mark.parametrize("cert_url", [
+    "https://api.sandbox.paypal.com/v1/notifications/certs/CERT-1",
+    "https://api-m.sandbox.paypal.com/v1/notifications/certs/CERT-1",
+    "https://api.sandbox.paypal.com:443/v1/notifications/certs/CERT-1",
+])
+def test_signature_verification_posts_required_fields_to_paypal(monkeypatch, cert_url):
+    posted = {}
+    _sandbox(monkeypatch)
 
     def fake_post(url, **kwargs):
         posted.update({"url": url, **kwargs})
         return _Response()
 
-    monkeypatch.setattr(paypal_ui.requests, "post", fake_post)
-    headers = {
-        "paypal-transmission-id": "T-1",
-        "paypal-transmission-time": "2026-10-29T12:00:00Z",
-        "paypal-cert-url": f"{paypal_ui.PAYPAL_BASE}/v1/notifications/certs/CERT-1",
-        "paypal-auth-algo": "SHA256withRSA",
-        "paypal-transmission-sig": "signature-value",
-    }
+    monkeypatch.setattr(paypal_ui, "_paypal_post", fake_post)
     event = _event()
 
-    assert paypal_ui._verify_paypal_webhook(event, headers) is True
-    assert posted["url"].endswith("/v1/notifications/verify-webhook-signature")
+    assert paypal_ui._verify_paypal_webhook(event, _headers(cert_url)) is True
+    assert posted["url"] == "https://api-m.sandbox.paypal.com/v1/notifications/verify-webhook-signature"
     assert posted["json"]["webhook_id"] == "WH-CONFIGURED"
     assert posted["json"]["webhook_event"] is event
+    assert posted["json"]["cert_url"] == cert_url
     assert posted["timeout"] == 30
 
 
-def test_signature_verification_rejects_missing_headers_or_wrong_cert_host(monkeypatch):
-    monkeypatch.setattr(paypal_ui, "PAYPAL_WEBHOOK_ID", "WH-CONFIGURED")
+def test_signature_verification_logs_only_missing_headers_reason(monkeypatch, caplog):
+    _sandbox(monkeypatch)
+    monkeypatch.setattr(paypal_ui, "_paypal_token", lambda: pytest.fail("Unexpected PayPal request"))
     assert paypal_ui._verify_paypal_webhook(_event(), {}) is False
-    headers = {
-        "paypal-transmission-id": "T-1",
-        "paypal-transmission-time": "2026-10-29T12:00:00Z",
-        "paypal-cert-url": "https://example.invalid/cert",
-        "paypal-auth-algo": "SHA256withRSA",
-        "paypal-transmission-sig": "signature-value",
-    }
-    assert paypal_ui._verify_paypal_webhook(_event(), headers) is False
+    assert caplog.messages == ["paypal_webhook_signature_rejected: missing_headers"]
+
+
+@pytest.mark.parametrize("cert_url", [
+    "http://api.sandbox.paypal.com/v1/notifications/certs/CERT-1",
+    "https://user@api.sandbox.paypal.com/v1/notifications/certs/CERT-1",
+    "https://api.sandbox.paypal.com.evil.invalid/v1/notifications/certs/CERT-1",
+    "https://api.sandbox.paypal.com:444/v1/notifications/certs/CERT-1",
+    "https://api.sandbox.paypal.com/v1/notifications/certs/CERT-1?extra=1",
+    "https://api.sandbox.paypal.com/v1/notifications/certs/CERT-1#extra",
+    "https://api.sandbox.paypal.com/v1/notifications/certs/../other",
+    "https://api-m.sandbox.paypal.com/v1/notifications/certs/%2e%2e",
+    "https://api-m.sandbox.paypal.com/v1/notifications/other",
+    "https://api-m.sandbox.paypal.com/v1/notifications/certs/",
+    "https://api-m.paypal.com/v1/notifications/certs/CERT-1",
+    "https://[invalid/v1/notifications/certs/CERT-1",
+])
+def test_signature_verification_rejects_out_of_policy_cert_urls(monkeypatch, caplog, cert_url):
+    _sandbox(monkeypatch)
+    monkeypatch.setattr(paypal_ui, "_paypal_token", lambda: pytest.fail("Unexpected PayPal request"))
+    assert paypal_ui._verify_paypal_webhook(_event(), _headers(cert_url)) is False
+    assert caplog.messages == ["paypal_webhook_signature_rejected: cert_host_not_allowed"]
+
+
+@pytest.mark.parametrize("cert_url, allowed", [
+    ("https://api-m.paypal.com/v1/notifications/certs/CERT-1", True),
+    ("https://api.paypal.com/v1/notifications/certs/CERT-1", False),
+    ("https://api.sandbox.paypal.com/v1/notifications/certs/CERT-1", False),
+    ("https://api-m.sandbox.paypal.com/v1/notifications/certs/CERT-1", False),
+])
+def test_live_does_not_admit_sandbox_or_unverified_alternate_host(cert_url, allowed):
+    assert paypal_ui._cert_url_allowed(cert_url, "live") is allowed
+
+
+def test_paypal_signature_failure_returns_400_without_ledger_or_handoff(monkeypatch, caplog):
+    _sandbox(monkeypatch)
+    rejected = MagicMock(status_code=200)
+    rejected.json.return_value = {"verification_status": "FAILURE", "debug": "not-for-logs"}
+    monkeypatch.setattr(paypal_ui, "_paypal_post", lambda *a, **k: rejected)
+    monkeypatch.setattr(paypal_ui, "pg", lambda: pytest.fail("Unverified event reached the DB"))
+    monkeypatch.setattr(
+        paypal_ui, "handoff_after_payment", lambda *a: pytest.fail("Unverified event triggered Danea")
+    )
+
+    with _webhook_client() as client:
+        response = client.post("/paypal/webhook", json=_event(), headers=_headers())
+
+    assert response.status_code == 400
+    assert caplog.messages == ["paypal_webhook_signature_rejected: verification_failed"]
+
+
+def test_sandbox_order_72_already_paid_does_not_credit_or_send_danea_again(monkeypatch):
+    # Synthetic fixture of the state reached by #72; never touches the staging order.
+    _sandbox(monkeypatch)
+    monkeypatch.setenv("QRFACILE_INVOICE_TO", "billing@example.test")
+    monkeypatch.setattr(paypal_ui, "_paypal_post", lambda *a, **k: _Response())
+    monkeypatch.setattr(
+        paypal_ui, "grant_annual_units", lambda *a, **k: pytest.fail("Paid order received more credits")
+    )
+    monkeypatch.setattr(
+        invoice_handoff, "send_email_message", lambda *a: pytest.fail("Danea was sent twice")
+    )
+    sent_at = datetime(2026, 11, 27, 17, 48, tzinfo=timezone.utc)
+    order = dict(
+        _order(),
+        id=72,
+        status="paid",
+        paypal_capture_id="CAP-1",
+        pack="annual_start",
+        invoice_handoff_sent_at=sent_at,
+        invoice_handoff_attempts=1,
+    )
+    webhook_conn = MagicMock()
+    webhook_conn.__enter__.return_value = webhook_conn
+    webhook_cur = webhook_conn.cursor.return_value.__enter__.return_value
+    webhook_cur.fetchone.side_effect = [{"id": 100}, order, None]
+    monkeypatch.setattr(paypal_ui, "pg", lambda: webhook_conn)
+    mail_conn = MagicMock()
+    mail_conn.__enter__.return_value = mail_conn
+    mail_cur = mail_conn.cursor.return_value.__enter__.return_value
+    mail_cur.fetchone.return_value = order
+    monkeypatch.setattr(invoice_handoff, "pg", lambda: mail_conn)
+    handoff_results = []
+
+    def record_handoff(order_id):
+        handoff_results.append((order_id, invoice_handoff.handoff_after_payment(order_id)))
+
+    monkeypatch.setattr(paypal_ui, "handoff_after_payment", record_handoff)
+    with _webhook_client() as client:
+        first = client.post("/paypal/webhook", json=_event(), headers=_headers())
+        duplicate = client.post("/paypal/webhook", json=_event(), headers=_headers())
+
+    assert first.status_code == duplicate.status_code == 200
+    assert first.json() == {"ok": True, "status": "processed"}
+    assert duplicate.json() == {"ok": True, "status": "duplicate"}
+    assert handoff_results == [(72, "already_sent")]
+    statements = [(" ".join(call.args[0].split()), call.args[1]) for call in webhook_cur.execute.call_args_list]
+    assert len(statements) == 5
+    assert "verified_at" in statements[0][0] and "'verified'" in statements[0][0]
+    assert statements[2][0].startswith("UPDATE paypal_webhook_events")
+    assert statements[2][1] == ("processed", 72, "CAP-1", None, "WH-1")
+    assert "paypal_webhook_processed" in statements[3][0] and "processed" in statements[3][1]
+    assert not any("credit_ledger" in sql or sql.startswith("UPDATE orders") for sql, _ in statements)
+    mail_cur.execute.assert_called_once_with("SELECT * FROM orders WHERE id=%s FOR UPDATE", (72,))
+    assert (order["invoice_handoff_sent_at"], order["invoice_handoff_attempts"]) == (sent_at, 1)
 
 
 def test_webhook_migration_is_transactional_idempotent_and_minimizes_payloads():
