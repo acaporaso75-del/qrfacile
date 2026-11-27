@@ -208,7 +208,7 @@ def pricing_page(request: Request):
       su tutte le bottiglie dello stesso vino, annata e lotto. Un vino, un’annata o un lotto
       differente richiede un nuovo QR e il relativo credito.</p>
       <p>Studi grafici, gestione multi-cantina e grandi volumi:
-      <a class="pricingQuoteLink" href="/support">richiedi un preventivo</a>.</p>
+      <a class="inlineProseLink" href="/support">richiedi un preventivo</a>.</p>
       {paypal_checkout_script()}
 
       <section class="assistSection">
@@ -262,11 +262,6 @@ def pricing_page(request: Request):
         max-width:1180px;
         margin:0 auto;
         padding:20px 0 70px;
-      }}
-
-      .pricingPage .pricingQuoteLink {{
-        text-decoration:underline !important;
-        text-underline-offset:.15em;
       }}
 
       .pricingHero {{

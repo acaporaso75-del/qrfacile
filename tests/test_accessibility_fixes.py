@@ -29,15 +29,19 @@ def test_primary_buttons_and_muted_text_meet_wcag_aa_contrast():
         assert _ratio(_css_var("muted"), background) >= 4.5, background
 
 
-def test_pricing_quote_link_is_underlined_without_hover_or_focus():
+def test_quote_links_are_underlined_without_hover_or_focus():
     from starlette.requests import Request
 
     from qrfacile_app.pricing_ui import pricing_page
 
     request = Request({"type": "http", "method": "GET", "path": "/pricing", "headers": [], "query_string": b""})
     html = pricing_page(request).body.decode()
-    assert '<a class="pricingQuoteLink" href="/support">richiedi un preventivo</a>' in html
-    assert re.search(r"\.pricingPage \.pricingQuoteLink\s*\{\s*text-decoration:\s*underline\s*!important;", html)
+    billing_template = (ROOT / "qrfacile_app" / "billing_ui.py").read_text(encoding="utf-8")
+    css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
+    quote_link = '<a class="inlineProseLink" href="/support">richiedi un preventivo</a>'
+    assert quote_link in html
+    assert quote_link in billing_template
+    assert re.search(r"a\.inlineProseLink\s*\{\s*text-decoration:\s*underline\s*!important;", css)
 
 
 def test_white_numbers_on_teal_badges_meet_contrast():

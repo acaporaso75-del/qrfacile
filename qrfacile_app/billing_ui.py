@@ -451,7 +451,7 @@ def billing(request: Request, msg: str = "", err: str = ""):
       {subscription_html}
       {annual_allowances_html}
       {recommended_box}
-      <p>Studi e gestione multi-cantina: <a href="/support">richiedi un preventivo</a>.</p>
+      <p>Studi e gestione multi-cantina: <a class="inlineProseLink" href="/support">richiedi un preventivo</a>.</p>
 
       <div class="billingPackGrid">
         {pack_cards}
