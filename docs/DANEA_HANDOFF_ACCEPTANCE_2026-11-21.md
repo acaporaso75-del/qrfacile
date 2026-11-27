@@ -128,7 +128,7 @@ che era attivo al momento originario del pagamento.
 | Hand-off Danea | PASS | `invoice_handoff_sent_at` valorizzato (18:48:52 CET), `invoice_handoff_attempts=1`, nessun errore. |
 | Ricezione mail e import in Danea | PASS, dichiarazione del titolare | Il titolare ha confermato entrambi in chat; nessun accesso a caselle o a Danea da parte di Codex. |
 | File originale, campi importati e azioni successive in Danea | NOT_VERIFIED | Nessuna copia della mail o del file è stata letta. Non si deduce una trasmissione allo SDI, né l'eliminazione del documento. |
-| Idempotenza dopo webhook verificato | NOT_VERIFIED a questo readback | Nessuna riga webhook correlata al #72 alle 20:20:59 CET. Vedere `PAYPAL_SANDBOX_ACCEPTANCE_2026-10-31.md` per la verifica del retry. |
+| Idempotenza dopo webhook verificato | PASS | Dopo il retry firmato sullo staging `a50b03a`, alle 21:07:56 CET risultano ancora una sola riga Wine da `+15`, un tentativo Danea e lo stesso `invoice_handoff_sent_at`, senza errori. Vedere `PAYPAL_SANDBOX_ACCEPTANCE_2026-10-31.md`. |
 
 Comandi di evidenza: `GET /healthz`; `git rev-parse HEAD` e confronto
 dell'hash del modulo PayPal installato con quello versionato; `SELECT` in

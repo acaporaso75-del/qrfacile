@@ -8,7 +8,7 @@ Questo documento registra il collaudo end-to-end del webhook firmato sul runtime
 - Ambiente PayPal: [x] Sandbox  [ ] Live
 - SHA installato (40 caratteri): a50b03acb4861e46a74ea640a56fc9b0bae1626d
 - URL listener HTTPS: https://paypal-sandbox.qrfacile.it/paypal/webhook
-- Data, ora e fuso: 2026-11-27, 20:23–20:28 CET, Europe/Rome
+- Data, ora e fuso: 2026-11-27, 20:23–21:07 CET, Europe/Rome
 - Operatore: Codex, su autorizzazione del titolare
 - Riferimento REST app Sandbox: app di staging verificata in sola lettura; valori non esposti
 - Riferimento webhook registrato: SHA-256 prefisso `cb3ab11cae3f`
@@ -19,25 +19,28 @@ Questo documento registra il collaudo end-to-end del webhook firmato sul runtime
 
 - [x] Il listener e registrato sulla stessa REST app Sandbox usata dal checkout di prova.
   Lo stesso accesso in sola lettura a PayPal Sandbox trova il listener configurato e l'evento della capture del #72.
-- [ ] Un evento Sandbox reale, non simulato, ha superato la verifica firma PayPal.
+- [x] Un evento Sandbox reale, non simulato, ha superato la verifica firma PayPal.
 - [x] Header firma mancanti o alterati sono stati rifiutati senza fulfillment.
   Header mancanti provati sul runtime storico del 2 novembre; sul candidato i test confermano il rifiuto se la verifica PayPal fallisce. Variante alterata di un evento reale non provata.
 - [x] Ambiente, event ID, ordine, capture, importo e valuta sono stati correlati esattamente.
   Letti in Sandbox e nel DB staging senza esporre gli ID; corrisponde un solo `PAYMENT.CAPTURE.COMPLETED`.
-- [ ] Solo `PAYMENT.CAPTURE.COMPLETED` ha erogato i crediti previsti, una sola volta.
+- [x] Solo `PAYMENT.CAPTURE.COMPLETED` ha erogato i crediti previsti, una sola volta.
+  Un solo accredito da 15 sul #72 dopo ritorno e retry; primo accredito da webhook e duplicato coperti anche dalla CI su PostgreSQL.
 - [ ] Il reinvio dello stesso evento dal dashboard PayPal e stato acquisito senza duplicare crediti.
+  La riconsegna automatica dello stesso evento è riuscita sul candidato. Non è stato eseguito un nuovo reinvio manuale dal pannello.
 - [x] Un tentativo non verificabile o non correlabile resta fail-closed e osservabile.
   Un POST non verificabile ha restituito HTTP `400`, con ledger invariato e nessun credito erogato.
 - [ ] Eventi diversi da `PAYMENT.CAPTURE.COMPLETED` non hanno erogato crediti e restano auditabili.
 - [ ] Ledger, coda di revisione e alert non espongono payload, event ID, PII o credenziali.
+  Readback e probe aggregato sanitizzati; la consegna dell'alert è da provare nella fase operativa.
 
 ## Esito
 
 Decisione: [ ] PASS  [ ] FAIL
 
-- Nome e ruolo del verificatore: Codex, verifica tecnica; PASS non assegnato
+- Nome e ruolo del verificatore: Codex, verifica tecnica; PASS del retry runtime, attestazione completa ancora aperta
 - Data e fuso orario: 2026-11-27, Europe/Rome
-- Anomalie residue: evento reale del #72 identificato lato PayPal; consegna con firma verificata sul nuovo SHA ancora NOT_VERIFIED.
+- Anomalie residue: il validatore storico richiede ancora la prova del reinvio manuale, degli altri tipi di evento e degli alert; non è stato modificato.
 - Firma o evidenza equivalente: Compliance CI `46056205589`, readback staging e Caddy riportati sotto.
 
 ## Readback della correzione 42P18 e baseline del retry
@@ -71,10 +74,20 @@ Decisione: [ ] PASS  [ ] FAIL
   `check_paypal_webhook_queue.py` in sola lettura alle 20:27:36 CET:
   `open=0 failed=0 stale=0`; non prova una consegna.
 
-**Gate runtime: NOT_VERIFIED.** La verifica sarà completa solo dopo un
-`POST 200` in Caddy correlato a una riga `processed` con `verified_at`
-sullo SHA sopra, una sola riga crediti da `+15` e timestamp/invii Danea
-invariati. Non è stato richiesto alcun reinvio in questa sessione.
+## Retry automatico dell'ordine #72 — PASS runtime
+
+| Prova | Readback del 2026-11-27 (Europe/Rome) |
+| --- | --- |
+| Gateway | Journal Caddy del solo listener Sandbox: 21:07:30 CET, `POST 200`, host certificato `api.sandbox.paypal.com`. |
+| Identità release | `GET /healthz`, `git rev-parse HEAD`, stato checkout pulito e SHA-256 dei moduli PayPal coincidono con `a50b03acb4861e46a74ea640a56fc9b0bae1626d` prima e dopo. |
+| Firma e correlazione | `SELECT` in transazione `READ ONLY`: una riga `processed` per l'ordine interno `72`, `verified_at` e `processed_at` valorizzati alle 21:07:23.503527 CET, ambiente `sandbox` e hash evento `f5250e62468b` uguale a PayPal. Una riga di audit `paypal_webhook_processed`. |
+| Crediti e Danea | Readback alle 21:07:56 CET: una sola riga Wine da `+15`; `invoice_handoff_attempts=1`, timestamp `2026-11-27T18:48:52.337121+01:00` invariato e nessun errore. |
+
+Il retry è la prima elaborazione verificata del webhook, per questo la
+riga è `processed`, non `duplicate`. L'ordine era già pagato dal ritorno
+del browser: il webhook non ha prodotto un secondo accredito o invio.
+Nessun reinvio, nuovo ordine, pagamento o capture eseguito da Codex.
+Il PASS runtime non spunta i controlli rimanenti del protocollo documentale.
 
 ## Riferimenti ufficiali PayPal
 
