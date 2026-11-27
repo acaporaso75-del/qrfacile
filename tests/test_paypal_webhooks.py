@@ -1,11 +1,15 @@
 import asyncio
 import json
+import os
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import psycopg
 import pytest
 from fastapi import HTTPException, Request
+from psycopg.conninfo import conninfo_to_dict
 
 from qrfacile_app import paypal_ui
 from qrfacile_app.services import invoice_handoff
@@ -225,6 +229,92 @@ def test_sandbox_order_72_already_paid_does_not_credit_or_send_danea_again(monke
     assert not any("credit_ledger" in sql or sql.startswith("UPDATE orders") for sql, _ in statements)
     mail_cur.execute.assert_called_once_with("SELECT * FROM orders WHERE id=%s FOR UPDATE", (72,))
     assert (order["invoice_handoff_sent_at"], order["invoice_handoff_attempts"]) == (sent_at, 1)
+
+
+@pytest.mark.integration
+def test_paid_sandbox_webhook_persists_audit_and_deduplicates_on_postgres(monkeypatch):
+    url = os.getenv("QRFACILE_TEST_DATABASE_URL", "").strip()
+    if not url:
+        pytest.skip("QRFACILE_TEST_DATABASE_URL is not configured")
+    config = conninfo_to_dict(url)
+    loopback = {"localhost": "127.0.0.1", "127.0.0.1": "127.0.0.1", "::1": "::1"}
+    host = config.get("host")
+    if host not in loopback or not config.get("dbname", "").startswith("qrfacile_test_"):
+        pytest.fail("The webhook integration test requires an isolated local PostgreSQL test database")
+
+    _sandbox(monkeypatch)
+    monkeypatch.setattr(paypal_ui, "_paypal_post", lambda *a, **k: _Response())
+    monkeypatch.setattr(
+        paypal_ui, "grant_annual_units", lambda *a, **k: pytest.fail("Paid order received more credits")
+    )
+    monkeypatch.setenv("QRFACILE_INVOICE_TO", "billing@example.test")
+    monkeypatch.setattr(
+        invoice_handoff, "send_email_message", lambda *a: pytest.fail("Danea was sent twice")
+    )
+    sent_at = datetime(2026, 11, 27, 17, 48, tzinfo=timezone.utc)
+
+    with psycopg.connect(url, hostaddr=loopback[host], connect_timeout=5) as conn:
+        # Share session-local tables across both handlers without changing the test DB's public schema.
+        conn.execute("""
+            SET search_path TO pg_temp;
+            CREATE TEMP TABLE orders (
+                id bigint PRIMARY KEY, status text, payment_environment text,
+                paypal_order_id text, paypal_capture_id text, amount_cents integer,
+                currency text, invoice_handoff_sent_at timestamptz, invoice_handoff_attempts integer
+            );
+            CREATE TEMP TABLE paypal_webhook_events (
+                id bigserial PRIMARY KEY, event_id text NOT NULL UNIQUE, event_type text NOT NULL,
+                payment_environment text NOT NULL, verification_status text NOT NULL,
+                order_id bigint REFERENCES orders(id), resource_id text, paypal_order_id text,
+                paypal_capture_id text, payload_sha256 char(64) NOT NULL, failure_code text,
+                verified_at timestamptz, processed_at timestamptz
+            );
+            CREATE TEMP TABLE audit_log (
+                user_id bigint, role text, action text NOT NULL, entity_type text, entity_id bigint,
+                ip text, user_agent text, meta jsonb NOT NULL, created_at timestamptz NOT NULL
+            );
+        """)
+        conn.execute("""
+            INSERT INTO orders (
+                id, status, payment_environment, paypal_order_id, paypal_capture_id, amount_cents,
+                currency, invoice_handoff_sent_at, invoice_handoff_attempts
+            ) VALUES (72, 'paid', 'sandbox', 'PP-77', 'CAP-1', 12078, 'EUR', %s, 1)
+        """, (sent_at,))
+        conn.commit()
+        monkeypatch.setattr(paypal_ui, "pg", lambda: nullcontext(conn))
+        monkeypatch.setattr(invoice_handoff, "pg", lambda: nullcontext(conn))
+        handoff_results = []
+
+        def record_handoff(order_id):
+            handoff_results.append((order_id, invoice_handoff.handoff_after_payment(order_id)))
+
+        monkeypatch.setattr(paypal_ui, "handoff_after_payment", record_handoff)
+
+        first = _post_webhook(_event(), _headers())
+        duplicate = _post_webhook(_event(), _headers())
+
+        assert first.status_code == duplicate.status_code == 200
+        assert json.loads(first.body) == {"ok": True, "status": "processed"}
+        assert json.loads(duplicate.body) == {"ok": True, "status": "duplicate"}
+        assert handoff_results == [(72, "already_sent")]
+        assert conn.execute("""
+            SELECT event_id, order_id, verification_status, verified_at IS NOT NULL,
+                   processed_at IS NOT NULL, failure_code
+            FROM paypal_webhook_events
+        """).fetchall() == [("WH-1", 72, "processed", True, True, None)]
+        assert conn.execute("SELECT action, entity_id, meta FROM audit_log").fetchall() == [
+            ("paypal_webhook_processed", 72, {
+                "event_id": "WH-1",
+                "event_type": "PAYMENT.CAPTURE.COMPLETED",
+                "payment_environment": "sandbox",
+                "status": "processed",
+                "failure_code": None,
+            }),
+        ]
+        assert conn.execute("""
+            SELECT status, paypal_capture_id, invoice_handoff_sent_at, invoice_handoff_attempts
+            FROM orders WHERE id = 72
+        """).fetchone() == ("paid", "CAP-1", sent_at, 1)
 
 
 def test_webhook_migration_is_transactional_idempotent_and_minimizes_payloads():

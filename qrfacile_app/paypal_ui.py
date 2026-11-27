@@ -520,6 +520,7 @@ async def paypal_webhook(request: Request):
                 """,
                 (status, order_id, capture_id, failure_code, event_id),
             )
+            # PostgreSQL needs explicit types for the variadic JSON values, including NULL.
             cur.execute(
                 """
                 INSERT INTO audit_log (
@@ -529,11 +530,11 @@ async def paypal_webhook(request: Request):
                     NULL, 'system', 'paypal_webhook_processed', 'orders', %s,
                     NULL, 'paypal-webhook',
                     jsonb_build_object(
-                        'event_id', %s,
-                        'event_type', %s,
-                        'payment_environment', %s,
-                        'status', %s,
-                        'failure_code', %s
+                        'event_id', %s::text,
+                        'event_type', %s::text,
+                        'payment_environment', %s::text,
+                        'status', %s::text,
+                        'failure_code', %s::text
                     ), now()
                 )
                 """,
