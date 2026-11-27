@@ -41,6 +41,11 @@ def test_home_header_leads_to_the_module_choice():
     assert 'href="/register-winery"' not in header
 
 
+def test_only_home_opts_into_the_wide_public_layout():
+    assert 'class="publicWrap publicWrapWide"' in _home()
+    assert 'class="publicWrap publicWrapWide"' not in landing_routes.wine_home(_request("/wine")).body.decode()
+
+
 @pytest.mark.parametrize(("path", "page"), (
     ("/", landing_routes.home),
     ("/link", landing_routes.link_home),

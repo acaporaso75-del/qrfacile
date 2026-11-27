@@ -409,6 +409,8 @@ def page_public(
     canonical_path: str = "",
     robots: str = "index,follow",
     structured_data: dict | list[dict] | None = None,
+    *,
+    wide_layout: bool = False,
 ) -> str:
     if not actions_html:
         actions_html = (
@@ -418,6 +420,7 @@ def page_public(
         )
 
     header = _public_topbar(actions_html=actions_html)
+    wrap_class = "publicWrap publicWrapWide" if wide_layout else "publicWrap"
 
     description = (
         description.strip()
@@ -472,7 +475,7 @@ def page_public(
 </head>
 <body>
 <a class="skipLink" href="#main-content">Vai al contenuto principale</a>
-<div class="publicWrap">
+<div class="{wrap_class}">
   {header}
 
   <main class="publicMain" id="main-content" tabindex="-1">

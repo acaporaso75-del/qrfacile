@@ -70,23 +70,28 @@ def _module_chooser(link_on: bool) -> str:
             letter-spacing:.06em; text-transform:uppercase;
           }}
           .chooserHeading h1 {{
-            margin:0; color:#0f172a; font-size:clamp(1.65rem,4vw,2.85rem);
+            margin:0; color:#0f172a; font-size:clamp(1.65rem,3.1vw,4rem);
             line-height:1.12; letter-spacing:-.025em; overflow-wrap:anywhere;
           }}
           .chooserLead {{ color:#334155; margin:7px 0 0; line-height:1.45; }}
-          .chooserGrid {{ display:grid; gap:12px; grid-template-columns:repeat(3,minmax(0,1fr)); }}
+          .chooserGrid {{
+            display:grid; gap:clamp(10px,1.1vw,24px);
+            grid-template-columns:repeat(3,minmax(0,1fr));
+          }}
           .chooserCard {{
             background:#fff; border:1px solid #d5e5e5; border-radius:16px;
-            padding:clamp(12px,2vw,17px); display:flex; flex-direction:column; gap:9px;
+            padding:clamp(12px,1.1vw,24px); display:flex; flex-direction:column; gap:9px;
           }}
           .chooserCard.active {{ border-color:#0f766e; background:#f0fdfa; }}
           .chooserCardTitle {{ display:flex; align-items:center; gap:9px; }}
-          .chooserCard h2 {{ margin:0; font-size:clamp(1rem,2vw,1.2rem); line-height:1.2; overflow-wrap:anywhere; }}
+          .chooserCard h2 {{ margin:0; font-size:clamp(1rem,1.25vw,1.6rem); line-height:1.2; overflow-wrap:anywhere; }}
           .chooserIcon {{
-            flex:none; width:32px; height:32px; border-radius:9px;
-            display:grid; place-items:center; font-size:20px; background:#eaf3f3;
+            flex:none; width:clamp(32px,2vw,48px); height:clamp(32px,2vw,48px); border-radius:9px;
+            display:grid; place-items:center; font-size:clamp(20px,1.35vw,28px); background:#eaf3f3;
           }}
-          .chooserCard p {{ margin:0; color:#334155; font-size:.94rem; line-height:1.4; flex:1; }}
+          .chooserCard p {{
+            margin:0; max-width:48ch; color:#334155; font-size:clamp(.94rem,1vw,1.15rem); line-height:1.4; flex:1;
+          }}
           .chooserFooter {{ display:flex; gap:6px 8px; align-items:center; flex-wrap:wrap; }}
           .chooserFooter .btn {{ width:auto; min-height:44px; padding:7px 11px; font-size:.94rem; }}
           .chooserSoon, .chooserFree {{
@@ -94,6 +99,9 @@ def _module_chooser(link_on: bool) -> str:
           }}
           .chooserSoon {{ color:#78350f; background:#fef3c7; }}
           .chooserFree {{ color:#115e59; background:#ccfbf1; }}
+          @media(min-width:1550px) {{
+            .chooserGrid {{ grid-template-columns:repeat(6,minmax(0,1fr)); }}
+          }}
           @media(max-width:850px) {{
             .chooserGrid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }}
           }}
@@ -144,10 +152,13 @@ def home(request: Request):
       </section>
 
       <style>
-        .modularHome {
-          max-width:1180px;
-          margin:0 auto;
+        .publicWrap.publicWrapWide {
+          width:100%;
+          max-width:none;
+          padding-inline:clamp(12px,2.5vw,64px);
         }
+
+        .publicWrapWide .publicMain { margin-top:clamp(12px,1.8vw,24px); }
 
         .moduleIntro {
           margin:26px 0 0;
@@ -166,6 +177,8 @@ def home(request: Request):
 
         .moduleIntro p,
         .moduleFeature span { color:#475569; line-height:1.5; }
+
+        .moduleIntro p { max-width:68ch; }
 
         .moduleActiveGrid {
           margin-top:16px;
@@ -199,6 +212,7 @@ def home(request: Request):
         actions_html=actions,
         description="Scegli il QR adatto alla tua attività. Con QRFacile Wine crei etichette digitali per il vino e scarichi il QR per la stampa.",
         canonical_path="/",
+        wide_layout=True,
         structured_data={
             "@context": "https://schema.org",
             "@type": "Organization",
