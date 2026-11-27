@@ -32,7 +32,7 @@ Questo documento registra il collaudo end-to-end del webhook firmato sul runtime
   Un POST non verificabile ha restituito HTTP `400`, con ledger invariato e nessun credito erogato.
 - [ ] Eventi diversi da `PAYMENT.CAPTURE.COMPLETED` non hanno erogato crediti e restano auditabili.
 - [ ] Ledger, coda di revisione e alert non espongono payload, event ID, PII o credenziali.
-  Readback e probe aggregato sanitizzati; la consegna dell'alert è da provare nella fase operativa.
+  Readback e probe aggregato sanitizzati. Ricezione dell'alert sintetico sanitizzato confermata dal titolare: vedere `OPERATIONAL_ACCEPTANCE_2026-10-31.md`. La prova di consegna non chiude da sola il controllo complessivo.
 
 ## Esito
 
@@ -40,7 +40,7 @@ Decisione: [ ] PASS  [ ] FAIL
 
 - Nome e ruolo del verificatore: Codex, verifica tecnica; PASS del retry runtime, attestazione completa ancora aperta
 - Data e fuso orario: 2026-11-27, Europe/Rome
-- Anomalie residue: il validatore storico richiede ancora la prova del reinvio manuale, degli altri tipi di evento e degli alert; non è stato modificato.
+- Anomalie residue: il validatore storico richiede ancora la prova del reinvio manuale, degli altri tipi di evento e il controllo complessivo dei dati esposti. La consegna dell'alert sintetico è documentata separatamente; il validatore non è stato modificato.
 - Firma o evidenza equivalente: Compliance CI `46056205589`, readback staging e Caddy riportati sotto.
 
 ## Readback della correzione 42P18 e baseline del retry
