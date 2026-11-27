@@ -7,14 +7,36 @@ router = APIRouter()
 
 
 _CHOOSER_SOON = '<span class="chooserSoon">In arrivo</span>'
+_WINE_GUIDE_PREVIEW = """
+      <div class="chooserGuide">
+        <svg viewBox="0 0 28 28" width="28" height="28" aria-hidden="true" focusable="false">
+          <rect x="2" y="4" width="24" height="17" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="m12 8 6 4.5-6 4.5z" fill="currentColor"/>
+          <path d="M10 25h8m-4-4v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <div>
+          <strong>Guida video Wine</strong>
+          <span>Dal primo accesso al QR, passo passo.</span>
+          <small>In preparazione</small>
+        </div>
+      </div>
+"""
 
 
-def _chooser_card(icon: str, title: str, text: str, footer: str, *, active: bool = False) -> str:
+def _chooser_card(
+    vignette: str,
+    title: str,
+    text: str,
+    footer: str,
+    *,
+    active: bool = False,
+    guide: str = "",
+) -> str:
     classes = "chooserCard active" if active else "chooserCard"
     return (
-        f'<article class="{classes}"><div class="chooserCardTitle">'
-        f'<span class="chooserIcon" aria-hidden="true">{icon}</span><h2>{title}</h2></div>'
-        f'<p>{text}</p><div class="chooserFooter">{footer}</div></article>'
+        f'<article class="{classes}"><div class="chooserArt" aria-hidden="true">'
+        f'<img src="/static/module-vignettes/{vignette}.svg" alt="" width="160" height="92"></div>'
+        f'<h2>{title}</h2><p>{text}</p><div class="chooserFooter">{footer}</div>{guide}</article>'
     )
 
 
@@ -31,22 +53,22 @@ def _module_chooser(link_on: bool) -> str:
         else _chooser_discovery("/link", "Link")
     )
     cards = [
-        _chooser_card("🍷", "Ho una cantina",
+        _chooser_card("wine", "Ho una cantina",
                       "Etichette digitali del vino, senza canone annuale.",
                       '<span class="chooserFree">3 QR gratis</span>'
                       '<a class="btn btn-primary" href="/register-winery" aria-label="Inizia con Wine">Inizia</a>'
                       '<a class="btn" href="/wine">Scopri Wine</a>',
-                      active=True),
-        _chooser_card("🔗", "Ho un'attività",
+                      active=True, guide=_WINE_GUIDE_PREVIEW),
+        _chooser_card("link", "Ho un'attività",
                       "Un QR per il tuo sito, un PDF o i tuoi contatti.",
                       link_footer, active=link_on),
-        _chooser_card("🍽️", "Ho un ristorante", "Menu digitale aggiornabile in più lingue.",
+        _chooser_card("menu", "Ho un ristorante", "Menu digitale aggiornabile in più lingue.",
                       _chooser_discovery("/menu", "Menu")),
-        _chooser_card("🎓", "Quiz e formazione", "Domande e percorsi da un QR.",
+        _chooser_card("quiz", "Quiz e formazione", "Domande e percorsi da un QR.",
                       _chooser_discovery("/quiz", "Quiz e formazione")),
-        _chooser_card("📦", "Magazzino", "Schede e movimenti di prodotti e materiali.",
+        _chooser_card("warehouse", "Magazzino", "Schede e movimenti di prodotti e materiali.",
                       _chooser_discovery("/warehouse", "Magazzino")),
-        _chooser_card("🎟️", "Eventi", "Programmi, iscrizioni e votazioni.",
+        _chooser_card("events", "Eventi", "Programmi, iscrizioni e votazioni.",
                       _chooser_discovery("/events", "Eventi")),
     ]
     return f"""
@@ -83,12 +105,12 @@ def _module_chooser(link_on: bool) -> str:
             padding:clamp(12px,1.1vw,24px); display:flex; flex-direction:column; gap:9px;
           }}
           .chooserCard.active {{ border-color:#0f766e; background:#f0fdfa; }}
-          .chooserCardTitle {{ display:flex; align-items:center; gap:9px; }}
           .chooserCard h2 {{ margin:0; font-size:clamp(1rem,1.25vw,1.6rem); line-height:1.2; overflow-wrap:anywhere; }}
-          .chooserIcon {{
-            flex:none; width:clamp(32px,2vw,48px); height:clamp(32px,2vw,48px); border-radius:9px;
-            display:grid; place-items:center; font-size:clamp(20px,1.35vw,28px); background:#eaf3f3;
+          .chooserArt {{
+            height:clamp(55px,7vw,100px); display:grid; place-items:center;
+            border-radius:12px; background:linear-gradient(125deg,#f8fafc,#eef6f5);
           }}
+          .chooserArt img {{ display:block; width:auto; height:100%; max-width:100%; object-fit:contain; }}
           .chooserCard p {{
             margin:0; max-width:48ch; color:#334155; font-size:clamp(.94rem,1vw,1.15rem); line-height:1.4; flex:1;
           }}
@@ -99,6 +121,18 @@ def _module_chooser(link_on: bool) -> str:
           }}
           .chooserSoon {{ color:#78350f; background:#fef3c7; }}
           .chooserFree {{ color:#115e59; background:#ccfbf1; }}
+          .chooserGuide {{
+            display:flex; gap:9px; align-items:flex-start; padding:10px;
+            border:1px solid #90c9bd; border-radius:11px;
+            background:#e3f6f1; color:#134e4a;
+          }}
+          .chooserGuide svg {{ flex:none; }}
+          .chooserGuide strong,
+          .chooserGuide span,
+          .chooserGuide small {{ display:block; }}
+          .chooserGuide strong {{ font-size:.94rem; line-height:1.25; }}
+          .chooserGuide span {{ margin-top:3px; font-size:.82rem; line-height:1.35; }}
+          .chooserGuide small {{ margin-top:4px; font-size:.76rem; font-weight:750; }}
           @media(min-width:1550px) {{
             .chooserGrid {{ grid-template-columns:repeat(6,minmax(0,1fr)); }}
           }}
@@ -108,9 +142,9 @@ def _module_chooser(link_on: bool) -> str:
           @media(max-width:560px) {{
             .chooserGrid {{ gap:8px; }}
             .chooserCard {{ padding:10px; gap:6px; }}
-            .chooserCardTitle {{ align-items:flex-start; gap:6px; }}
-            .chooserIcon {{ width:25px; height:25px; font-size:16px; }}
             .chooserCard p {{ font-size:.88rem; }}
+            .chooserGuide {{ padding:8px; }}
+            .chooserGuide svg {{ display:none; }}
           }}
           @media(max-width:350px) {{
             .chooserGrid {{ grid-template-columns:minmax(0,1fr); }}

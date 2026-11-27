@@ -1,7 +1,9 @@
 """Home page: 'Cosa vuoi fare con il tuo QR?' tiles let visitors pick a module."""
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
+from xml.etree import ElementTree
 
 import pytest
 from starlette.requests import Request
@@ -44,6 +46,26 @@ def test_home_header_leads_to_the_module_choice():
 def test_only_home_opts_into_the_wide_public_layout():
     assert 'class="publicWrap publicWrapWide"' in _home()
     assert 'class="publicWrap publicWrapWide"' not in landing_routes.wine_home(_request("/wine")).body.decode()
+
+
+def test_home_vignettes_are_distinct_and_decorative():
+    html = _home()
+    assets = Path(__file__).resolve().parents[1] / "static" / "module-vignettes"
+    assert html.count('<div class="chooserArt" aria-hidden="true">') == 6
+    for module in ("wine", "link", "menu", "quiz", "warehouse", "events"):
+        assert html.count(f'<img src="/static/module-vignettes/{module}.svg" alt="" width="160" height="92">') == 1
+        root = ElementTree.parse(assets / f"{module}.svg").getroot()
+        assert root.tag == "{http://www.w3.org/2000/svg}svg"
+        assert root.get("viewBox") == "0 0 160 92"
+
+
+def test_only_wine_has_an_explicit_unpublished_video_guide():
+    html = _home()
+    wine = html.split('<article class="chooserCard active">', 1)[1].split("</article>", 1)[0]
+    guide = wine.split('<div class="chooserGuide">', 1)[1]
+    assert "Guida video Wine" in guide and "In preparazione" in guide
+    assert all(tag not in guide for tag in ("<a ", "<button", "<iframe", "<video"))
+    assert html.count('<div class="chooserGuide">') == 1
 
 
 @pytest.mark.parametrize(("path", "page"), (
