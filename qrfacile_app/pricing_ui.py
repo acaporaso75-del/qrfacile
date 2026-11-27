@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
 from qrfacile_app.checkout_ui import paypal_checkout_form, paypal_checkout_script
-from qrfacile_app.ui_shell import page_public, esc
+from qrfacile_app.ui_shell import page_public, esc, quote_request_link
 from qrfacile_app.pricing_config import (
     FREE_WINE_CREDITS_ON_REGISTER,
     QR_STANDARD_YEARS,
@@ -208,7 +208,7 @@ def pricing_page(request: Request):
       su tutte le bottiglie dello stesso vino, annata e lotto. Un vino, un’annata o un lotto
       differente richiede un nuovo QR e il relativo credito.</p>
       <p>Studi grafici, gestione multi-cantina e grandi volumi:
-      <a class="inlineProseLink" href="/support">richiedi un preventivo</a>.</p>
+      {quote_request_link()}.</p>
       {paypal_checkout_script()}
 
       <section class="assistSection">

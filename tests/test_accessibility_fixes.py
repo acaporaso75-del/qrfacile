@@ -33,15 +33,16 @@ def test_quote_links_are_underlined_without_hover_or_focus():
     from starlette.requests import Request
 
     from qrfacile_app.pricing_ui import pricing_page
+    from qrfacile_app.ui_shell import quote_request_link
 
     request = Request({"type": "http", "method": "GET", "path": "/pricing", "headers": [], "query_string": b""})
     html = pricing_page(request).body.decode()
     billing_template = (ROOT / "qrfacile_app" / "billing_ui.py").read_text(encoding="utf-8")
-    css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
-    quote_link = '<a class="inlineProseLink" href="/support">richiedi un preventivo</a>'
+    quote_link = quote_request_link()
+    assert quote_link.startswith('<a href="/support" style="text-decoration:underline !important;')
+    assert quote_link.endswith('>richiedi un preventivo</a>')
     assert quote_link in html
-    assert quote_link in billing_template
-    assert re.search(r"a\.inlineProseLink\s*\{\s*text-decoration:\s*underline\s*!important;", css)
+    assert "{quote_request_link()}" in billing_template
 
 
 def test_white_numbers_on_teal_badges_meet_contrast():

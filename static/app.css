@@ -49,11 +49,6 @@ a{
 
 a:hover{ opacity:.96; }
 
-a.inlineProseLink{
-  text-decoration:underline !important;
-  text-underline-offset:.15em;
-}
-
 .skipLink{
   position:fixed;
   top:8px;

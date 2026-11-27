@@ -8,7 +8,7 @@ from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.checkout_ui import paypal_checkout_form, paypal_checkout_script
 from qrfacile_app.db import pg
-from qrfacile_app.ui_shell import page, top_actions, pill, esc
+from qrfacile_app.ui_shell import page, top_actions, pill, esc, quote_request_link
 from qrfacile_app.pricing_config import get_purchase_pack, list_billing_packs
 
 router = APIRouter()
@@ -451,7 +451,7 @@ def billing(request: Request, msg: str = "", err: str = ""):
       {subscription_html}
       {annual_allowances_html}
       {recommended_box}
-      <p>Studi e gestione multi-cantina: <a class="inlineProseLink" href="/support">richiedi un preventivo</a>.</p>
+      <p>Studi e gestione multi-cantina: {quote_request_link()}.</p>
 
       <div class="billingPackGrid">
         {pack_cards}

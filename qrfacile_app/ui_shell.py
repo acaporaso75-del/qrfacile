@@ -47,6 +47,11 @@ def top_actions(*links: tuple[str, str]) -> str:
     return " ".join(out)
 
 
+def quote_request_link() -> str:
+    # Keep the inline link identifiable even with a previously cached app.css.
+    return '<a href="/support" style="text-decoration:underline !important;text-underline-offset:.15em">richiedi un preventivo</a>'
+
+
 def _brand_logo_html(size: int = 44) -> str:
     return f"""
       <img src="/static/qrfacile.svg" alt="QRFACILE" style="
