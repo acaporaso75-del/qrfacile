@@ -108,3 +108,30 @@ allo SDI o eliminata da Easyfatt.
 Non è stato osservato un errore applicativo. Il limite è operativo: il conto
 acquirente Sandbox richiedeva l'interazione del titolare, che non era al PC.
 L'ordine è rimasto non pagato e non è una prova end-to-end dell'hand-off Danea.
+
+## Prova completata del 2026-11-27 — ordine interno #72
+
+Questa è una sessione separata da quella del 21 novembre. Il titolare ha
+completato il pagamento PayPal Sandbox su staging e ha confermato in chat
+il ritorno a QRFacile, la ricezione della mail e il buon esito della prova
+di importazione in Danea.
+
+Readback del 27 novembre alle **20:20:59 CET (Europe/Rome)**, staging
+`192.168.1.139:8001`, SHA installato
+`0830971362716079391007766e5ff7d41bc95713`. Il readback non prova lo SHA
+che era attivo al momento originario del pagamento.
+
+| Verifica | Esito | Evidenza |
+| --- | --- | --- |
+| Pagamento Sandbox | PASS | Ordine interno `72`, `paid`, `sandbox`, `12078` centesimi EUR, capture presente. |
+| Accredito Wine al ritorno da PayPal | PASS | Una sola riga del ledger per l'ordine, `+15` unità Wine. |
+| Hand-off Danea | PASS | `invoice_handoff_sent_at` valorizzato (18:48:52 CET), `invoice_handoff_attempts=1`, nessun errore. |
+| Ricezione mail e import in Danea | PASS, dichiarazione del titolare | Il titolare ha confermato entrambi in chat; nessun accesso a caselle o a Danea da parte di Codex. |
+| File originale, campi importati e azioni successive in Danea | NOT_VERIFIED | Nessuna copia della mail o del file è stata letta. Non si deduce una trasmissione allo SDI, né l'eliminazione del documento. |
+| Idempotenza dopo webhook verificato | NOT_VERIFIED a questo readback | Nessuna riga webhook correlata al #72 alle 20:20:59 CET. Vedere `PAYPAL_SANDBOX_ACCEPTANCE_2026-10-31.md` per la verifica del retry. |
+
+Comandi di evidenza: `GET /healthz`; `git rev-parse HEAD` e confronto
+dell'hash del modulo PayPal installato con quello versionato; `SELECT` in
+transazione `READ ONLY` su `orders`, `credit_ledger` e
+`paypal_webhook_events`, limitati all'ordine interno `72`. Nessun ID PayPal
+completo, payload, recapito o dato fiscale riportato.
