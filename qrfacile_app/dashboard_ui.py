@@ -10,6 +10,7 @@ from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, esc
 from qrfacile_app.ui_layout import pill
+from qrfacile_app.services.storage import versioned_upload_url
 
 router = APIRouter()
 
@@ -18,9 +19,9 @@ def _h(s: str) -> str:
     return html.escape(s or "")
 
 
-def _thumb(asset_path: str | None) -> str:
+def _thumb(asset_path: str | None, updated_at: object = "") -> str:
     if asset_path:
-        return f"/uploads/{asset_path}"
+        return versioned_upload_url(asset_path, updated_at)
     return "/static/img/placeholder_label.svg"
 
 
@@ -28,7 +29,7 @@ def _balances(cur, user_id: int) -> dict:
     cur.execute(
         """
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
         """,
@@ -113,7 +114,7 @@ def _load_inline_management(cur, wine_ids: list[int], winery_ids: list[int]) -> 
               u.id AS studio_user_id,
               u.email,
               COALESCE(s.company_name, '') AS company_name
-            FROM studio_clients sc
+            FROM studio_clients sc /* security-review: selection-only */
             JOIN users u ON u.id = sc.studio_user_id
             LEFT JOIN studios s ON s.user_id = u.id
             WHERE sc.winery_id = ANY(%s)
@@ -149,8 +150,8 @@ def _management_picker(wine_id: int, labels: list[dict], studios: list[dict], re
     return f"""
     <form method="post" action="/app/wine/{int(wine_id)}/management/set" class="dashboardManagementPicker">
       <input type="hidden" name="return_to" value="{_h(return_to)}">
-      <span>Gestione grafica</span>
-      <select name="management_value">
+      <span id="mgmt-label-{int(wine_id)}">Gestione grafica</span>
+      <select aria-labelledby="mgmt-label-{int(wine_id)}" name="management_value">
         {''.join(options)}
       </select>
       <button class="btn" type="submit">Salva</button>
@@ -224,7 +225,7 @@ def _compliance_state(r: dict) -> tuple[str, list[str], list[str]]:
         missing.append("cantina")
 
     if not slug:
-        missing.append("slug pubblico")
+        missing.append("codice pagina")
 
     if ingredient_count <= 0 and not extra_ingredients:
         missing.append("ingredienti")
@@ -233,7 +234,7 @@ def _compliance_state(r: dict) -> tuple[str, list[str], list[str]]:
         missing.append("allergeni")
 
     if not nutrition_ok:
-        missing.append("energia kJ/kcal")
+        missing.append("valori nutrizionali")
 
     if recycle_count <= 0:
         missing.append("riciclabilità")
@@ -261,14 +262,25 @@ def _compliance_badge_html(r: dict) -> str:
         <div class="dashboardCompliance dashboardComplianceGreen">
           <span class="dashboardComplianceDot"></span>
           <div>
-            <b>Compliance OK</b>
-            <small>Dati principali completi</small>
+            <b>Dati obbligatori completi</b>
+            <small>Pronto per la pubblicazione</small>
           </div>
         </div>
         """
 
     if state == "yellow":
-        detail = ", ".join(warnings[:3])
+        if warnings == ["retro etichetta"]:
+            # Only the optional back image is missing: the lot is complete.
+            return """
+            <div class="dashboardCompliance dashboardComplianceGreen">
+              <span class="dashboardComplianceDot"></span>
+              <div>
+                <b>Dati obbligatori completi</b>
+                <small>Facoltativo: aggiungi la foto del retro</small>
+              </div>
+            </div>
+            """
+        detail = ", ".join("foto del fronte" if w == "fronte etichetta" else "foto del retro" for w in warnings[:3])
         return f"""
         <div class="dashboardCompliance dashboardComplianceYellow">
           <span class="dashboardComplianceDot"></span>
@@ -353,7 +365,13 @@ def _dashboard_counts(rows: list[dict]) -> dict:
         if (r.get("status") or "").strip().lower() == "attiva":
             published += 1
 
-        if state == "green" and not missing and not warnings:
+        # A published lot passed the publication gate; otherwise a lot is
+        # complete when no mandatory data is missing and the front image
+        # exists. The back image is optional and never makes a lot
+        # "incomplete" (it showed "0 complete / 0%" for a published wine).
+        is_published = (r.get("status") or "").strip().lower() == "attiva"
+        front_ok = bool((r.get("front_thumb") or "").strip())
+        if is_published or (not missing and front_ok):
             complete += 1
         else:
             incomplete += 1
@@ -394,10 +412,10 @@ def _primary_lot_cta(r: dict, role: str) -> str:
     is_published = (r.get("status") or "").strip().lower() == "attiva"
 
     if missing:
-        return f'<a class="btn btn-primary" href="/app/wine/{wine_id}?tab=compliance">Completa compliance</a>'
+        return f'<a class="btn btn-primary" href="/app/wine/{wine_id}/compliance">Completa i dati obbligatori</a>'
 
-    if warnings:
-        return f'<a class="btn btn-primary" href="/app/wine/{wine_id}?tab=images">Completa compliance</a>'
+    if "fronte etichetta" in warnings and not is_published:
+        return f'<a class="btn btn-primary" href="/app/wine/{wine_id}/images">Carica la foto dell’etichetta</a>'
 
     if is_published and slug:
         return f'<a class="btn btn-primary" href="/e/{slug}" target="_blank">Apri pagina pubblica</a>'
@@ -425,10 +443,11 @@ def _next_step(rows: list[dict], role: str) -> tuple[str, str, str]:
         name = (r.get("wine_name") or "lotto").strip()
 
         if missing:
-            return ("Completa compliance", f"Riparti da {name}: mancano dati obbligatori.", f"/app/wine/{wine_id}?tab=compliance")
+            return ("Completa i dati obbligatori", f"Riparti da {name}: mancano {', '.join(missing)}.", f"/app/wine/{wine_id}/compliance")
 
-        if warnings:
-            return ("Completa compliance", f"Controlla immagini e dettagli di {name}.", f"/app/wine/{wine_id}?tab=images")
+        published_row = (r.get("status") or "").strip().lower() == "attiva"
+        if "fronte etichetta" in warnings and not published_row:
+            return ("Carica la foto dell’etichetta", f"Per {name} manca la foto del fronte.", f"/app/wine/{wine_id}/images")
 
     for r in rows:
         if (r.get("status") or "").strip().lower() != "attiva":
@@ -436,14 +455,62 @@ def _next_step(rows: list[dict], role: str) -> tuple[str, str, str]:
             name = (r.get("wine_name") or "lotto").strip()
             if role in ("winery", "admin"):
                 return ("Pubblica pagina ufficiale", f"{name} è completo: puoi procedere alla pubblicazione.", f"/app/wine/{wine_id}?tab=export")
-            return ("Preview tecnica", f"{name} è completo: verifica la preview prima della consegna.", f"/app/wine/{wine_id}?tab=export")
+            return ("Anteprima", f"{name} è completo: controlla l’anteprima prima della consegna.", f"/app/wine/{wine_id}?tab=export")
 
     first = rows[0]
     slug = (first.get("slug") or "").strip()
     if slug:
-        return ("Preview tecnica", "Tutti i lotti visibili sono pronti: controlla l’esperienza finale.", f"/preview/{_h(slug)}")
+        return ("Tutto pronto", "I tuoi vini sono online. Quando hai un nuovo lotto, crealo da qui.", "/app/new-wine")
 
     return ("Nuovo lotto", "Aggiungi un nuovo lotto quando hai una nuova etichetta da preparare.", "/app/new-wine")
+
+
+def _first_wine_checklist(rows: list[dict], master_count: int, role: str) -> str:
+    """Step-by-step guide shown until the first wine page is published."""
+    if role not in ("winery", "admin") or any(_lot_flags(r)["published"] for r in rows):
+        return ""
+    first = rows[0] if rows else None
+    flags = _lot_flags(first) if first else {}
+    wine_id = int(first["wine_id"]) if first else 0
+    base = f"/app/wine/{wine_id}" if wine_id else ""
+    steps = [
+        ("Dai un nome al tuo vino", master_count > 0 or bool(rows), "/app/new-wine-master"),
+        ("Crea il lotto: ottieni il QR", bool(rows), "/app/new-wine"),
+        ("Ingredienti e allergeni", bool(flags.get("ingredients") and flags.get("allergens")), f"{base}/compliance#ingredienti"),
+        ("Valori nutrizionali", bool(flags.get("nutrition")), f"{base}/compliance#nutrizione"),
+        ("Bottiglia, tappo e imballaggi", bool(flags.get("recycle")), f"{base}/compliance#riciclabilita"),
+        ("Foto dell’etichetta", bool(flags.get("images")), f"{base}/images"),
+        ("Controlla e pubblica", False, f"{base}/review"),
+        ("Scarica il QR per la tipografia", False, f"{base}/export"),
+    ]
+    current = next((i for i, (_label, done, _href) in enumerate(steps) if not done), len(steps) - 1)
+    items = []
+    for i, (label, done, href) in enumerate(steps):
+        reachable = i <= current and (i < 2 or wine_id)
+        state = "Fatto" if done else ("Da fare adesso" if i == current else "Dopo")
+        cls = "firstWineStep" + (" done" if done else "") + (" current" if i == current else "")
+        title = f'<a href="{_h(href)}">{_h(label)}</a>' if reachable and not done else _h(label)
+        items.append(f'<li class="{cls}"><span>{"✓" if done else i + 1}</span><div><b>{title}</b><small>{state}</small></div></li>')
+    cta_label, _cta_done, cta_href = steps[current]
+    return f"""
+    <section class="card firstWine" aria-labelledby="first-wine-title">
+      <div class="dashboardSectionKicker">Il tuo primo vino</div>
+      <div class="h2" id="first-wine-title">Segui questi passi, uno alla volta</div>
+      <div class="p">Ogni passo si salva da solo: puoi interrompere e riprendere quando vuoi.</div>
+      <ol class="firstWineSteps">{''.join(items)}</ol>
+      <a class="btn btn-primary firstWineCta" href="{_h(cta_href)}">Continua: {_h(cta_label)}</a>
+      <style>
+        .firstWine{{margin-bottom:18px;border:2px solid #14b8a6}}
+        .firstWineSteps{{list-style:none;margin:14px 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}}
+        .firstWineStep{{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid rgba(2,8,23,.09);border-radius:14px;background:#fff}}
+        .firstWineStep span{{display:grid;place-items:center;flex:0 0 30px;height:30px;border-radius:10px;background:#e2e8f0;font-weight:900}}
+        .firstWineStep b{{display:block;font-size:14px}}.firstWineStep small{{color:#556377}}
+        .firstWineStep.done span{{background:#dcfce7;color:#166534}}
+        .firstWineStep.current{{border-color:#14b8a6;background:#f0fdfa}}.firstWineStep.current span{{background:#0f766e;color:#fff}}
+        .firstWineCta{{font-size:16px;padding:14px 18px}}
+      </style>
+    </section>
+    """
 
 
 def _onboarding_html(rows: list[dict], role: str) -> str:
@@ -478,10 +545,10 @@ def _onboarding_html(rows: list[dict], role: str) -> str:
     <section class="dashboardOnboarding card">
       <div class="dashboardOnboardingHead">
         <div>
-          <div class="dashboardSectionKicker">Percorso guidato</div>
-          <div class="h2">Compliance cantina</div>
+          <div class="dashboardSectionKicker">I tuoi vini</div>
+          <div class="h2">Cosa è pronto e cosa manca</div>
           <div class="p">
-            Una vista unica per capire cosa è pronto, cosa manca e qual è la prossima azione utile.
+            Per ogni dato obbligatorio vedi quanti lotti sono a posto, e qual è la prossima cosa utile da fare.
           </div>
         </div>
 
@@ -496,20 +563,6 @@ def _onboarding_html(rows: list[dict], role: str) -> str:
         </div>
       </div>
 
-      <div class="dashboardGlobalState">
-        <div>
-          <span>Lotti completi</span>
-          <b>{counts["complete"]}</b>
-        </div>
-        <div>
-          <span>Incompleti</span>
-          <b>{counts["incomplete"]}</b>
-        </div>
-        <div>
-          <span>Pubblicati</span>
-          <b>{counts["published"]}</b>
-        </div>
-      </div>
 
       <div class="dashboardOnboardingGrid">
         <div class="dashboardChecklist">
@@ -522,8 +575,6 @@ def _onboarding_html(rows: list[dict], role: str) -> str:
           <small>{_h(next_text)}</small>
           <div class="dashboardNextActions">
             <a class="btn btn-primary" href="{_h(next_href)}">{_h(next_label)}</a>
-            <a class="btn" href="/app/new-wine-master">Nuova etichetta</a>
-            <a class="btn" href="/app/new-wine">Nuovo lotto</a>
           </div>
         </div>
       </div>
@@ -535,8 +586,8 @@ def _wine_card(r: dict, role: str = "", labels_by_wine: dict[int, list[dict]] | 
     slug = r.get("slug") or ""
     wine_id = int(r["wine_id"])
 
-    front = _thumb(r.get("front_thumb"))
-    back = _thumb(r.get("back_thumb"))
+    front = _thumb(r.get("front_thumb"), r.get("front_updated_at"))
+    back = _thumb(r.get("back_thumb"), r.get("back_updated_at"))
 
     wine_name = _h(r.get("wine_name") or "Senza nome")
     winery_name = _h(r.get("winery_name") or "")
@@ -585,7 +636,7 @@ def _wine_card(r: dict, role: str = "", labels_by_wine: dict[int, list[dict]] | 
               <div class="dashboardMeta">
                 {vintage_html}
                 <span class="dashboardMetaPill">Lotto {lot}</span>
-                <span class="dashboardMetaPill">Slug {slug_safe or "-"}</span>
+                <span class="dashboardMetaPill">Codice pagina {slug_safe or "-"}</span>
               </div>
 
               {checks}
@@ -605,8 +656,8 @@ def _wine_card(r: dict, role: str = "", labels_by_wine: dict[int, list[dict]] | 
           </div>
 
           <div class="dashboardWineFooter" onclick="event.stopPropagation()">
-            <a class="dashboardInlineLink" href="/app/wine/{wine_id}?tab=compliance">
-              Compliance
+            <a class="dashboardInlineLink" href="/app/wine/{wine_id}/compliance">
+              Dati obbligatori
             </a>
             <a class="dashboardInlineLink" href="/app/wine/{wine_id}?tab=export">
               Esportazione QR
@@ -658,7 +709,7 @@ def _worker_summary_html(r: dict, role: str = "") -> str:
 
 
 @router.get("/app/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request, q: str = "", work: str = "all"):
+def dashboard(request: Request, q: str = "", work: str = "all", view: str = ""):
     user = require_any_role(request, ("winery", "studio", "admin"))
 
     role = (user.get("role") or "").lower().strip()
@@ -680,8 +731,7 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
 
                 if not active:
                     actions = (
-                        pill(f"wine: {balances['wine']}", "green") + " " +
-                        pill(f"generic: {balances['generic']}") + " " +
+                        pill(f"QR vino disponibili: {balances['wine']}", "green") + " " +
                         top_actions(
                             ("/admin", "Admin"),
                             ("/app/start", "Menu"),
@@ -730,10 +780,14 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
             elif role == "studio":
                 cur.execute(
                     """
-                    SELECT winery_id
-                    FROM studio_clients
-                    WHERE studio_user_id=%s
-                      AND can_view=TRUE
+                    SELECT DISTINCT wl.winery_id
+                    FROM label_collaborators lc
+                    JOIN wine_labels wl ON wl.id=lc.wine_label_id
+                    JOIN studio_clients sc
+                      ON sc.studio_user_id=lc.collaborator_user_id
+                     AND sc.winery_id=wl.winery_id
+                    WHERE lc.collaborator_user_id=%s
+                      AND lc.active=TRUE AND lc.can_view=TRUE AND sc.can_view=TRUE
                     """,
                     (uid,),
                 )
@@ -749,8 +803,7 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
             if not allowed_winery_ids:
                 if role == "studio":
                     actions = (
-                        pill(f"wine: {balances['wine']}", "green") + " " +
-                        pill(f"generic: {balances['generic']}") + " " +
+                        pill(f"QR vino disponibili: {balances['wine']}", "green") + " " +
                         top_actions(
                             ("/app/start", "Menu"),
                             ("/studio", "Area Studio"),
@@ -810,8 +863,7 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
                     ))
 
                 actions = (
-                    pill(f"wine: {balances['wine']}", "green") + " " +
-                    pill(f"generic: {balances['generic']}") + " " +
+                    pill(f"QR vino disponibili: {balances['wine']}", "green") + " " +
                     top_actions(
                         ("/app/start", "Menu"),
                         ("/app/new-wine", "Nuovo lotto"),
@@ -845,19 +897,37 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
 
             where = "qw.winery_id = ANY(%s)"
             params = [allowed_winery_ids]
+            if role == "studio":
+                where += """
+                AND EXISTS (
+                  SELECT 1 FROM wine_labels wl_scope
+                  JOIN label_collaborators lc_scope ON lc_scope.wine_label_id=wl_scope.id
+                  JOIN studio_clients sc_scope
+                    ON sc_scope.studio_user_id=lc_scope.collaborator_user_id
+                   AND sc_scope.winery_id=wl_scope.winery_id
+                  WHERE wl_scope.wine_id=qw.id
+                    AND lc_scope.collaborator_user_id=%s
+                    AND lc_scope.active=TRUE AND lc_scope.can_view=TRUE
+                    AND sc_scope.can_view=TRUE
+                )
+                """
+                params.append(uid)
             work = (work or "all").strip().lower()
             if work not in ("all", "self", "assigned", "pending"):
                 work = "all"
 
-            cur.execute(
-                """
-                SELECT COUNT(*)::int AS n
-                FROM wines_master
-                WHERE winery_id = ANY(%s)
-                """,
-                (allowed_winery_ids,),
-            )
-            master_count = int((cur.fetchone() or {}).get("n") or 0)
+            if role == "studio":
+                master_count = 0
+            else:
+                cur.execute(
+                    """
+                    SELECT COUNT(*)::int AS n
+                    FROM wines_master
+                    WHERE winery_id = ANY(%s)
+                    """,
+                    (allowed_winery_ids,),
+                )
+                master_count = int((cur.fetchone() or {}).get("n") or 0)
 
             if q:
                 where += """
@@ -940,6 +1010,8 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
                   w.name AS winery_name,
                   wa_front.img_thumb AS front_thumb,
                   wa_back.img_thumb AS back_thumb,
+                  wa_front.updated_at AS front_updated_at,
+                  wa_back.updated_at AS back_updated_at,
                   COALESCE(ing.ingredient_count, 0) AS ingredient_count,
                   COALESCE(allg.allergen_count, 0) AS allergen_count,
                   COALESCE(rec.recycle_count, 0) AS recycle_count,
@@ -981,7 +1053,10 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
                 LEFT JOIN (
                   SELECT wine_id, COUNT(*)::int AS recycle_count
                   FROM wine_recycle_items
-                  WHERE COALESCE(code, '') <> ''
+                  WHERE COALESCE(BTRIM(product), '') <> ''
+                     OR COALESCE(BTRIM(code), '') NOT IN ('', '-')
+                     OR COALESCE(BTRIM(extra_code), '') <> ''
+                     OR COALESCE(BTRIM(note), '') <> ''
                   GROUP BY wine_id
                 ) rec ON rec.wine_id = qw.id
 
@@ -1029,8 +1104,7 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
                 labels_by_wine, studios_by_winery = {}, {}
 
     actions = (
-        pill(f"wine: {balances['wine']}", "green") + " " +
-        pill(f"generic: {balances['generic']}") + " " +
+        pill(f"QR vino disponibili: {balances['wine']}", "green") + " " +
         top_actions(
             ("/app/start", "Menu"),
             ("/app/new-wine-master", "Nuova etichetta"),
@@ -1097,9 +1171,13 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
 
     counts = _dashboard_counts(rows)
     onboarding_html = _onboarding_html(rows, role)
+    first_wine_html = "" if q else _first_wine_checklist(rows, master_count, role)
 
-    body = f"""
-    <section class="dashboardWrap">
+    # First-wine mode: until the first page is published a winery sees only
+    # the step-by-step checklist (and its draft), not three overlapping
+    # panels with the same buttons. ?view=full shows everything.
+    first_wine_mode = bool(first_wine_html) and role == "winery" and view != "full"
+    full_dashboard_html = "" if first_wine_mode else f"""
       <div class="dashboardHero">
         <div>
           <div class="dashboardEyebrow">Dashboard Wine</div>
@@ -1146,13 +1224,13 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
       <div class="dashboardToolbar card">
         <form method="get" class="dashboardSearchForm">
           <div>
-            <label style="margin-top:0">Cerca lotto, vino o slug</label>
-            <input class="input" name="q" value="{_h(q)}" placeholder="Es. Falanghina, lotto L25, slug...">
+            <label for="dash-q" style="margin-top:0">Cerca per nome del vino, lotto o codice pagina</label>
+            <input id="dash-q" class="input" name="q" value="{_h(q)}" placeholder="Es. Falanghina, lotto L25, slug...">
           </div>
 
           <div>
-            <label style="margin-top:0">Chi lavora</label>
-            <select name="work">
+            <label for="dash-work" style="margin-top:0">Chi lavora</label>
+            <select id="dash-work" name="work">
               <option value="all" {'selected' if work == 'all' else ''}>Tutte</option>
               <option value="self" {'selected' if work == 'self' else ''}>Gestisco io</option>
               <option value="assigned" {'selected' if work == 'assigned' else ''}>Studio assegnato</option>
@@ -1168,6 +1246,19 @@ def dashboard(request: Request, q: str = "", work: str = "all"):
         </form>
       </div>
 
+    """
+    if first_wine_mode:
+        cards_html = (
+            '<div class="h2" style="margin:8px 0 12px">Il tuo vino in preparazione</div>' + cards_html
+            if rows else ""
+        )
+        cards_html += '<p class="p" style="margin-top:14px"><a href="/app/dashboard?view=full">Vedi la dashboard completa</a></p>'
+        actions = pill(f"QR vino disponibili: {balances['wine']}", "green") + " " + top_actions(("/logout", "Esci"))
+
+    body = f"""
+    <section class="dashboardWrap">
+      {first_wine_html}
+      {full_dashboard_html}
       <div class="dashboardList">
         {cards_html}
       </div>

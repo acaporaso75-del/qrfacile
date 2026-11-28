@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, top_actions, esc
 from qrfacile_app.ui_layout import pill
@@ -15,7 +16,7 @@ def _balances(cur, user_id: int) -> dict:
     cur.execute(
         """
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
         """,
@@ -181,9 +182,7 @@ def start(request: Request, msg: str = "", err: str = ""):
         pass
 
     actions = ""
-    actions += pill(f"wine: {balances.get('wine', 0)}", "green")
-    actions += " "
-    actions += pill(f"generic: {balances.get('generic', 0)}")
+    actions += pill(f"QR vino disponibili: {balances.get('wine', 0)}", "green")
     actions += " "
     actions += top_actions(
         ("/app/billing", "Crediti"),
@@ -397,7 +396,7 @@ def start(request: Request, msg: str = "", err: str = ""):
                 Crediti disponibili
               </div>
 
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:10px;margin-top:12px">
                 <div style="
                   padding:12px;
                   border-radius:16px;
@@ -497,6 +496,7 @@ def menu_alias():
 
 @router.post("/app/start/select")
 def select_mode(request: Request, mode: str = Form(...)):
+    require_csrf_or_same_origin(request)
     u = require_any_role(request, ("winery", "studio", "admin"))
     role = (u.get("role") or "").strip().lower()
     mode = (mode or "").strip().lower()

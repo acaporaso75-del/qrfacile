@@ -1,3 +1,4 @@
+import json
 import time
 from typing import Optional
 
@@ -7,7 +8,10 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import csrf_input, require_csrf_or_same_origin
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
+from qrfacile_app.guided_flow import completed_steps, render_guided_stepper
+from qrfacile_app.services.nutrition_estimate import FORMULA_TEXT, estimator_js_constants
 
 router = APIRouter()
 
@@ -34,8 +38,10 @@ def _wine(cur, wine_id: int) -> dict:
                qw.wine_name,
                qw.vintage,
                qw.lot,
+               qi.slug,
                w.name AS winery_name
         FROM qr_wines qw
+        JOIN qr_items qi ON qi.id = qw.qr_item_id
         JOIN wineries w ON w.id = qw.winery_id
         WHERE qw.id=%s
         LIMIT 1
@@ -54,7 +60,7 @@ def _balances(cur, user_id: int) -> dict:
     cur.execute(
         """
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
         """,
@@ -285,7 +291,7 @@ def _status_chip(label: str, ok: bool) -> str:
     """
 
 
-def _summary_html(ingredients: list[str], allergens: list[str], nut: dict, recycle: dict, meta: dict, role: str = '', wine_id: int = 0) -> str:
+def _summary_html(ingredients: list[str], allergens: list[str], nut: dict, recycle: dict, meta: dict, role: str = '', wine_id: int = 0, csrf_html: str = '') -> str:
     extra_ingredients = (meta.get("extra_ingredients") or "").strip()
 
     ingredient_ok = bool(ingredients) or bool(extra_ingredients)
@@ -296,7 +302,7 @@ def _summary_html(ingredients: list[str], allergens: list[str], nut: dict, recyc
     checks = [
         ("Ingredienti", ingredient_ok),
         ("Allergeni", allergen_ok),
-        ("Energia kJ/kcal", nutrition_ok),
+        ("Valori nutrizionali", nutrition_ok),
         ("Riciclabilità", recycle_ok),
     ]
 
@@ -308,7 +314,7 @@ def _summary_html(ingredients: list[str], allergens: list[str], nut: dict, recyc
         detail = "Completa i campi mancanti prima di considerare pronta l’etichetta digitale."
         box_cls = "todo"
     else:
-        title = "Compliance principale completa"
+        title = "Dati obbligatori completi"
         detail = "I dati obbligatori principali risultano compilati."
         box_cls = "ok"
 
@@ -339,12 +345,14 @@ def _summary_html(ingredients: list[str], allergens: list[str], nut: dict, recyc
         <form method="post"
               action="/app/wine/{int(wine_id)}/request-publish-override"
               class="complianceOverrideRequest">
-          <div>
-            <label>Richiesta sblocco admin</label>
-            <input class="input" name="reason"
-                   placeholder="Motivo richiesta, es. test stampa, urgenza, dati in verifica...">
-          </div>
-          <button class="btn" type="submit">Richiedi sblocco admin</button>
+          {csrf_html}
+          <details>
+            <summary>Ti manca un dato e devi pubblicare comunque? Chiedi aiuto all’assistenza</summary>
+            <label for="f-reason">Spiega cosa ti serve</label>
+            <input id="f-reason" class="input" name="reason"
+                   placeholder="es. aspetto i valori dall’enologo, devo stampare entro venerdì">
+            <button class="btn" type="submit">Invia richiesta all’assistenza</button>
+          </details>
         </form>
         """
 
@@ -383,28 +391,32 @@ def _recycle_rows(recycle: dict) -> str:
           <div class="complianceRecycleGrid">
             <div>
               <label>Prodotto / materiale</label>
-              <input class="input" name="rec_{key}_product"
+              <input aria-label="Prodotto / materiale – {esc(label)}" class="input" name="rec_{key}_product"
                      value="{esc(_val(r.get('product')))}"
                      placeholder="es. vetro verde / sughero / alluminio">
             </div>
 
             <div>
               <label>Codice</label>
-              <input class="input mono" name="rec_{key}_code"
+              <input aria-label="Codice – {esc(label)}" class="input mono" name="rec_{key}_code"
                      value="{esc(_val(r.get('code')))}"
-                     placeholder="es. GL71">
+                     placeholder="es. GL 71">
             </div>
 
             <div>
               <label>Codice extra</label>
-              <input class="input mono" name="rec_{key}_extra"
-                     value="{esc(_val(r.get('extra_code')))}"
-                     placeholder="es. C/ALU90">
+              <details class="qrfAdvanced"><summary>Opzioni avanzate</summary>
+                <label>Codice aggiuntivo eccezionale</label>
+                <input aria-label="Codice aggiuntivo eccezionale – {esc(label)}" class="input mono" name="rec_{key}_extra"
+                       value="{esc(_val(r.get('extra_code')))}"
+                       placeholder="Solo se documentato dal fornitore">
+                <small>Non usare per il normale codice del materiale. Compilare solo quando il fornitore richiede un secondo riferimento documentato.</small>
+              </details>
             </div>
 
             <div>
               <label>Note</label>
-              <input class="input" name="rec_{key}_note"
+              <input aria-label="Note – {esc(label)}" class="input" name="rec_{key}_note"
                      value="{esc(_val(r.get('note')))}"
                      placeholder="facoltativo">
             </div>
@@ -413,6 +425,187 @@ def _recycle_rows(recycle: dict) -> str:
         """)
 
     return "\n".join(rows)
+
+
+# The compliance page holds ingredients, nutrition, packaging and options in
+# one very long page (about 10,000 px on a phone). With JavaScript the
+# sections are shown one at a time; every field stays in the same form, so
+# "Salva" still saves everything. Without JavaScript the page is unchanged.
+_SECTION_TABS = (
+    ("ingredients", "Ingredienti e allergeni", ("ingredienti", "ingredienti-testo")),
+    ("nutrition", "Valori nutrizionali", ("nutrizione",)),
+    ("recycling", "Bottiglia e imballaggi", ("riciclabilita",)),
+    ("more", "Altre opzioni", ("altre-opzioni", "controllo-finale", "pubblicazione")),
+)
+_SECTION_TABS_TEMPLATE = """
+<div class="qrfSectionTabs" role="tablist" aria-label="Sezioni dei dati obbligatori" hidden>__BUTTONS__</div>
+<style>
+  .qrfSectionTabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:14px 0}
+  .qrfSectionTabs button{display:flex;gap:8px;align-items:center;padding:12px;border:1px solid rgba(2,8,23,.12);border-radius:14px;background:#fff;font-weight:800;text-align:left;cursor:pointer}
+  .qrfSectionTabs button span{display:grid;place-items:center;flex:0 0 28px;height:28px;border-radius:9px;background:#e2e8f0}
+  .qrfSectionTabs button.done span{background:#dcfce7;color:#166534}
+  .qrfSectionTabs button[aria-selected="true"]{border-color:#14b8a6;background:#f0fdfa}
+  .qrfSectionTabs button[aria-selected="true"] span{background:#0f766e;color:#fff}
+  .qrfSectionHidden{display:none!important}
+  .qrfSectionNext{margin-top:14px}
+</style>
+<script>
+(() => {
+  const tabs = __TABS__;
+  const nav = document.querySelector('.qrfSectionTabs');
+  if (!nav) return;
+  const nodes = tab => tab.ids.map(id => document.getElementById(id)).filter(Boolean);
+  const keyForHash = () => {
+    const id = location.hash.replace('#', '');
+    return (tabs.find(tab => tab.ids.includes(id)) || tabs[0]).key;
+  };
+  let nextButtons = [];
+  const show = (key, scroll) => {
+    tabs.forEach(tab => {
+      nodes(tab).forEach(node => node.classList.toggle('qrfSectionHidden', tab.key !== key));
+      const button = nav.querySelector(`[data-tab="${tab.key}"]`);
+      button.setAttribute('aria-selected', String(tab.key === key));
+      button.tabIndex = tab.key === key ? 0 : -1;
+    });
+    nextButtons.forEach(({owner, button}) => button.classList.toggle('qrfSectionHidden', owner !== key));
+    if (scroll) nav.scrollIntoView({behavior: 'smooth', block: 'start'});
+  };
+  const start = () => {
+    if (!tabs.every(tab => nodes(tab).length)) return;  // unexpected layout: leave the page as is
+    nav.hidden = false;
+    tabs.forEach((tab, index) => {
+      const tabButton = nav.querySelector(`[data-tab="${tab.key}"]`);
+      tabButton.addEventListener('click', () => show(tab.key, true));
+      tabButton.addEventListener('keydown', event => {
+        const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+        if (!keys.includes(event.key)) return;
+        event.preventDefault();
+        const current = tabs.findIndex(item => item.key === tab.key);
+        const target = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+          : (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+        const nextButton = nav.querySelector(`[data-tab="${tabs[target].key}"]`);
+        show(tabs[target].key, false);
+        nextButton.focus();
+      });
+      const next = tabs[index + 1];
+      if (!next) return;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn-primary qrfSectionNext';
+      button.textContent = `Avanti: ${next.label}`;
+      button.addEventListener('click', () => show(next.key, true));
+      const anchor = nodes(tab)[nodes(tab).length - 1];
+      anchor.insertAdjacentElement('afterend', button);
+      nextButtons.push({owner: tab.key, button});
+    });
+    show(keyForHash(), false);
+    window.addEventListener('hashchange', () => show(keyForHash(), true));
+    // A required field in a hidden section must become visible to be fixed.
+    document.addEventListener('invalid', event => {
+      const owner = tabs.find(tab => nodes(tab).some(node => node.contains(event.target)));
+      if (owner) show(owner.key, false);
+    }, true);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+</script>
+"""
+
+
+def _section_tabs_html(completed: set[str]) -> str:
+    buttons = "".join(
+        f'<button type="button" role="tab" data-tab="{key}" class="{"done" if key in completed else ""}" '
+        f'aria-selected="{"true" if index == 1 else "false"}" tabindex="{0 if index == 1 else -1}">'
+        f'<span>{"✓" if key in completed else index}</span>{esc(label)}</button>'
+        for index, (key, label, _ids) in enumerate(_SECTION_TABS, 1)
+    )
+    tabs = [{"key": key, "label": label, "ids": list(ids)} for key, label, ids in _SECTION_TABS]
+    return (
+        _SECTION_TABS_TEMPLATE
+        .replace("__BUTTONS__", buttons)
+        .replace("__TABS__", json.dumps(tabs, ensure_ascii=False))
+    )
+
+
+_NUTRITION_ESTIMATOR_TEMPLATE = """
+<details class="nutritionEstimator" open>
+  <summary>Non hai i valori? Calcolali dalla gradazione e dagli zuccheri residui</summary>
+  <p class="p">Bastano i dati della scheda dell’enologo. Il risultato è una stima: controllala
+  e, se hai le analisi di laboratorio, usa quelle.</p>
+  <div class="nutritionEstimatorGrid">
+    <label>Gradazione alcolica (% vol)*<input class="input mono" data-est="alcohol" inputmode="decimal" placeholder="es. 13,5"></label>
+    <label>Zuccheri residui (g/l)*<input class="input mono" data-est="sugar" inputmode="decimal" placeholder="es. 2"></label>
+    <label>Glicerolo (g/l, facoltativo)<input class="input mono" data-est="glycerol" inputmode="decimal" placeholder="es. 7"></label>
+    <label>Acidità totale (g/l, facoltativo)<input class="input mono" data-est="acids" inputmode="decimal" placeholder="es. 5,5"></label>
+  </div>
+  <button class="btn" type="button" data-est-run>Calcola</button>
+  <div class="nutritionEstimatorResult" data-est-result role="status" aria-live="polite"></div>
+  <button class="btn btn-primary" type="button" data-est-apply hidden>Usa questi valori</button>
+  <p class="nutritionEstimatorNote">__FORMULA__ Dopo aver usato i valori ricordati di salvare.</p>
+</details>
+<style>
+  .nutritionEstimator{margin:0 0 16px;padding:14px 16px;border:2px solid #14b8a6;border-radius:16px;background:#f0fdfa}
+  .nutritionEstimator>summary{cursor:pointer;font-weight:800;color:#0f766e}
+  .nutritionEstimatorGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:10px 0}
+  .nutritionEstimatorGrid label{display:grid;gap:6px;font-weight:700}
+  .nutritionEstimatorResult{margin:10px 0;font-size:15px}
+  .nutritionEstimatorNote{margin-top:10px;font-size:12px;color:#556377}
+</style>
+<script>
+(() => {
+  const F = __CONSTANTS__;
+  const box = document.currentScript.closest('.nutritionEstimator') || document.querySelector('.nutritionEstimator');
+  if (!box) return;
+  const num = key => {
+    const raw = String((box.querySelector(`[data-est="${key}"]`) || {}).value || '').trim().replace(',', '.');
+    return raw === '' ? 0 : Number(raw);
+  };
+  const result = box.querySelector('[data-est-result]');
+  const apply = box.querySelector('[data-est-apply]');
+  let values = null;
+  const fmt = (v, d) => v.toFixed(d).replace('.', ',');
+  box.querySelector('[data-est-run]').addEventListener('click', () => {
+    const alcohol = num('alcohol'), sugar = num('sugar'), glycerol = num('glycerol'), acids = num('acids');
+    const alcoholRaw = String(box.querySelector('[data-est="alcohol"]').value || '').trim();
+    if (!alcoholRaw || [alcohol, sugar, glycerol, acids].some(v => !Number.isFinite(v) || v < 0) || alcohol > 25) {
+      result.textContent = 'Inserisci almeno la gradazione (tra 0 e 25) e gli zuccheri residui, con numeri validi.';
+      apply.hidden = true; values = null; return;
+    }
+    const g = {alcohol: alcohol * F.density, carbohydrate: sugar / 10, polyol: glycerol / 10, organic_acid: acids / 10};
+    let kj = 0, kcal = 0;
+    for (const key of Object.keys(g)) { kj += g[key] * F[key][0]; kcal += g[key] * F[key][1]; }
+    values = {
+      energy_kj: Math.round(kj), energy_kcal: Math.round(kcal), fat: 0, saturates: 0,
+      carbs: Math.round((g.carbohydrate + g.polyol) * 10) / 10, sugars: Math.round(g.carbohydrate * 10) / 10,
+      protein: 0, salt: 0,
+    };
+    result.innerHTML = `<b>Stima per 100 ml:</b> energia ${values.energy_kj} kJ / ${values.energy_kcal} kcal · `
+      + `carboidrati ${fmt(values.carbs, 1)} g di cui zuccheri ${fmt(values.sugars, 1)} g · grassi, proteine e sale 0 g`;
+    apply.hidden = false;
+  });
+  apply.addEventListener('click', () => {
+    if (!values) return;
+    for (const [name, value] of Object.entries(values)) {
+      const input = document.querySelector(`input[name="${name}"]`);
+      if (!input) continue;
+      input.value = String(value).replace('.', ',');
+      input.dispatchEvent(new Event('input', {bubbles: true}));
+      input.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+    result.innerHTML += '<br><b>Valori inseriti nel modulo qui sotto: controllali e premi Salva.</b>';
+    apply.hidden = true;
+  });
+})();
+</script>
+"""
+
+
+def _nutrition_estimator_html() -> str:
+    return (
+        _NUTRITION_ESTIMATOR_TEMPLATE
+        .replace("__CONSTANTS__", estimator_js_constants())
+        .replace("__FORMULA__", esc(FORMULA_TEXT))
+    )
 
 
 @router.get("/app/wine/{wine_id}/compliance", response_class=HTMLResponse)
@@ -442,10 +635,9 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
     meta = data["meta"]
 
     actions = (
-        pill(f"wine: {balances.get('wine', 0)}", "green") + " " +
-        pill(f"generic: {balances.get('generic', 0)}") + " " +
+        pill(f"QR vino disponibili: {balances.get('wine', 0)}", "green") + " " +
         top_actions(
-            (f"/app/wine/{int(wine_id)}", "Overview"),
+            (f"/app/wine/{int(wine_id)}", "Scheda vino"),
             ("/app/dashboard", "Dashboard"),
             ("/logout", "Logout"),
         )
@@ -472,13 +664,17 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
     rec_html = _recycle_rows(recycle)
 
     theme = (meta.get("public_theme") or "minimal").strip() or "minimal"
-    summary_html = _summary_html(ingredients, allergens, nut, recycle, meta, role=role, wine_id=int(wine_id))
+    csrf_html = csrf_input(request)
+    summary_html = _summary_html(
+        ingredients, allergens, nut, recycle, meta,
+        role=role, wine_id=int(wine_id), csrf_html=csrf_html,
+    )
 
     body = f"""
     <section class="complianceWrap">
       <div class="complianceHero">
         <div>
-          <div class="complianceEyebrow">Compliance vino</div>
+          <div class="complianceEyebrow">Etichetta digitale</div>
           <div class="h1">Dati obbligatori</div>
           <div class="p">
             Compila ingredienti, allergeni, valori nutrizionali, riciclabilità e contenuti pubblici
@@ -494,25 +690,14 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
           {summary_html}
         </div>
 
-        <div class="complianceHeroCard">
-          <div class="complianceHeroCardTitle">Percorso consigliato</div>
-
-          <div class="complianceStepsMini">
-            <div><b>1</b><span>Immagini</span></div>
-            <div class="active"><b>2</b><span>Compliance</span></div>
-            <div><b>3</b><span>Export</span></div>
-          </div>
-        </div>
+        <div class="complianceHeroCard"><div class="complianceHeroCardTitle">Percorso guidato</div><p>Salva ogni sezione e continua fino al controllo finale.</p></div>
       </div>
 
-      <div class="complianceTabs">
-        <a class="complianceTab" href="/app/wine/{int(wine_id)}">Overview</a>
-        <a class="complianceTab" href="/app/wine/{int(wine_id)}/images">Immagini</a>
-        <a class="complianceTab active" href="/app/wine/{int(wine_id)}/compliance">Compliance</a>
-        <a class="complianceTab" href="/app/wine/{int(wine_id)}/export">Export</a>
-      </div>
+      {render_guided_stepper(int(wine_id), "ingredients", completed_steps(int(wine_id)))}
 
-      <div class="complianceFlow">
+      <!-- page tabs removed: the guided stepper above links every page -->
+
+      <div class="complianceFlow" style="display:none">
         <a href="/app/wine/{int(wine_id)}/images">
           <span>1</span>
           <b>Immagini</b>
@@ -521,7 +706,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
 
         <a class="active" href="/app/wine/{int(wine_id)}/compliance">
           <span>2</span>
-          <b>Compliance</b>
+          <b>Dati obbligatori</b>
           <small>Compila i dati obbligatori</small>
         </a>
 
@@ -532,7 +717,9 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
         </a>
       </div>
 
-      <div class="complianceGrid2">
+      {_section_tabs_html(completed_steps(int(wine_id)))}
+
+      <div class="complianceGrid2" id="ingredienti">
         <div class="card compliancePanel">
           <div class="compliancePanelHead">
             <div>
@@ -549,14 +736,15 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
           <form method="post"
                 action="/app/wine/{int(wine_id)}/compliance/add-ingredient"
                 class="complianceInlineForm">
+            {csrf_html}
             <div>
-              <label>Aggiungi ingrediente</label>
-              <input class="input" name="name"
+              <label for="f-ingredient-name">Aggiungi ingrediente</label>
+              <input id="f-ingredient-name" class="input" name="name"
                      placeholder="es. uva, mosto, anidride solforosa..."
                      required>
             </div>
 
-            <button class="btn btn-primary" type="submit">Aggiungi</button>
+            <button class="btn" type="submit">Aggiungi ingrediente</button>
           </form>
 
           <div class="note" style="margin-top:14px">
@@ -580,14 +768,15 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
           <form method="post"
                 action="/app/wine/{int(wine_id)}/compliance/add-allergen"
                 class="complianceInlineForm">
+            {csrf_html}
             <div>
-              <label>Aggiungi allergene</label>
-              <input class="input" name="name"
+              <label for="f-allergen-name">Aggiungi allergene</label>
+              <input id="f-allergen-name" class="input" name="name"
                      placeholder="es. solfiti, latte, uova..."
                      required>
             </div>
 
-            <button class="btn btn-primary" type="submit">Aggiungi</button>
+            <button class="btn" type="submit">Aggiungi allergene</button>
           </form>
 
           <div class="note" style="margin-top:14px">
@@ -597,7 +786,8 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
       </div>
 
       <form id="saveForm" method="post" action="/app/wine/{int(wine_id)}/compliance/save">
-        <div class="card compliancePanel" style="margin-top:18px">
+        {csrf_html}
+        <div class="card compliancePanel" id="ingredienti-testo" style="margin-top:18px">
           <div class="compliancePanelHead">
             <div>
               <div class="complianceSmallLabel">Extra ingredienti</div>
@@ -606,13 +796,13 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
             <span class="complianceIcon">✍️</span>
           </div>
 
-          <label>Extra ingredienti</label>
-          <input class="input" name="extra_ingredients"
+          <label for="f-extra_ingredients">Extra ingredienti</label>
+          <input id="f-extra_ingredients" class="input" name="extra_ingredients"
                  value="{esc((meta.get('extra_ingredients') or '').strip())}"
                  placeholder="es. eventuali ingredienti non presenti in lista">
         </div>
 
-        <div class="card compliancePanel" style="margin-top:18px">
+        <div class="card compliancePanel" id="nutrizione" style="margin-top:18px">
           <div class="compliancePanelHead">
             <div>
               <div class="complianceSmallLabel">Nutrizione</div>
@@ -623,70 +813,72 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
           </div>
 
           <div class="note" style="margin-top:0">
-            Energia in kJ e kcal obbligatoria. Gli altri campi possono essere lasciati vuoti.
+            Valori riferiti a 100 ml. kJ e kcal sono obbligatori; virgola e punto sono entrambi accettati.
           </div>
+
+          {_nutrition_estimator_html()}
 
           <div class="complianceNutritionGrid">
             <div>
-              <label>kJ*</label>
-              <input class="input mono" name="energy_kj"
+              <label for="nutrition-energy-kj">Energia (kJ per 100 ml)*</label>
+              <input class="input mono" id="nutrition-energy-kj" name="energy_kj" inputmode="decimal" min="0" max="5000"
                      value="{esc(_val(nut.get('energy_kj')))}"
                      placeholder="0">
             </div>
 
             <div>
-              <label>kcal*</label>
-              <input class="input mono" name="energy_kcal"
+              <label for="nutrition-energy-kcal">Energia (kcal per 100 ml)*</label>
+              <input class="input mono" id="nutrition-energy-kcal" name="energy_kcal" inputmode="decimal" min="0" max="1200"
                      value="{esc(_val(nut.get('energy_kcal')))}"
                      placeholder="0">
             </div>
 
             <div>
-              <label>Grassi</label>
-              <input class="input mono" name="fat"
+              <label for="nutrition-fat">Grassi</label>
+              <input class="input mono" id="nutrition-fat" name="fat" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('fat')))}">
             </div>
 
             <div>
-              <label>Saturi</label>
-              <input class="input mono" name="saturates"
+              <label for="nutrition-saturates">Saturi</label>
+              <input class="input mono" id="nutrition-saturates" name="saturates" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('saturates')))}">
             </div>
 
             <div>
-              <label>Carboidrati</label>
-              <input class="input mono" name="carbs"
+              <label for="nutrition-carbs">Carboidrati</label>
+              <input class="input mono" id="nutrition-carbs" name="carbs" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('carbs')))}">
             </div>
 
             <div>
-              <label>Zuccheri</label>
-              <input class="input mono" name="sugars"
+              <label for="nutrition-sugars">Zuccheri</label>
+              <input class="input mono" id="nutrition-sugars" name="sugars" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('sugars')))}">
             </div>
 
             <div>
-              <label>Proteine</label>
-              <input class="input mono" name="protein"
+              <label for="nutrition-protein">Proteine</label>
+              <input class="input mono" id="nutrition-protein" name="protein" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('protein')))}">
             </div>
 
             <div>
-              <label>Sale</label>
-              <input class="input mono" name="salt"
+              <label for="nutrition-salt">Sale</label>
+              <input class="input mono" id="nutrition-salt" name="salt" inputmode="decimal" min="0" max="100"
                      value="{esc(_val(nut.get('salt')))}">
             </div>
           </div>
         </div>
 
-        <div class="card compliancePanel" style="margin-top:18px">
+        <div class="card compliancePanel" id="riciclabilita" style="margin-top:18px">
           <div class="compliancePanelHead">
             <div>
               <div class="complianceSmallLabel">Riciclabilità</div>
               <div class="h2">Componenti packaging</div>
             </div>
 
-            <span class="pill pill-muted">Codice minimo “-”</span>
+            <span class="pill pill-muted">Materiale e codice verificati</span>
           </div>
 
           <div class="complianceRecycleList">
@@ -694,7 +886,7 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
           </div>
         </div>
 
-        <div class="card compliancePanel" style="margin-top:18px">
+        <div class="card compliancePanel" id="altre-opzioni" style="margin-top:18px">
           <div class="compliancePanelHead">
             <div>
               <div class="complianceSmallLabel">Pagina pubblica</div>
@@ -705,8 +897,8 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
 
           <div class="complianceGrid2">
             <div>
-              <label>Stile pagina pubblica</label>
-              <select name="public_theme">
+              <label for="f-public_theme">Stile pagina pubblica</label>
+              <select id="f-public_theme" name="public_theme">
                 <option value="minimal" {"selected" if theme == "minimal" else ""}>Normativo</option>
                 <option value="saas" {"selected" if theme == "saas" else ""}>Moderno</option>
                 <option value="classic" {"selected" if theme == "classic" else ""}>Classico</option>
@@ -714,21 +906,57 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
             </div>
 
             <div>
-              <label>Nota</label>
-              <input class="input" value="Lo stile modifica solo la presentazione. La pagina resta senza pubblicità." disabled>
+              <label for="public-theme-note">Nota</label>
+              <input class="input" id="public-theme-note" value="Lo stile modifica solo la presentazione. La pagina resta senza pubblicità." disabled>
             </div>
           </div>
 
-          <label>Descrizione opzionale</label>
-          <textarea class="input" name="story_text" style="min-height:110px">{esc((meta.get("story_text") or "").strip())}</textarea>
+          <label for="f-story_text">Descrizione opzionale</label>
+          <textarea id="f-story_text" class="input" name="story_text" style="min-height:110px">{esc((meta.get("story_text") or "").strip())}</textarea>
         </div>
 
         <div class="complianceActions">
-          <a class="btn" href="/app/wine/{int(wine_id)}">Torna al lotto</a>
-          <button class="btn btn-primary complianceSaveBtn" type="submit">Salva compliance</button>
-          <a class="btn complianceExportBtn" href="/app/wine/{int(wine_id)}/export">Vai a Export</a>
+          <a class="btn" href="/app/wine/{int(wine_id)}/images">Indietro</a>
+          <button class="btn" type="submit" name="continue_to" value="stay">Salva</button>
+          <button class="btn btn-primary complianceSaveBtn" type="submit" name="continue_to" value="review">Salva e continua</button>
         </div>
       </form>
+
+      <div class="card compliancePanel" id="controllo-finale" style="margin-top:18px">
+        <div class="complianceSmallLabel">Step 6</div><div class="h2">Controllo finale</div>
+        <p>Qui vedi cosa manca e il collegamento per completarlo. Al momento della pubblicazione il controllo viene ripetuto automaticamente.</p>
+        {summary_html}
+      </div>
+      <div class="card compliancePanel" id="pubblicazione" style="margin-top:18px">
+        <div class="complianceSmallLabel">Step 7</div><div class="h2">Preview e pubblicazione</div>
+        <div class="complianceActions">
+          <a class="btn" href="/preview/{esc(w.get('slug') or '')}" target="_blank">Apri preview</a>
+          <a class="btn btn-primary" href="/app/wine/{int(wine_id)}">Vai alla pubblicazione</a>
+        </div>
+      </div>
+
+      <script>
+      (() => {{
+        const form=document.getElementById('saveForm'); if(!form) return;
+        const storageKey='qrfacile:wine:{int(wine_id)}:draft';
+        const status=document.createElement('div'); status.className='note'; status.style.marginTop='10px'; status.textContent='Tutte le modifiche sono salvate.';
+        form.insertAdjacentElement('afterbegin',status);
+        let dirty=false; let submitting=false;
+        const fields=Array.from(document.querySelectorAll('input[name],select[name],textarea[name]')).filter(node=>node.type!=='file'&&node.name!=='csrf_token');
+        const keyFor=node=>`${{node.form?.action||'page'}}::${{node.name}}`;
+        if ({str((msg or '').startswith('Dati salvati correttamente')).lower()}) sessionStorage.removeItem(storageKey);
+        else {{
+          try {{ const draft=JSON.parse(sessionStorage.getItem(storageKey)||'{{}}'); fields.forEach(node=>{{if(Object.hasOwn(draft,keyFor(node))) node.value=draft[keyFor(node)]}}); }} catch (_) {{}}
+        }}
+        const remember=()=>{{
+          dirty=true; status.textContent='Modifiche non salvate'; status.className='note note-warn';
+          const draft={{}}; fields.forEach(node=>draft[keyFor(node)]=node.value); sessionStorage.setItem(storageKey,JSON.stringify(draft));
+        }};
+        fields.forEach(node=>{{node.addEventListener('input',remember);node.addEventListener('change',remember)}});
+        form.addEventListener('submit',()=>{{submitting=true}});
+        window.addEventListener('beforeunload',event=>{{if(dirty&&!submitting){{event.preventDefault();event.returnValue=''}}}});
+      }})();
+      </script>
 
       <style>
         .complianceWrap {{
@@ -1232,8 +1460,8 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
     """
 
     return HTMLResponse(page(
-        title="QRFACILE · Compliance",
-        subtitle="Compliance lotto",
+        title="QRFACILE · Dati obbligatori",
+        subtitle="Dati obbligatori del lotto",
         body_html=body,
         actions_html=actions,
         user_email=user.get("email", ""),
@@ -1243,7 +1471,8 @@ def compliance_get(request: Request, wine_id: int, msg: str = ""):
 
 
 @router.post("/app/wine/{wine_id}/compliance/add-ingredient")
-def add_ingredient(request: Request, wine_id: int, name: str = Form(...)):
+def add_ingredient(request: Request, wine_id: int, name: str = Form(...), csrf_token: str = Form("")):
+    require_csrf_or_same_origin(request, csrf_token)
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             w = _wine(cur, int(wine_id))
@@ -1304,7 +1533,8 @@ def add_ingredient(request: Request, wine_id: int, name: str = Form(...)):
 
 
 @router.post("/app/wine/{wine_id}/compliance/add-allergen")
-def add_allergen(request: Request, wine_id: int, name: str = Form(...)):
+def add_allergen(request: Request, wine_id: int, name: str = Form(...), csrf_token: str = Form("")):
+    require_csrf_or_same_origin(request, csrf_token)
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             w = _wine(cur, int(wine_id))
@@ -1351,7 +1581,6 @@ def add_allergen(request: Request, wine_id: int, name: str = Form(...)):
     return _redirect(wine_id, "Allergene aggiunto")
 
 
-@router.post("/app/wine/{wine_id}/compliance/save")
 def compliance_save(
     request: Request,
     wine_id: int,

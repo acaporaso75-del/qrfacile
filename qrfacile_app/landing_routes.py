@@ -6,421 +6,258 @@ from qrfacile_app.ui_shell import page_public
 router = APIRouter()
 
 
+_CHOOSER_SOON = '<span class="chooserSoon">In arrivo</span>'
+_WINE_GUIDE_PREVIEW = """
+      <div class="chooserGuide">
+        <svg viewBox="0 0 28 28" width="28" height="28" aria-hidden="true" focusable="false">
+          <rect x="2" y="4" width="24" height="17" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="m12 8 6 4.5-6 4.5z" fill="currentColor"/>
+          <path d="M10 25h8m-4-4v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <div>
+          <strong>Guida video Wine</strong>
+          <span>Dal primo accesso al QR, passo passo.</span>
+          <small>In preparazione</small>
+        </div>
+      </div>
+"""
+
+
+def _chooser_card(
+    vignette: str,
+    title: str,
+    text: str,
+    footer: str,
+    *,
+    active: bool = False,
+    guide: str = "",
+) -> str:
+    classes = "chooserCard active" if active else "chooserCard"
+    return (
+        f'<article class="{classes}"><div class="chooserArt" aria-hidden="true">'
+        f'<img src="/static/module-vignettes/{vignette}.svg" alt="" width="160" height="92"></div>'
+        f'<h2>{title}</h2><p>{text}</p><div class="chooserFooter">{footer}</div>{guide}</article>'
+    )
+
+
+def _chooser_discovery(path: str, module: str) -> str:
+    return _CHOOSER_SOON + f'<a class="btn" href="{path}" aria-label="Scopri {module}">Scopri</a>'
+
+
+def _module_chooser(link_on: bool) -> str:
+    """One entry point per module, before any explanatory content."""
+    link_footer = (
+        '<span class="chooserFree">3 QR gratis</span>'
+        '<a class="btn btn-primary" href="/register-business">Inizia</a>'
+        if link_on
+        else _chooser_discovery("/link", "Link")
+    )
+    cards = [
+        _chooser_card("wine", "Ho una cantina",
+                      "Etichette digitali del vino, senza canone annuale.",
+                      '<span class="chooserFree">3 QR gratis</span>'
+                      '<a class="btn btn-primary" href="/register-winery" aria-label="Inizia con Wine">Inizia</a>'
+                      '<a class="btn" href="/wine">Scopri Wine</a>',
+                      active=True, guide=_WINE_GUIDE_PREVIEW),
+        _chooser_card("link", "Ho un'attività",
+                      "Un QR per il tuo sito, un PDF o i tuoi contatti.",
+                      link_footer, active=link_on),
+        _chooser_card("menu", "Ho un ristorante", "Menu digitale aggiornabile in più lingue.",
+                      _chooser_discovery("/menu", "Menu")),
+        _chooser_card("quiz", "Quiz e formazione", "Domande e percorsi da un QR.",
+                      _chooser_discovery("/quiz", "Quiz e formazione")),
+        _chooser_card("warehouse", "Magazzino", "Schede e movimenti di prodotti e materiali.",
+                      _chooser_discovery("/warehouse", "Magazzino")),
+        _chooser_card("events", "Eventi", "Programmi, iscrizioni e votazioni.",
+                      _chooser_discovery("/events", "Eventi")),
+    ]
+    return f"""
+      <section class="moduleChooser" id="scegli" aria-labelledby="scegli-title">
+        <div class="chooserHeading" id="moduli">
+          <p class="chooserEyebrow">Piattaforma QR modulare</p>
+          <h1 id="scegli-title">Cosa vuoi fare con il tuo QR?</h1>
+          <p class="chooserLead">Scegli il modulo adatto alla tua attività.</p>
+        </div>
+        <div class="chooserGrid">{''.join(cards)}</div>
+        <style>
+          .moduleChooser {{
+            padding:clamp(14px,3vw,28px);
+            border:1px solid #d5e5e5;
+            border-radius:24px;
+            background:linear-gradient(135deg,#eff9f7,#f8fafc 68%);
+          }}
+          .chooserHeading {{ margin:0 0 18px; }}
+          .chooserEyebrow {{
+            margin:0 0 5px; color:#0f766e; font-size:.78rem; font-weight:850;
+            letter-spacing:.06em; text-transform:uppercase;
+          }}
+          .chooserHeading h1 {{
+            margin:0; color:#0f172a; font-size:clamp(1.65rem,3.1vw,4rem);
+            line-height:1.12; letter-spacing:-.025em; overflow-wrap:anywhere;
+          }}
+          .chooserLead {{ color:#334155; margin:7px 0 0; line-height:1.45; }}
+          .chooserGrid {{
+            display:grid; gap:clamp(10px,1.1vw,24px);
+            grid-template-columns:repeat(3,minmax(0,1fr));
+          }}
+          .chooserCard {{
+            background:#fff; border:1px solid #d5e5e5; border-radius:16px;
+            padding:clamp(12px,1.1vw,24px); display:flex; flex-direction:column; gap:9px;
+          }}
+          .chooserCard.active {{ border-color:#0f766e; background:#f0fdfa; }}
+          .chooserCard h2 {{ margin:0; font-size:clamp(1rem,1.25vw,1.6rem); line-height:1.2; overflow-wrap:anywhere; }}
+          .chooserArt {{
+            position:relative; flex:none; height:clamp(55px,5.2vw,84px); overflow:hidden;
+            border-radius:12px; background:linear-gradient(125deg,#f8fafc,#eef6f5);
+          }}
+          .chooserArt img {{
+            position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:contain;
+          }}
+          .chooserCard p {{
+            margin:0; max-width:48ch; color:#334155; font-size:clamp(.94rem,1vw,1.15rem); line-height:1.4; flex:1;
+          }}
+          .chooserFooter {{ display:flex; gap:6px 8px; align-items:center; flex-wrap:wrap; }}
+          .chooserFooter .btn {{ width:auto; min-height:44px; padding:7px 11px; font-size:.94rem; }}
+          .chooserSoon, .chooserFree {{
+            font-weight:800; border-radius:999px; padding:4px 8px; font-size:.8rem;
+          }}
+          .chooserSoon {{ color:#78350f; background:#fef3c7; }}
+          .chooserFree {{ color:#115e59; background:#ccfbf1; }}
+          .chooserGuide {{
+            display:flex; gap:9px; align-items:flex-start; padding:10px;
+            border:1px solid #90c9bd; border-radius:11px;
+            background:#e3f6f1; color:#134e4a;
+          }}
+          .chooserGuide svg {{ flex:none; }}
+          .chooserGuide strong,
+          .chooserGuide span,
+          .chooserGuide small {{ display:block; }}
+          .chooserGuide strong {{ font-size:.94rem; line-height:1.25; }}
+          .chooserGuide span {{ margin-top:3px; font-size:.82rem; line-height:1.35; }}
+          .chooserGuide small {{ margin-top:4px; font-size:.76rem; font-weight:750; }}
+          @media(min-width:1550px) {{
+            .chooserGrid {{ grid-template-columns:repeat(6,minmax(0,1fr)); }}
+          }}
+          @media(max-width:850px) {{
+            .chooserGrid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }}
+          }}
+          @media(max-width:560px) {{
+            .chooserGrid {{ gap:8px; }}
+            .chooserCard {{ padding:10px; gap:6px; }}
+            .chooserCard p {{ font-size:.88rem; }}
+            .chooserGuide {{ padding:8px; }}
+            .chooserGuide svg {{ display:none; }}
+          }}
+          @media(max-width:350px) {{
+            .chooserGrid {{ grid-template-columns:minmax(0,1fr); }}
+          }}
+        </style>
+      </section>
+    """
+
+
 @router.get("/", response_class=HTMLResponse)
 def home(request: Request):
     actions = """
-    <a class="btn" href="#moduli">Moduli e piani</a>
-    <a class="btn btn-primary" href="/wine">Vai a QRFACILE Wine</a>
-    <a class="btn" href="/login">Login</a>
+    <a class="btn" href="/pricing">Prezzi</a>
+    <a class="btn" href="/login">Accedi</a>
+    <a class="btn btn-primary" href="#scegli">Scegli il tuo QR</a>
     """
 
     body = """
-    <section class="modularHome">
-      <div class="moduleHero">
-        <div class="moduleHeroOverlay">
-          <div class="moduleEyebrow">Piattaforma QR modulare</div>
-          <h1>QRFACILE</h1>
-          <p>
-            Una piattaforma generale per creare QR dinamici verticali. Ogni modulo
-            avra il proprio flusso, le proprie pagine pubbliche e i propri piani.
-          </p>
-          <div class="moduleHeroActions">
-            <a class="btn btn-primary" href="/wine">Vai a QRFACILE Wine</a>
-            <a class="btn" href="/login">Login</a>
+    <div class="modularHome">
+      {module_chooser}
+
+      <section class="moduleIntro" aria-labelledby="come-funziona-title">
+        <h2 id="come-funziona-title">Stampi il QR una volta. Lo aggiorni quando vuoi.</h2>
+        <p>Gestisci il contenuto dal tuo pannello, senza cambiare il codice che hai già stampato.</p>
+        <div class="moduleActiveGrid">
+          <div class="moduleFeature">
+            <b>Contenuti aggiornabili</b>
+            <span>Il codice rimanda a una pagina pubblica che puoi modificare.</span>
           </div>
-          <div class="moduleHeroBadges">
-            <span>Moduli attivabili</span>
-            <span>QR dinamici</span>
-            <span>Console operativa</span>
-            <span>Export stampa</span>
+          <div class="moduleFeature">
+            <b>Pannello riservato</b>
+            <span>Chi scansiona il QR vede la pagina pubblica, non il tuo pannello di gestione.</span>
           </div>
-        </div>
-      </div>
-
-      <section class="moduleIntro">
-        <div>
-          <div class="moduleEyebrow">Piattaforma generale</div>
-          <h2>QR dinamici per esigenze diverse.</h2>
-          <p>
-            Un'unica piattaforma per creare QR dinamici, contenuti aggiornabili
-            e pagine dedicate. Parti dal modulo piu adatto e attiva nuovi usi QR
-            quando ti servono.
-          </p>
-        </div>
-        <div class="moduleStatus active">Attivo</div>
-      </section>
-
-      <section class="moduleActiveGrid">
-        <div class="moduleFeature">
-          <b>QR dinamici</b>
-          <span>Ogni modulo gestisce contenuti aggiornabili collegati a QR pubblici.</span>
-        </div>
-        <div class="moduleFeature">
-          <b>Pagine pubbliche</b>
-          <span>Esperienze verticali per consultazione, informazione, raccolta dati o operativita.</span>
-        </div>
-        <div class="moduleFeature">
-          <b>Console riservata</b>
-          <span>Accesso operativo separato dalla pagina pubblica mostrata tramite QR.</span>
-        </div>
-        <div class="moduleFeature">
-          <b>Piani chiari</b>
-          <span>Scegli il percorso piu adatto al tuo uso, dal primo progetto alla crescita.</span>
-        </div>
-      </section>
-
-      <section class="moduleCatalogHead" id="moduli">
-        <div class="moduleEyebrow">Roadmap modulare</div>
-        <h2>Una base, piu moduli verticali.</h2>
-        <p>
-          QRFACILE nasce come piattaforma generale: ogni modulo mantiene lo stesso
-          approccio operativo, con QR dinamici, pagine pubbliche e pannello di gestione.
-        </p>
-      </section>
-
-      <section class="moduleCatalog">
-        <article class="moduleCard active">
-          <div class="moduleCardTop">
-            <span class="moduleStatus active">Attivo</span>
-            <b>Wine Compliance</b>
+          <div class="moduleFeature">
+            <b>Pronto da stampare</b>
+            <span>Scarica il codice per etichette, confezioni o materiali promozionali.</span>
           </div>
-          <p>Etichette digitali vino, compliance e QR per stampa.</p>
-          <a class="btn btn-primary" href="/wine">Vai al modulo</a>
-        </article>
-
-        <article class="moduleCard">
-          <div class="moduleCardTop">
-            <span class="moduleStatus soon">In arrivo</span>
-            <b>Link Diretto</b>
-          </div>
-          <p>QR dinamico verso pagine, PDF, cataloghi o link esterni aggiornabili.</p>
-          <a class="btn" href="/link">Scopri modulo</a>
-        </article>
-
-        <article class="moduleCard">
-          <div class="moduleCardTop">
-            <span class="moduleStatus soon">In arrivo</span>
-            <b>Menu Ristorante</b>
-          </div>
-          <p>Menu digitale aggiornabile per sale, tavoli, asporto e carte stagionali.</p>
-          <a class="btn" href="/menu">Scopri modulo</a>
-        </article>
-
-        <article class="moduleCard">
-          <div class="moduleCardTop">
-            <span class="moduleStatus soon">In arrivo</span>
-            <b>Quiz / Formazione</b>
-          </div>
-          <p>QR per percorsi formativi, quiz, raccolta risposte e contenuti didattici.</p>
-          <a class="btn" href="/quiz">Scopri modulo</a>
-        </article>
-
-        <article class="moduleCard">
-          <div class="moduleCardTop">
-            <span class="moduleStatus soon">In arrivo</span>
-            <b>QR Magazzino</b>
-          </div>
-          <p>Schede operative per prodotti, scaffali, materiali e inventari leggeri.</p>
-          <a class="btn" href="/warehouse">Scopri modulo</a>
-        </article>
-
-        <article class="moduleCard">
-          <div class="moduleCardTop">
-            <span class="moduleStatus soon">In arrivo</span>
-            <b>Eventi / Votazioni</b>
-          </div>
-          <p>QR per eventi, raccolta preferenze, votazioni, accesso rapido e feedback.</p>
-          <a class="btn" href="/events">Scopri modulo</a>
-        </article>
-      </section>
-
-      <section class="moduleFinal">
-        <div>
-          <div class="moduleEyebrow">Moduli e piani</div>
-          <h2>Trova il modulo giusto per il tuo prossimo QR.</h2>
-          <p>Inizia da un uso concreto e aggiungi nuove esperienze QR quando la tua attivita cresce.</p>
-        </div>
-        <div class="moduleFinalActions">
-          <a class="btn btn-primary" href="/wine">Vai a QRFACILE Wine</a>
-          <a class="btn" href="/login">Login</a>
-          <a class="btn" href="#moduli">Esplora i moduli</a>
         </div>
       </section>
 
       <style>
-        .modularHome {
-          max-width:1180px;
-          margin:0 auto;
-        }
-
-        .moduleHero {
-          min-height:560px;
-          border-radius:30px;
-          overflow:hidden;
-          position:relative;
-          display:flex;
-          align-items:flex-end;
-          background:
-            linear-gradient(90deg,rgba(8,47,73,.90),rgba(15,118,110,.62),rgba(255,255,255,.06)),
-            url('/static/qr3d.png') center right / contain no-repeat,
-            linear-gradient(135deg,#0f766e,#f8fafc);
-          box-shadow:0 28px 90px rgba(2,8,23,.14);
-        }
-
-        .moduleHeroOverlay {
+        .publicWrap.publicWrapWide {
           width:100%;
-          min-height:560px;
-          padding:44px;
-          display:flex;
-          flex-direction:column;
-          justify-content:flex-end;
-          background:linear-gradient(180deg,rgba(2,8,23,.08),rgba(2,8,23,.42));
+          max-width:none;
+          padding-inline:clamp(12px,2.5vw,64px);
         }
 
-        .moduleEyebrow {
-          display:inline-flex;
-          width:max-content;
-          padding:8px 13px;
-          border-radius:999px;
-          background:rgba(236,253,245,.92);
-          color:#0f766e;
-          font-size:12px;
-          font-weight:950;
-          letter-spacing:.04em;
-          text-transform:uppercase;
-        }
-
-        .moduleHero h1 {
-          margin-top:16px;
-          margin-bottom:0;
-          font-size:clamp(48px,8vw,96px);
-          line-height:.95;
-          font-weight:950;
-          letter-spacing:0;
-          color:white;
-        }
-
-        .moduleHero p {
-          margin-top:18px;
-          max-width:720px;
-          color:#ecfeff;
-          font-size:18px;
-          font-weight:720;
-          line-height:1.55;
-        }
-
-        .moduleHeroActions,
-        .moduleFinalActions {
-          margin-top:24px;
-          display:flex;
-          gap:12px;
-          flex-wrap:wrap;
-        }
-
-        .moduleHeroBadges {
-          margin-top:20px;
-          display:flex;
-          gap:9px;
-          flex-wrap:wrap;
-        }
-
-        .moduleHeroBadges span {
-          display:inline-flex;
-          padding:8px 11px;
-          border-radius:999px;
-          background:rgba(255,255,255,.18);
-          border:1px solid rgba(255,255,255,.28);
-          color:white;
-          font-size:12px;
-          font-weight:900;
-        }
-
-        .moduleIntro,
-        .moduleFeature,
-        .moduleCard,
-        .moduleAudience > div,
-        .moduleFinal {
-          border:1px solid rgba(2,8,23,.08);
-          border-radius:22px;
-          background:rgba(255,255,255,.84);
-          box-shadow:0 18px 55px rgba(2,8,23,.06);
-        }
+        .publicWrapWide .publicMain { margin-top:clamp(12px,1.8vw,24px); }
 
         .moduleIntro {
-          margin-top:22px;
-          padding:26px;
-          display:grid;
-          grid-template-columns:minmax(0,1fr) auto;
-          gap:18px;
-          align-items:start;
+          margin:26px 0 0;
+          padding:clamp(16px,3vw,26px);
+          border:1px solid #dce5e6;
+          border-radius:22px;
+          background:#fff;
         }
 
-        .moduleIntro h2,
-        .moduleCatalogHead h2,
-        .moduleAudience h2,
-        .moduleFinal h2 {
-          margin:10px 0 0;
-          font-size:clamp(28px,4vw,46px);
-          line-height:1.05;
-          font-weight:950;
-          letter-spacing:0;
+        .moduleIntro h2 {
+          margin:0;
+          font-size:clamp(22px,3vw,30px);
+          line-height:1.2;
           color:#0f172a;
         }
 
         .moduleIntro p,
-        .moduleCatalogHead p,
-        .moduleAudience p,
-        .moduleFinal p,
-        .moduleCard p,
-        .moduleFeature span {
-          color:#475569;
-          font-weight:730;
-          line-height:1.55;
-        }
+        .moduleFeature span { color:#475569; line-height:1.5; }
 
-        .moduleStatus {
-          display:inline-flex;
-          width:max-content;
-          padding:7px 11px;
-          border-radius:999px;
-          font-size:12px;
-          font-weight:950;
-          text-transform:uppercase;
-        }
+        .moduleIntro p { max-width:68ch; }
 
-        .moduleStatus.active {
-          color:#0f766e;
-          background:rgba(236,253,245,.95);
-          border:1px solid rgba(20,184,166,.16);
-        }
-
-        .moduleStatus.soon {
-          color:#7c2d12;
-          background:rgba(255,247,237,.96);
-          border:1px solid rgba(251,146,60,.20);
-        }
-
-        .moduleActiveGrid,
-        .moduleCatalog {
-          margin-top:18px;
+        .moduleActiveGrid {
+          margin-top:16px;
           display:grid;
-          grid-template-columns:repeat(4,minmax(0,1fr));
-          gap:14px;
-        }
-
-        .moduleFeature,
-        .moduleCard {
-          padding:20px;
-        }
-
-        .moduleFeature b,
-        .moduleCard b {
-          display:block;
-          color:#0f172a;
-          font-size:17px;
-          font-weight:950;
-        }
-
-        .moduleFeature span {
-          display:block;
-          margin-top:8px;
-          font-size:14px;
-        }
-
-        .moduleCatalogHead {
-          margin-top:36px;
-        }
-
-        .moduleCatalog {
-          grid-template-columns:repeat(3,minmax(0,1fr));
-        }
-
-        .moduleCard {
-          min-height:190px;
-          display:flex;
-          flex-direction:column;
-          justify-content:space-between;
-          gap:18px;
-        }
-
-        .moduleCard.active {
-          background:linear-gradient(135deg,rgba(236,253,245,.96),rgba(255,255,255,.92));
-          border-color:rgba(20,184,166,.18);
-        }
-
-        .moduleCardTop {
-          display:grid;
+          grid-template-columns:repeat(auto-fit,minmax(min(100%,235px),1fr));
           gap:12px;
         }
 
-        .moduleAudience {
-          margin-top:22px;
-          display:grid;
-          grid-template-columns:1fr 1fr;
-          gap:16px;
+        .moduleFeature {
+          padding:14px;
+          border:1px solid #dce5e6;
+          border-radius:14px;
+          background:#f8fafc;
         }
 
-        .moduleAudience > div {
-          padding:26px;
-        }
+        .moduleFeature b,
+        .moduleFeature span { display:block; }
 
-        .moduleAudience .btn {
-          margin-top:18px;
-        }
-
-        .moduleFinal {
-          margin-top:24px;
-          padding:28px;
-          display:flex;
-          justify-content:space-between;
-          align-items:center;
-          gap:20px;
-          background:
-            radial-gradient(circle at 0% 0%, rgba(191,245,230,.50), transparent 34%),
-            rgba(255,255,255,.88);
-        }
-
-        @media(max-width:1050px) {
-          .moduleActiveGrid,
-          .moduleCatalog,
-          .moduleAudience,
-          .moduleIntro {
-            grid-template-columns:1fr;
-          }
-
-          .moduleFinal {
-            flex-direction:column;
-            align-items:flex-start;
-          }
-        }
-
-        @media(max-width:560px) {
-          .moduleHero,
-          .moduleHeroOverlay {
-            min-height:620px;
-          }
-
-          .moduleHeroOverlay,
-          .moduleIntro,
-          .moduleAudience > div,
-          .moduleFinal {
-            padding:24px;
-          }
-
-          .moduleHeroActions .btn,
-          .moduleFinalActions .btn {
-            width:100%;
-          }
-        }
+        .moduleFeature span { margin-top:4px; font-size:14px; }
       </style>
-    </section>
+    </div>
     """
+
+    # QRFacile Link is not released yet: its tile shows "In arrivo".
+    body = body.replace("{module_chooser}", _module_chooser(False))
 
     return HTMLResponse(page_public(
         title="QRFACILE · Piattaforma QR modulare",
         subtitle="Home",
         body_html=body,
         actions_html=actions,
+        description="Scegli il QR adatto alla tua attività. Con QRFacile Wine crei etichette digitali per il vino e scarichi il QR per la stampa.",
+        canonical_path="/",
+        wide_layout=True,
+        structured_data={
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "Enolab S.r.l.",
+            "brand": {"@type": "Brand", "name": "QRFACILE"},
+            "url": "https://www.qrfacile.it/",
+            "email": "info@enolab.it",
+            "vatID": "IT01413300623",
+        },
     ))
 
 
@@ -513,10 +350,13 @@ def wine_home(request: Request):
       <section class="winePlans">
         <div class="moduleCatalogHead">
           <div class="moduleEyebrow">Piani QRFACILE Wine</div>
-          <h2>Pricing del modulo Wine.</h2>
+          <h2>Paghi i QR quando ti servono, senza canone annuale.</h2>
           <p>
-            I piani e i crediti reali restano nel contesto Wine. Gli altri moduli
-            sono in arrivo e non hanno ancora pricing pubblico.
+            Acquisti crediti utilizzabili entro 12 mesi. Nessun abbonamento obbligatorio,
+            nessun rinnovo automatico: ogni QR creato resta online e modificabile per
+            i 10 o 25 anni scelti, anche senza altri acquisti.
+            Lo stesso QR può essere stampato su tutte le bottiglie della medesima referenza;
+            un vino, un’annata o un lotto differente richiede un nuovo QR.
           </p>
         </div>
 
@@ -527,15 +367,15 @@ def wine_home(request: Request):
           </div>
           <div class="winePlan">
             <b>QR vino 10 anni</b>
-            <span>1 credito Wine per un QR vino standard.</span>
+            <span>1 credito Wine per una referenza, su tutte le sue bottiglie.</span>
           </div>
           <div class="winePlan">
             <b>QR vino 25 anni</b>
-            <span>2 crediti Wine per un QR vino esteso.</span>
+            <span>2 crediti Wine per una referenza, su tutte le sue bottiglie.</span>
           </div>
           <div class="winePlan">
             <b>Pacchetti crediti</b>
-            <span>Acquisto di crediti Wine e servizi opzionali dalla pagina prezzi.</span>
+            <span>Crediti validi 12 mesi per creare nuovi QR; nessun canone sui QR già creati.</span>
           </div>
         </div>
 
@@ -551,7 +391,7 @@ def wine_home(request: Request):
         <div>
           <div class="moduleEyebrow">Accesso Wine</div>
           <h2>Porta i tuoi QR vino su pagine sempre aggiornabili.</h2>
-          <p>Registrati come cantina oppure accedi se hai gia un account QRFACILE.</p>
+          <p>Registrati come cantina oppure accedi se hai già un account QRFACILE.</p>
         </div>
         <div class="moduleFinalActions">
           <a class="btn btn-primary" href="/register-winery">Registrati come Cantina</a>
@@ -846,6 +686,18 @@ def wine_home(request: Request):
         subtitle="Wine",
         body_html=body,
         actions_html=actions,
+        description="Etichetta digitale vino per cantine e studi grafici: ingredienti, allergeni, valori nutrizionali, riciclo, QR dinamico ed export per tipografia.",
+        canonical_path="/wine",
+        structured_data={
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            "name": "QRFACILE Wine",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "url": "https://www.qrfacile.it/wine",
+            "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR", "description": "3 crediti iniziali gratuiti"},
+            "provider": {"@type": "Organization", "name": "Enolab S.r.l."},
+        },
     ))
 
 
@@ -881,7 +733,7 @@ def link_home(request: Request):
           <div class="linkEyebrow">Modulo Link Diretto</div>
           <h2>Un QR, destinazioni aggiornabili.</h2>
           <p>
-            QRFACILE Link sara pensato per chi vuole collegare un QR a contenuti
+            QRFACILE Link sarà pensato per chi vuole collegare un QR a contenuti
             digitali semplici, senza vincolarsi a una destinazione fissa stampata
             per sempre.
           </p>
@@ -901,11 +753,11 @@ def link_home(request: Request):
 
       <section class="linkNote">
         <div>
-          <div class="linkEyebrow">Niente pricing ancora</div>
-          <h2>Il modulo non e ancora attivo.</h2>
+          <div class="linkEyebrow">In arrivo</div>
+          <h2>Il modulo non è ancora attivo.</h2>
           <p>
-            QRFACILE Link e in arrivo: non ci sono prezzi reali, crediti dedicati
-            o onboarding pubblico specifico per questo modulo.
+            QRFACILE Link sarà disponibile a breve, con prezzi e registrazione dedicati.
+            Scrivici per sapere quando parte o per provarlo in anteprima.
           </p>
         </div>
         <div class="linkActions">
@@ -926,10 +778,7 @@ def link_home(request: Request):
           padding:44px;
           display:flex;
           align-items:flex-end;
-          background:
-            linear-gradient(90deg,rgba(15,23,42,.90),rgba(15,118,110,.55)),
-            url('/static/qr3d.png') center right / contain no-repeat,
-            linear-gradient(135deg,#0f172a,#f8fafc);
+          background:linear-gradient(135deg,#0f172a,#0f766e);
           box-shadow:0 28px 90px rgba(2,8,23,.14);
           overflow:hidden;
         }
@@ -1144,7 +993,7 @@ def _coming_soon_module_page(
           <p>
             Questo modulo non ha ancora pricing reale, crediti dedicati o un
             onboarding pubblico specifico. Puoi richiedere informazioni per
-            valutare il caso d'uso piu adatto.
+            valutare il caso d'uso più adatto.
           </p>
         </div>
         <div class="futureActions">
@@ -1165,10 +1014,7 @@ def _coming_soon_module_page(
           padding:44px;
           display:flex;
           align-items:flex-end;
-          background:
-            linear-gradient(90deg,rgba(15,23,42,.90),rgba(15,118,110,.58)),
-            url('/static/qr3d.png') center right / contain no-repeat,
-            linear-gradient(135deg,#0f172a,#f8fafc);
+          background:linear-gradient(135deg,#0f172a,#0f766e);
           box-shadow:0 28px 90px rgba(2,8,23,.14);
           overflow:hidden;
         }}
@@ -1340,7 +1186,7 @@ def menu_home(request: Request):
         module_label="Modulo Menu Ristorante",
         intro_title="Carte digitali pronte per tavoli, sale e asporto.",
         intro_copy=(
-            "QRFACILE Menu sara pensato per gestire menu, listini, allergeni, "
+            "QRFACILE Menu sarà pensato per gestire menu, listini, allergeni, "
             "proposte stagionali e contenuti collegati senza ristampare materiali."
         ),
         examples=[
@@ -1366,7 +1212,7 @@ def quiz_home(request: Request):
         module_label="Modulo Quiz/Formazione",
         intro_title="Coinvolgi persone e raccogli risposte da QR.",
         intro_copy=(
-            "QRFACILE Quiz sara pensato per creare esperienze formative e "
+            "QRFACILE Quiz sarà pensato per creare esperienze formative e "
             "interattive accessibili con un QR, con contenuti aggiornabili nel tempo."
         ),
         examples=[
@@ -1374,7 +1220,7 @@ def quiz_home(request: Request):
             ("Quiz", "Domande, verifiche rapide e contenuti interattivi."),
             ("Feedback", "Raccolta risposte dopo eventi, corsi o visite."),
             ("Onboarding", "Guide e controlli per nuovi collaboratori."),
-            ("Scuole", "Attivita e approfondimenti collegati a materiali fisici."),
+            ("Scuole", "Attività e approfondimenti collegati a materiali fisici."),
             ("Campagne", "Esperienze educative o promozionali misurabili."),
         ],
     )
@@ -1392,7 +1238,7 @@ def warehouse_home(request: Request):
         module_label="Modulo QR Magazzino",
         intro_title="Informazioni operative dove servono.",
         intro_copy=(
-            "QRFACILE Magazzino sara pensato per collegare oggetti, aree e "
+            "QRFACILE Magazzino sarà pensato per collegare oggetti, aree e "
             "materiali a pagine pratiche, istruzioni, schede e riferimenti rapidi."
         ),
         examples=[
@@ -1418,13 +1264,13 @@ def events_home(request: Request):
         module_label="Modulo Eventi/Votazioni",
         intro_title="Pagine QR per partecipanti, pubblico e staff.",
         intro_copy=(
-            "QRFACILE Eventi sara pensato per gestire contenuti pubblici e "
+            "QRFACILE Eventi sarà pensato per gestire contenuti pubblici e "
             "interazioni leggere durante manifestazioni, incontri e iniziative."
         ),
         examples=[
             ("Programmi", "Agenda, orari e informazioni sempre aggiornabili."),
             ("Votazioni", "Raccolta preferenze e scelte dal pubblico."),
-            ("Feedback", "Questionari rapidi dopo sessioni o attivita."),
+            ("Feedback", "Questionari rapidi dopo sessioni o attività."),
             ("Mappe", "Indicazioni, sale, stand e punti di interesse."),
             ("Accessi rapidi", "Link utili per partecipanti e organizzatori."),
             ("Campagne evento", "Contenuti temporanei collegati a materiali stampati."),
@@ -2039,14 +1885,14 @@ body {
     <div class="heroText">
       <div class="eyebrow">QRFACILE · Etichetta digitale vino</div>
 
-      <h1>Il QR del vino,<br>fatto semplice.<br><span>Senza abbonamento obbligatorio.</span></h1>
+      <h1>Il QR del vino,<br>fatto semplice.<br><span>Lo paghi una volta. Nessun canone annuale.</span></h1>
 
       <p>
-        Crea QR vino per l’etichetta digitale, gestisci lotti, ingredienti,
-        allergeni, valori nutrizionali, riciclo ed export per la stampa.
+        Acquista crediti soltanto quando ti servono. Ogni QR resta online e modificabile
+        per 10 o 25 anni, anche senza rinnovi o nuovi acquisti.
       </p>
 
-      <div class="credit-strip" style="margin-top:18px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+      <div class="credit-strip" style="margin-top:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px">
         <div style="border:1px solid rgba(2,8,23,.10);background:rgba(255,255,255,.82);border-radius:18px;padding:12px">
           <b style="display:block;font-size:18px">1 credito</b>
           <span style="display:block;margin-top:4px;color:#64748b;font-size:12px;font-weight:850">QR vino 10 anni</span>
@@ -2057,7 +1903,7 @@ body {
         </div>
         <div style="border:1px solid rgba(2,8,23,.10);background:rgba(255,255,255,.82);border-radius:18px;padding:12px">
           <b style="display:block;font-size:18px">+1 credito</b>
-          <span style="display:block;margin-top:4px;color:#64748b;font-size:12px;font-weight:850">upgrade 10 → 25 anni</span>
+          <span style="display:block;margin-top:4px;color:#64748b;font-size:12px;font-weight:850">upgrade 10 → 25 anni su richiesta al supporto</span>
         </div>
       </div>
 

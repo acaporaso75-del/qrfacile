@@ -1,0 +1,23 @@
+[Unit]
+Description=QRFacile staging operational probes (observe only)
+After=network-online.target
+ConditionPathIsDirectory=/opt/qrfacile-staging
+
+[Service]
+Type=oneshot
+User=qrfacile
+WorkingDirectory=/opt/qrfacile-staging
+EnvironmentFile=/opt/qrfacile-staging/.env
+Environment="PGOPTIONS=-c default_transaction_read_only=on -c statement_timeout=5000"
+UnsetEnvironment=PGHOST PGHOSTADDR PGPORT PGDATABASE PGUSER PGSERVICE PGSERVICEFILE
+ExecStartPre=/opt/qrfacile-staging/venv/bin/python -B -c "import os\nfrom psycopg.conninfo import conninfo_to_dict\ntry:\n    e = os.environ\n    d = conninfo_to_dict(e.get('DATABASE_URL', ''))\n    valid = (e.get('APP_ENV'), e.get('PAYPAL_MODE'), d.get('host'), d.get('port', '5432'), d.get('dbname'), d.get('user')) == ('staging', 'sandbox', '192.168.1.143', '5432', 'qrfacile_staging_db', 'qrfacile_staging_user') and not {'hostaddr', 'service', 'options'} & d.keys() and e.get('PGOPTIONS') == '-c default_transaction_read_only=on -c statement_timeout=5000'\nexcept Exception:\n    valid = False\nif not valid:\n    print('STAGING_OPERATIONAL_MONITOR_SCOPE_ERROR', flush=True)\n    raise SystemExit(2)"
+# Keep the default reconciliation threshold and the non-green exit status.
+# Do not mail repeatedly for the known staging reconciliation finding.
+ExecStart=/opt/qrfacile-staging/venv/bin/python -B /opt/qrfacile-staging/scripts/check_operational_readiness.py --timeout-per-check 12
+TimeoutStartSec=75s
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

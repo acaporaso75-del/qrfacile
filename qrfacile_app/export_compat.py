@@ -1,8 +1,30 @@
+from urllib.parse import urlencode
+
 from fastapi import APIRouter, Request, Query
 from fastapi.responses import RedirectResponse
 from qrfacile_app.auth_core import require_any_role
 
 router = APIRouter()
+
+_LEGACY_PNG_PRESETS = {
+    (20, 300): "label_std",
+    (25, 600): "label_pro",
+    (30, 300): "carton",
+    (40, 300): "fair",
+}
+
+
+def _legacy_preset(fmt: str, size_mm: int, dpi: int) -> str:
+    normalized = str(fmt or "png").lower().strip()
+    if normalized in {"jpg", "jpeg", "png"}:
+        return _LEGACY_PNG_PRESETS.get((int(size_mm), int(dpi)), "label_pro")
+    if normalized == "svg":
+        return "vector_svg"
+    if normalized == "pdf":
+        return "square_pdf"
+    if normalized == "pdf_a4":
+        return "a4_pdf"
+    return "label_pro"
 
 @router.get("/app/export/{wine_id}")
 def export_compat(
@@ -20,10 +42,7 @@ def export_compat(
     """
     require_any_role(request, ["winery"])
 
-    fmt = (fmt or "png").lower().strip()
-    # se qualcuno chiede jpg, lo mappiamo a png (v1) per non rompere
-    if fmt == "jpg" or fmt == "jpeg":
-        fmt = "png"
-
-    url = f"/app/wine/{wine_id}/export/file?fmt={fmt}&size_mm={int(size_mm)}&dpi={int(dpi)}&name={name}"
+    preset = _legacy_preset(fmt, size_mm, dpi)
+    query = urlencode({"preset": preset, "name": str(name or "qrfacile")})
+    url = f"/app/wine/{wine_id}/export/file?{query}"
     return RedirectResponse(url, status_code=307)

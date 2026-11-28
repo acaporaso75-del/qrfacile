@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app.ui_shell import page, esc, pill
 
@@ -34,7 +35,7 @@ def _balances(cur, user_id: int) -> dict:
 def _credits(cur, user_id: int) -> dict:
     cur.execute("""
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
     """, (int(user_id),))
@@ -64,31 +65,31 @@ def studio_commissions(request: Request, msg: str = "", err: str = ""):
     <div class="card" style="margin-top:14px">
         <div class="h2">Riepilogo Commissioni</div>
 
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:14px" class="grid2">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:14px;margin-top:14px">
 
             <div class="card">
-                {pill("Maturing")}
+                {pill("In maturazione")}
                 <div style="font-size:22px;font-weight:900;margin-top:10px">
                     {balances["maturing"]:.2f}€
                 </div>
             </div>
 
             <div class="card">
-                {pill("Available","green")}
+                {pill("Disponibile","green")}
                 <div style="font-size:22px;font-weight:900;margin-top:10px">
                     {balances["available"]:.2f}€
                 </div>
             </div>
 
             <div class="card">
-                {pill("Requested")}
+                {pill("Richiesto")}
                 <div style="font-size:22px;font-weight:900;margin-top:10px">
                     {balances["requested"]:.2f}€
                 </div>
             </div>
 
             <div class="card">
-                {pill("Paid")}
+                {pill("Pagato")}
                 <div style="font-size:22px;font-weight:900;margin-top:10px">
                     {balances["paid"]:.2f}€
                 </div>
@@ -108,10 +109,10 @@ def studio_commissions(request: Request, msg: str = "", err: str = ""):
 
             <form method="post" action="/studio/request-payout" style="margin-top:14px">
                 <label>IBAN</label>
-                <input class="input" name="iban" required>
+                <input aria-label="IBAN" class="input" name="iban" required>
 
                 <label>Beneficiario</label>
-                <input class="input" name="beneficiary" required>
+                <input aria-label="Beneficiario" class="input" name="beneficiary" required>
 
                 <div style="margin-top:14px">
                     <button class="btn btn-primary" type="submit">
@@ -153,6 +154,7 @@ def request_payout(
     iban: str = Form(...),
     beneficiary: str = Form(...),
 ):
+    require_csrf_or_same_origin(request)
     u = require_any_role(request, ("studio",))
     uid = int(u["id"])
 

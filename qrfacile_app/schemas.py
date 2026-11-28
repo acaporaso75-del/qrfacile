@@ -19,9 +19,16 @@ def ensure_tables():
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_credit_ledger_user ON credit_ledger(user_id, created_at DESC);")
             cur.execute("""
+              DO $$ BEGIN
+                IF to_regclass('public.available_credit_ledger') IS NULL THEN
+                  CREATE VIEW available_credit_ledger AS SELECT * FROM credit_ledger;
+                END IF;
+              END $$;
+            """)
+            cur.execute("""
               CREATE OR REPLACE VIEW credit_balance AS
               SELECT user_id, credit_type, COALESCE(SUM(delta),0) AS balance
-              FROM credit_ledger
+              FROM available_credit_ledger
               GROUP BY user_id, credit_type;
             """)
         conn.commit()

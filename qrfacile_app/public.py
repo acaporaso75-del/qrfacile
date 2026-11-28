@@ -1,12 +1,16 @@
 import time
-import hashlib
+from urllib.parse import quote
+from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
 from qrfacile_app.db import pg
+from qrfacile_app.services.recycling_catalog import canonical_recycling_code, normalize_recycling_items
+from qrfacile_app.services.storage import versioned_upload_url
+from qrfacile_app.services.wine_compliance_explainability import run_explainable_wine_compliance
 from qrfacile_app import ui
 
 router = APIRouter()
@@ -40,6 +44,8 @@ LOCALES = {
         "no_data": "Nessun dato inserito",
         "active_page": "Pagina attiva",
         "in_completion": "In completamento",
+        "being_updated_title": "Informazioni in aggiornamento",
+        "being_updated_text": "Alcune informazioni di questa etichetta sono in aggiornamento da parte del produttore.",
         "mandatory_data_incomplete": "Dati obbligatori non ancora completi",
         "technical_verification": "Questa pagina è raggiungibile per verifica tecnica. Risultano ancora da completare:",
         "digital_product_info": "Informazioni digitali del prodotto. Pagina destinata alla consultazione dei dati obbligatori del vino.",
@@ -82,6 +88,8 @@ LOCALES = {
         "no_data": "No data entered",
         "active_page": "Active page",
         "in_completion": "In completion",
+        "being_updated_title": "Information being updated",
+        "being_updated_text": "Some information on this label is being updated by the producer.",
         "mandatory_data_incomplete": "Mandatory data not yet complete",
         "technical_verification": "This page is reachable for technical verification. The following data still needs to be completed:",
         "digital_product_info": "Digital product information. Page intended for consultation of mandatory wine data.",
@@ -151,13 +159,6 @@ def day_utc() -> str:
     return time.strftime("%Y-%m-%d", time.gmtime())
 
 
-def fp_hash(request: Request) -> str:
-    ip = (request.client.host if request.client else "") or ""
-    ua = request.headers.get("user-agent", "") or ""
-    lang = request.headers.get("accept-language", "") or ""
-    return hashlib.sha256(f"{ip}|{ua}|{lang}".encode()).hexdigest()[:24]
-
-
 def choose_language(request: Request) -> str:
     query_lang = (request.query_params.get("lang") or "").strip().lower()
 
@@ -201,32 +202,6 @@ def choose_language(request: Request) -> str:
 
 def tr(locale: str, key: str) -> str:
     return LOCALES.get(locale, LOCALES["it"]).get(key, LOCALES["it"].get(key, key))
-
-
-def track_scan(cur, slug: str, request: Request):
-    day = day_utc()
-    fp = fp_hash(request)
-    ts = now_epoch()
-
-    cur.execute(
-        """
-        INSERT INTO qr_scan_dedup(slug, day, fp_hash, created_at)
-        VALUES (%s,%s,%s,%s)
-        ON CONFLICT (slug, day, fp_hash) DO NOTHING
-        """,
-        (slug, day, fp, ts),
-    )
-
-    if cur.rowcount == 1:
-        cur.execute(
-            """
-            INSERT INTO qr_scans_daily(slug, day, scans)
-            VALUES (%s,%s,1)
-            ON CONFLICT (slug, day)
-            DO UPDATE SET scans = qr_scans_daily.scans + 1
-            """,
-            (slug, day),
-        )
 
 
 def _pick_first_col(cur, table: str, candidates: list[str]) -> str | None:
@@ -319,6 +294,30 @@ def _upload_src(path: str) -> str:
     return "/uploads/" + path.lstrip("/")
 
 
+def _label_images_html(image_rows, wine_name: str) -> str:
+    image_cards = []
+    for image_row in image_rows:
+        kind = (image_row.get("kind") or "").strip().lower()
+        img_path = (image_row.get("img_optimized") or image_row.get("img_thumb") or "").strip()
+        if not img_path:
+            continue
+        label = "Fronte etichetta" if kind == "front" else "Retro etichetta"
+        src = versioned_upload_url(img_path, image_row.get("updated_at"))
+        image_cards.append(f"""
+        <figure class="labelImageCard">
+          <img src="{ui.esc(src)}" alt="{ui.esc(label)} {ui.esc(wine_name)}">
+          <figcaption>{ui.esc(label)}</figcaption>
+        </figure>
+        """)
+    if not image_cards:
+        return ""
+    return f"""
+        <section class="labelImages" aria-label="Immagini etichetta">
+          {''.join(image_cards)}
+        </section>
+        """
+
+
 def _is_suspicious_text(value: str) -> bool:
     v = (value or "").strip().lower()
     if not v:
@@ -362,8 +361,20 @@ def _fmt(x):
     return "—" if x is None or x == "" else str(x)
 
 
-def _num(x):
-    return ui.esc(_fmt(x))
+def _num(x, locale: str = "it"):
+    """Readable nutrition value: 0.000 -> 0, 2.600 -> 2,6 (IT) / 2.6 (EN)."""
+    if x is None or x == "":
+        return ui.esc(_fmt(x))
+    try:
+        value = Decimal(str(x))
+    except (InvalidOperation, ValueError):
+        return ui.esc(_fmt(x))
+    text = format(value.quantize(Decimal("0.01")).normalize(), "f")
+    if text in {"-0", ""}:
+        text = "0"
+    if locale == "it":
+        text = text.replace(".", ",")
+    return ui.esc(text)
 
 
 COMP_ICON = {
@@ -456,13 +467,17 @@ def _require_preview_access(request: Request, cur, qr_row: dict):
         cur.execute(
             """
             SELECT 1
-            FROM studio_clients
-            WHERE studio_user_id=%s
-              AND winery_id=%s
-              AND can_view=TRUE
+            FROM wine_labels wl
+            JOIN label_collaborators lc ON lc.wine_label_id=wl.id
+            JOIN studio_clients sc
+              ON sc.studio_user_id=lc.collaborator_user_id
+             AND sc.winery_id=wl.winery_id
+            WHERE wl.wine_id=%s
+              AND lc.collaborator_user_id=%s
+              AND lc.active=TRUE AND lc.can_view=TRUE AND sc.can_view=TRUE
             LIMIT 1
             """,
-            (uid, winery_id),
+            (int(qr_row.get("wine_id") or 0), uid),
         )
         if cur.fetchone():
             return user
@@ -488,17 +503,40 @@ def _label_missing(locale: str, ingredient_text: str, allergens: list[str], nut:
     return missing
 
 
-def _render_label_page(request: Request, slug: str, *, preview: bool):
+def _public_gate_allows(status: str, missing: list[str], compliance_report: dict) -> bool:
+    return status == "attiva" and not missing and bool(compliance_report.get("publishable"))
+
+
+def _not_published_page(slug: str) -> HTMLResponse:
+    safe_slug = ui.esc(slug)
+    return HTMLResponse(f"""<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Etichetta non ancora pubblicata</title><link rel="stylesheet" href="/static/app.css"></head><body><main style="max-width:760px;margin:60px auto;padding:24px"><div class="card"><div class="h1">Etichetta non ancora pubblicata</div><p>I dati sono in compilazione o devono ancora superare il controllo finale.</p><a class="btn btn-primary" href="/login?next=/preview/{safe_slug}">Accedi per completare o vedere l’anteprima</a></div></main></body></html>""", status_code=200)
+
+
+def _preview_response_headers() -> dict[str, str]:
+    return {
+        "X-Robots-Tag": "noindex, nofollow, noarchive",
+        "X-Frame-Options": "SAMEORIGIN",
+        "Content-Security-Policy": "default-src 'self'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'; object-src 'none'; img-src 'self' data: blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'",
+        "Cache-Control": "no-store",
+    }
+
+
+def _render_label_page(
+    request: Request,
+    slug: str = "",
+    *,
+    preview: bool,
+    wine_id: int | None = None,
+):
     slug = (slug or "").strip()
     locale = choose_language(request)
 
-    if not slug:
+    if not slug and wine_id is None:
         raise HTTPException(404, "Not found")
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(
-                """
+            select_sql = """
                 SELECT
                     qi.id AS qr_item_id,
                     qi.status,
@@ -515,16 +553,26 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
                     w.logo_path,
                     COALESCE(wm.public_theme, 'minimal') AS public_theme,
                     COALESCE(wm.extra_ingredients, '') AS extra_ingredients
-                FROM qr_items qi
-                JOIN qr_wines qw ON qw.qr_item_id = qi.id
+                FROM qr_wines qw
+                LEFT JOIN qr_items qi ON qi.id = qw.qr_item_id
                 JOIN wineries w ON w.id = qw.winery_id
                 LEFT JOIN wine_meta wm ON wm.wine_id = qw.id
-                WHERE qi.slug=%s
-                LIMIT 1
-                """,
-                (slug,),
-            )
+            """
+            if wine_id is not None:
+                cur.execute(select_sql + " WHERE qw.id=%s LIMIT 1", (int(wine_id),))
+            else:
+                cur.execute(select_sql + " WHERE qi.slug=%s LIMIT 1", (slug,))
             row = cur.fetchone()
+
+            if not row and not preview and slug:
+                # QR Link codes created by the beta were printed as /e/<slug>:
+                # forward them to their module (/d/) instead of a 404.
+                cur.execute(
+                    "SELECT 1 FROM qr_items WHERE slug=%s AND qr_type='external' LIMIT 1",
+                    (slug,),
+                )
+                if cur.fetchone():
+                    return RedirectResponse(f"/d/{quote(slug, safe='')}", status_code=301)
 
             if not row:
                 raise HTTPException(404, "QR not found")
@@ -532,9 +580,11 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
             if preview:
                 _require_preview_access(request, cur, row)
 
+            slug = str(row.get("slug") or "").strip()
+
             status = (row.get("status") or "").strip().lower()
             if not preview and status != "attiva":
-                raise HTTPException(404, "QR non pubblicato")
+                return _not_published_page(slug)
             is_draft = status != "attiva"
 
             cur.execute(
@@ -630,11 +680,14 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
                 """,
                 (int(row["wine_id"]),),
             )
-            recycle_rows = cur.fetchall() or []
+            recycle_rows = list(normalize_recycling_items({
+                item["component"]: dict(item)
+                for item in (cur.fetchall() or [])
+            }).values())
 
             cur.execute(
                 """
-                SELECT kind, img_thumb, img_optimized
+                SELECT kind, img_thumb, img_optimized, updated_at
                 FROM wine_assets
                 WHERE wine_id=%s
                   AND kind IN ('front', 'back')
@@ -664,17 +717,24 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
     public_missing = _label_missing(locale, ingredient_text, allergens, nut, recycle_rows)
     is_incomplete = bool(public_missing)
 
-    if not preview and is_incomplete:
-        raise HTTPException(404, "QR incompleto")
-
-    if not preview:
-        with pg() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                try:
-                    track_scan(cur, slug, request)
-                except Exception:
-                    pass
-            conn.commit()
+    compliance_payload = {
+        "wine": dict(row),
+        "nutrition": dict(nut),
+        "ingredients": ingredients,
+        "allergens": allergens,
+        "recycle": {item["component"]: dict(item) for item in recycle_rows},
+        "meta": {"extra_ingredients": extra_ing},
+    }
+    compliance_report = run_explainable_wine_compliance(compliance_payload)
+    # Continuity for printed QR codes: a page that is published (status
+    # "attiva") is already on bottles, so it is never replaced by an error or
+    # by "Etichetta non ancora pubblicata" when data is missing or the
+    # publication rules became stricter. It shows the data it has plus a
+    # neutral notice; the winery sees what is missing in its dashboard. New
+    # publications still have to pass the full gate in secure_publish_ui.
+    continuity_notice = not preview and not _public_gate_allows(status, public_missing, compliance_report)
+    if continuity_notice and status != "attiva":
+        return _not_published_page(slug)
 
     if is_draft:
         status_label = tr(locale, "technical_draft")
@@ -696,27 +756,7 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
         </div>
         """
 
-    label_images_html = ""
-    image_cards = []
-    for image_row in image_rows:
-        kind = (image_row.get("kind") or "").strip().lower()
-        img_path = (image_row.get("img_optimized") or image_row.get("img_thumb") or "").strip()
-        if not img_path:
-            continue
-        label = "Fronte etichetta" if kind == "front" else "Retro etichetta"
-        image_cards.append(f"""
-        <figure class="labelImageCard">
-          <img src="{ui.esc(_upload_src(img_path))}" alt="{ui.esc(label)} {ui.esc(wine_name)}">
-          <figcaption>{ui.esc(label)}</figcaption>
-        </figure>
-        """)
-
-    if image_cards:
-        label_images_html = f"""
-        <section class="labelImages" aria-label="Immagini etichetta">
-          {''.join(image_cards)}
-        </section>
-        """
+    label_images_html = _label_images_html(image_rows, wine_name)
 
     allergens_html = ""
 
@@ -752,7 +792,7 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
             continue
 
         product = (r.get("product") or "").strip()
-        code = (r.get("code") or "").strip()
+        code = canonical_recycling_code(r.get("code"))
         extra = (r.get("extra_code") or "").strip()
         note = (r.get("note") or "").strip()
         codes = ", ".join([c for c in [code, extra] if c])
@@ -785,18 +825,18 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
 
     recycle_html = "".join(rec_cards) if rec_cards else f"<span class='empty'>{ui.esc(tr(locale, 'no_data'))}</span>"
 
-    n_energy = f"{_num(nut.get('energy_kj'))} kJ / {_num(nut.get('energy_kcal'))} kcal"
-    n_fat = _num(nut.get("fat"))
-    n_sat = _num(nut.get("saturates"))
-    n_carbs = _num(nut.get("carbs"))
-    n_sug = _num(nut.get("sugars"))
-    n_prot = _num(nut.get("protein"))
-    n_salt = _num(nut.get("salt"))
+    n_energy = f"{_num(nut.get('energy_kj'), locale)} kJ / {_num(nut.get('energy_kcal'), locale)} kcal"
+    n_fat = _num(nut.get("fat"), locale)
+    n_sat = _num(nut.get("saturates"), locale)
+    n_carbs = _num(nut.get("carbs"), locale)
+    n_sug = _num(nut.get("sugars"), locale)
+    n_prot = _num(nut.get("protein"), locale)
+    n_salt = _num(nut.get("salt"), locale)
 
     warning_html = ""
     qr_definitive_notice = ""
 
-    if preview:
+    if preview and slug:
         qr_definitive_notice = """
         <section class="warningBox" style="border-color:rgba(20,184,166,.26);background:rgba(240,253,250,.92)">
           <div class="warningIcon">i</div>
@@ -808,8 +848,24 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
           </div>
         </section>
         """
+    elif preview:
+        qr_definitive_notice = """
+        <section class="warningBox" style="border-color:rgba(20,184,166,.26);background:rgba(240,253,250,.92)">
+          <div class="warningIcon">i</div><div><div class="warningTitle">Anteprima tecnica</div>
+          <div class="warningText">Anteprima disponibile dopo il salvataggio. Il QR definitivo non è stato ancora creato.</div></div>
+        </section>"""
 
-    if preview and is_incomplete:
+    if continuity_notice:
+        warning_html = f"""
+        <section class="warningBox continuityNotice" role="note">
+          <div class="warningIcon">i</div>
+          <div>
+            <div class="warningTitle">{ui.esc(tr(locale, "being_updated_title"))}</div>
+            <div class="warningText">{ui.esc(tr(locale, "being_updated_text"))}</div>
+          </div>
+        </section>
+        """
+    elif preview and is_incomplete:
         warning_html = f"""
         <section class="warningBox">
           <div class="warningIcon">!</div>
@@ -832,10 +888,11 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
 
     lang_links = []
 
+    preview_path = f"/app/wine/{int(row['wine_id'])}/preview" if preview else f"/e/{ui.esc(slug)}"
     for lang_code in SUPPORTED_LOCALES:
         active = " active" if lang_code == locale else ""
         lang_links.append(
-            f"<a class='langLink{active}' href='/{'preview' if preview else 'e'}/{ui.esc(slug)}?lang={lang_code}' hreflang='{lang_code}'>{lang_code.upper()}</a>"
+            f"<a class='langLink{active}' href='{preview_path}?lang={lang_code}' hreflang='{lang_code}'>{lang_code.upper()}</a>"
         )
 
     language_selector = "<nav class='languageSwitch' aria-label='Language'>" + "".join(lang_links) + "</nav>"
@@ -846,7 +903,7 @@ def _render_label_page(request: Request, slug: str, *, preview: bool):
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{ui.esc(wine_name)} · {ui.esc(winery_name)}</title>
-<meta name="robots" content="noindex,nofollow">
+<meta name="robots" content="noindex,nofollow,noarchive">
 <style>
 :root {{
   --bg:{pal["bg"]};
@@ -1672,7 +1729,10 @@ body {{
 </body>
 </html>"""
 
-    return HTMLResponse(html)
+    headers = {}
+    if preview:
+        headers = _preview_response_headers()
+    return HTMLResponse(html, headers=headers)
 
 
 @router.get("/e/{slug}", response_class=HTMLResponse)
@@ -1683,3 +1743,9 @@ def public_label(request: Request, slug: str):
 @router.get("/preview/{slug}", response_class=HTMLResponse)
 def preview_label(request: Request, slug: str):
     return _render_label_page(request, slug, preview=True)
+
+
+@router.get("/app/wine/{wine_id}/preview", response_class=HTMLResponse)
+def preview_wine(request: Request, wine_id: int):
+    """Authenticated preview by stable wine id, including drafts without a slug."""
+    return _render_label_page(request, preview=True, wine_id=wine_id)

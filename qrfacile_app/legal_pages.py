@@ -235,7 +235,7 @@ def _company_box() -> str:
 
 
 def _updated() -> str:
-    return "Ultimo aggiornamento: 11 maggio 2026"
+    return "Versione vigente: 25 ottobre 2026"
 
 
 @router.get("/legal", response_class=HTMLResponse)
@@ -330,6 +330,8 @@ def legal(request: Request):
         subtitle="Note legali",
         body_html=body,
         actions_html=_actions(),
+        description="Dati societari, finalità e responsabilità del servizio QRFACILE di Enolab S.r.l.",
+        canonical_path="/legal",
     ))
 
 
@@ -365,8 +367,8 @@ def privacy(request: Request):
           <li>dati aziendali: ragione sociale, P.IVA/C.F., indirizzo, città, provincia, CAP, PEC, SDI, telefono, referenti;</li>
           <li>dati relativi a cantine, studi grafici, clienti collegati, inviti e permessi;</li>
           <li>dati di prodotto: nome vino, annata, lotto, ingredienti, allergeni, valori nutrizionali, riciclabilità, immagini etichetta, logo cantina;</li>
-          <li>dati tecnici: log applicativi, indirizzo IP, user-agent, data/ora accesso, sessioni, informazioni necessarie alla sicurezza;</li>
-          <li>dati di scansione QR, ove presenti, trattati preferibilmente in forma tecnica, deduplicata o aggregata.</li>
+          <li>dati tecnici dell’area riservata: log applicativi, indirizzo IP, user-agent, data/ora accesso, sessioni e informazioni strettamente necessarie alla sicurezza;</li>
+          <li>evidenze di accettazione dei documenti contrattuali e richieste privacy.</li>
         </ul>
       </div>
 
@@ -428,7 +430,18 @@ def privacy(request: Request):
       </div>
 
       <div class="legalCard">
-        <h2>8. Diritti degli interessati</h2>
+        <h2>8. Pagine pubbliche e-label vino</h2>
+        <p>
+          Le pagine pubbliche obbligatorie raggiunte tramite il percorso <b>/e/</b> non usano cookie,
+          analytics, pixel, profilazione o fingerprinting e non registrano IP, user-agent o lingua del
+          visitatore per contare o deduplicare le scansioni. Questa separazione vale per la pagina
+          contenente ingredienti e dichiarazione nutrizionale; l’area riservata resta soggetta ai log
+          tecnici strettamente necessari alla sicurezza.
+        </p>
+      </div>
+
+      <div class="legalCard">
+        <h2>9. Diritti degli interessati</h2>
         <p>
           Nei casi previsti dalla normativa, l’interessato può esercitare i diritti di accesso, rettifica,
           cancellazione, limitazione del trattamento, opposizione, portabilità dei dati e revoca del consenso
@@ -440,17 +453,17 @@ def privacy(request: Request):
       </div>
 
       <div class="legalCard">
-        <h2>9. Reclamo all’autorità di controllo</h2>
+        <h2>10. Reclamo all’autorità di controllo</h2>
         <p>
           L’interessato ha diritto di proporre reclamo all’autorità di controllo competente in materia di protezione dei dati personali,
           ove ritenga che il trattamento violi la normativa applicabile.
         </p>
       </div>
 
-      <div class="legalWarn">
-        Questa informativa è redatta per il funzionamento attuale della piattaforma QRFACILE.
-        Prima dell’apertura commerciale definitiva è opportuno verificarla con consulente privacy/legale,
-        soprattutto in caso di attivazione di strumenti analytics, marketing, pagamento online o integrazioni terze.
+      <div class="legalNotice">
+        Eventuali futuri analytics, comunicazioni marketing o integrazioni che modifichino i trattamenti
+        richiederanno una nuova valutazione, l’aggiornamento di questa informativa e, quando necessario,
+        una specifica base giuridica o il consenso.
       </div>
 
       """ + LEGAL_STYLE + """
@@ -462,6 +475,8 @@ def privacy(request: Request):
         subtitle="Privacy",
         body_html=body,
         actions_html=_actions(),
+        description="Informativa privacy QRFACILE: dati trattati, finalità, basi giuridiche, conservazione e diritti degli interessati.",
+        canonical_path="/privacy",
     ))
 
 
@@ -507,11 +522,11 @@ def cookies(request: Request):
       </div>
 
       <div class="legalCard">
-        <h2>3. Statistiche QR e dati tecnici</h2>
+        <h2>3. Pagine pubbliche e-label vino</h2>
         <p>
-          Le scansioni dei QR possono essere conteggiate per finalità tecniche e statistiche del servizio,
-          ad esempio per mostrare dati aggregati o deduplicati sulle consultazioni delle pagine QR.
-          Tali conteggi sono progettati per ridurre l’identificazione diretta dell’utente finale.
+          Le pagine pubbliche obbligatorie raggiunte tramite <b>/e/</b> non impostano cookie e non
+          contengono analytics, pixel, profilazione, fingerprinting o conteggi basati su IP, user-agent
+          o lingua del visitatore. Le scansioni non sono registrate dall’applicazione.
         </p>
       </div>
 
@@ -533,9 +548,10 @@ def cookies(request: Request):
         </p>
       </div>
 
-      <div class="legalWarn">
-        La Cookie Policy dovrà essere aggiornata se verranno attivati strumenti di analytics, remarketing,
-        pixel social, sistemi di pagamento con tracciamenti propri o altri servizi terzi.
+      <div class="legalNotice">
+        Servizi esterni avviati su richiesta dell’utente, come il pagamento PayPal, applicano le proprie
+        informative nel dominio del fornitore. Qualunque futuro analytics, remarketing o pixel richiederà
+        una valutazione preventiva e l’eventuale gestione del consenso.
       </div>
 
       """ + LEGAL_STYLE + """
@@ -547,6 +563,8 @@ def cookies(request: Request):
         subtitle="Cookie",
         body_html=body,
         actions_html=_actions(),
+        description="Cookie Policy QRFACILE e separazione senza tracciamento delle pagine pubbliche e-label vino.",
+        canonical_path="/cookies",
     ))
 
 
@@ -595,8 +613,28 @@ def terms(request: Request):
       <div class="legalCard">
         <h2>4. QR gratuiti, piani e crediti</h2>
         <p>
-          QRFACILE può prevedere un numero iniziale di QR gratuiti, pacchetti, piani annuali o crediti utilizzabili
-          secondo le condizioni commerciali vigenti al momento dell’attivazione.
+          I pacchetti Wine B2B Start (15 unità, 99 € per pacchetto), Cantina (50 unità,
+          179 € per pacchetto) e Business (100 unità, 299 € per pacchetto) sono riservati
+          a clienti professionali.
+          I prezzi sono IVA esclusa; il checkout espone imponibile, IVA e totale prima del pagamento.
+          Per studi, multi-cantina, clienti esteri e regimi fiscali speciali è disponibile un preventivo.
+        </p>
+        <p>
+          Ogni acquisto attiva le proprie unità per 12 mesi dalla conferma del pagamento.
+          Il rinnovo è manuale, senza addebiti automatici. Le unità non utilizzate scadono senza riporto;
+          un nuovo acquisto non proroga quelle precedenti. Un QR da 10 anni utilizza 1 unità,
+          un QR da 25 anni ne utilizza 2. La durata decorre dalla creazione del QR.
+          Il mancato rinnovo non disattiva i QR già creati: restano disponibili e correggibili
+          per la durata scelta. I crediti acquistati prima del nuovo listino mantengono le condizioni originarie.
+          La durata commerciale non sostituisce la valutazione degli obblighi applicabili alla singola etichetta;
+          eventuali esigenze di conservazione più lunga devono essere concordate.
+        </p>
+        <p>
+          Ogni QR identifica una singola referenza, definita almeno da vino, annata e lotto dichiarati.
+          Il medesimo QR può essere stampato senza limiti di copie sulle bottiglie appartenenti a quella
+          referenza. L’utilizzo su un vino, un’annata o un lotto differente richiede la creazione di un
+          nuovo QR e il consumo delle relative unità. Restano consentite le correzioni dei dati della
+          medesima referenza, nel rispetto degli obblighi applicabili e della tracciabilità delle modifiche.
         </p>
         <p>
           Le condizioni economiche, i limiti dei piani, il numero di QR inclusi, eventuali funzionalità premium
@@ -735,6 +773,8 @@ def terms(request: Request):
         subtitle="Termini",
         body_html=body,
         actions_html=_actions(),
+        description="Termini di servizio QRFACILE per cantine, studi grafici e operatori professionali.",
+        canonical_path="/terms",
     ))
 
 @router.get("/trust", response_class=HTMLResponse)
@@ -841,6 +881,8 @@ def trust(request: Request):
         subtitle="Affidabilità",
         body_html=body,
         actions_html=_actions(),
+        description="Misure di affidabilità, continuità e sicurezza previste per i QR dinamici QRFACILE.",
+        canonical_path="/trust",
     ))
 
 
@@ -946,5 +988,7 @@ def support(request: Request):
         subtitle="Supporto",
         body_html=body,
         actions_html=_actions(),
+        description="Supporto QRFACILE per cantine e studi grafici: assistenza operativa, account, QR ed etichette digitali.",
+        canonical_path="/support",
     ))
 

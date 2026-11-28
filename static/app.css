@@ -4,7 +4,7 @@
   --surface:#ffffff;
   --card:#ffffff;
   --text:#0f172a;
-  --muted:#64748b;
+  --muted:#556377;
   --muted2:#94a3b8;
   --line:#e3e8f0;
   --line2:#d3dbe8;
@@ -22,7 +22,9 @@
   --warn:#fff3cf;
   --danger:#ffe0e6;
   --blue:#e8f1ff;
-  --accent:#0f9f92;
+  /* White text on the previous teal was 3.28:1. This darker teal keeps the
+     brand colour while meeting WCAG AA for normal-size button text. */
+  --accent:#0f766e;
   --accent2:#2563eb;
   --sans:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,"Apple Color Emoji","Segoe UI Emoji";
   --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
@@ -46,6 +48,27 @@ a{
 }
 
 a:hover{ opacity:.96; }
+
+.skipLink{
+  position:fixed;
+  top:8px;
+  left:8px;
+  z-index:10000;
+  padding:10px 14px;
+  border-radius:8px;
+  background:#0f172a;
+  color:#fff;
+  transform:translateY(-160%);
+}
+
+.skipLink:focus{
+  transform:translateY(0);
+}
+
+:where(a,button,input,select,textarea,[tabindex]):focus-visible{
+  outline:3px solid #f59e0b;
+  outline-offset:3px;
+}
 
 button{ font-family:inherit; }
 
@@ -292,6 +315,8 @@ img{ max-width:100%; }
 
 .sidebarCreditGeneric{ background:#eff6ff; }
 
+.sidebarCreditGeneric span{ color:#475569; }
+
 .sidebarUser{
   border:1px solid var(--line);
   border-radius:var(--r2);
@@ -397,8 +422,8 @@ img{ max-width:100%; }
 
 .btn-primary:hover,
 .btn.primary:hover{
-  background:#0d8f84;
-  border-color:#0d8f84;
+  background:#115e59;
+  border-color:#115e59;
   box-shadow:0 8px 18px rgba(15,159,146,.22);
 }
 
@@ -462,6 +487,15 @@ input[type="radio"]{
 textarea{
   min-height:130px;
   resize:vertical;
+}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    scroll-behavior:auto !important;
+    transition-duration:.01ms !important;
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+  }
 }
 
 .row{
@@ -625,6 +659,15 @@ th{
     padding:14px 14px 70px;
   }
 
+  /* On phones the work comes first; the menu and credits follow below. */
+  .shell > .content{
+    order:1;
+  }
+
+  .shell > .sidebar{
+    order:2;
+  }
+
   .h1{
     font-size:32px;
   }
@@ -655,8 +698,14 @@ th{
     width:100%;
   }
 
+  /* Header buttons side by side and wrapping: four stacked full-width
+     buttons pushed the login form below the fold on phones. */
   .topbar .row .btn{
-    width:100%;
+    width:auto;
+    flex:1 1 auto;
+    min-height:44px;
+    padding:10px 14px;
+    font-size:15px;
   }
 
   .sidebarCredits{

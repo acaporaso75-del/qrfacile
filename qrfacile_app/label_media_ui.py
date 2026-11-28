@@ -1,4 +1,3 @@
-import os
 import time
 from fastapi import APIRouter, Request, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -6,12 +5,11 @@ from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
 from qrfacile_app.auth import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app import ui
 from qrfacile_app.media_labels import process_label_image
 
 router = APIRouter()
-
-UPLOAD_ROOT = "/opt/qrfacile/uploads"
 
 
 def _fmt_ts(ts: int | None) -> str:
@@ -137,7 +135,7 @@ def label_image_page(request: Request, label_id: int, msg: str = ""):
         <form class="card" method="post" action="/app/label/{int(label_id)}/image" enctype="multipart/form-data" style="max-width:860px">
           <div class="section-title">Carica immagine etichetta</div>
           <div class="p">Carica un file JPG, PNG o WEBP. Verranno generate versioni ottimizzate e thumbnail.</div>
-          <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required>
+          <input type="file" name="image" aria-label="Immagine dell'etichetta" accept="image/jpeg,image/png,image/webp" required>
           <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
             <button class="btn btn-primary" type="submit">Carica</button>
             <a class="btn" href="/app/label/{int(label_id)}">Torna etichetta</a>
@@ -183,7 +181,7 @@ def label_image_page(request: Request, label_id: int, msg: str = ""):
 
   <div class="section" style="margin-top:16px">
     <div class="section-title">Anteprime</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px">
       {img_block(thumb, "Thumbnail")}
       {img_block(opt, "Ottimizzata")}
     </div>
@@ -201,6 +199,7 @@ def label_image_page(request: Request, label_id: int, msg: str = ""):
 
 @router.post("/app/label/{label_id}/image")
 def label_image_upload(request: Request, label_id: int, image: UploadFile = File(...)):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery", "studio", "admin"))
 
     with pg() as conn:

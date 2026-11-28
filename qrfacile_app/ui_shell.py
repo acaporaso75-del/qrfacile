@@ -1,5 +1,6 @@
 # /opt/qrfacile/qrfacile_app/ui_shell.py
 import html
+import json
 
 
 def esc(s: str) -> str:
@@ -10,10 +11,10 @@ def banner(msg: str = "", err: str = "") -> str:
     out = []
 
     if msg:
-        out.append(f"<div class='note note-ok'><b>OK:</b> {esc(msg)}</div>")
+        out.append(f"<div class='note note-ok' role='status' aria-live='polite'><b>OK:</b> {esc(msg)}</div>")
 
     if err:
-        out.append(f"<div class='note note-err'><b>Errore:</b> {esc(err)}</div>")
+        out.append(f"<div class='note note-err' role='alert'><b>Errore:</b> {esc(err)}</div>")
 
     return "\n".join(out)
 
@@ -44,6 +45,11 @@ def top_actions(*links: tuple[str, str]) -> str:
         out.append(f"<a class='btn' href='{esc(href)}'>{esc(label)}</a>")
 
     return " ".join(out)
+
+
+def quote_request_link() -> str:
+    # Keep the inline link identifiable even with a previously cached app.css.
+    return '<a href="/support" style="text-decoration:underline !important;text-underline-offset:.15em">richiedi un preventivo</a>'
 
 
 def _brand_logo_html(size: int = 44) -> str:
@@ -177,16 +183,54 @@ def _role_label(role: str) -> str:
     return role or "-"
 
 
+def _credits_for_email(user_email: str) -> dict | None:
+    """Real balances for pages that did not load them; None when unavailable."""
+    if not (user_email or "").strip():
+        return None
+    try:
+        from psycopg.rows import dict_row
+
+        from qrfacile_app.db import pg
+
+        with pg() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """
+                    SELECT l.credit_type, COALESCE(SUM(l.delta),0) AS bal
+                    FROM available_credit_ledger l
+                    JOIN users u ON u.id = l.user_id
+                    WHERE lower(u.email) = lower(%s)
+                    GROUP BY l.credit_type
+                    """,
+                    (user_email.strip(),),
+                )
+                out = {"wine": 0, "generic": 0}
+                for row in cur.fetchall() or []:
+                    out[str(row.get("credit_type") or "").strip().lower()] = int(row.get("bal") or 0)
+                return out
+    except Exception:
+        return None
+
+
+def _credit_value(credits: dict | None, key: str) -> str:
+    if not credits:
+        return "—"
+    return str(int(credits.get(key, 0) or 0))
+
+
 def _sidebar(role: str, user_email: str, credits: dict | None) -> str:
     role = (role or "").lower().strip()
-    credits = credits or {"wine": 0, "generic": 0}
+    # Several pages pass None or {} instead of the balance: showing 0 made
+    # customers think their QR credits were gone. Load the real value instead.
+    if not credits:
+        credits = _credits_for_email(user_email)
 
     nav = [
         ("/app/start", "🏠", "Menu", "Area operativa"),
         ("/app/dashboard", "📋", "Dashboard", "Etichette e lotti"),
         ("/app/new-wine-master", "🍷", "Nuova etichetta", "Prodotto"),
-        ("/app/new-wine", "🍾", "Nuovo lotto", "Scala 1 wine"),
-        ("/app/new-external", "🔗", "QR Link", "3 gratis + generic"),
+        ("/app/new-wine", "🍾", "Nuovo lotto", "Usa 1 QR vino"),
+        ("/app/new-external", "🔗", "QR Link", "3 gratuiti"),
         ("/app/billing", "💳", "Crediti", "Pacchetti"),
     ]
 
@@ -220,17 +264,17 @@ def _sidebar(role: str, user_email: str, credits: dict | None) -> str:
     footer = f"""
     <div class="sidebarFooter">
       <div class="sidebarCreditBox">
-        <div class="sidebarCreditTitle">Crediti</div>
+        <div class="sidebarCreditTitle">QR disponibili</div>
 
         <div class="sidebarCredits">
           <div class="sidebarCreditItem sidebarCreditWine">
-            <span>wine</span>
-            <b>{int(credits.get('wine', 0))}</b>
+            <span>QR vino</span>
+            <b>{_credit_value(credits, 'wine')}</b>
           </div>
 
           <div class="sidebarCreditItem sidebarCreditGeneric">
-            <span>generic</span>
-            <b>{int(credits.get('generic', 0))}</b>
+            <span>QR link</span>
+            <b>{_credit_value(credits, 'generic')}</b>
           </div>
         </div>
       </div>
@@ -340,10 +384,11 @@ def page_app(
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
+<a class="skipLink" href="#main-content">Vai al contenuto principale</a>
 <div class="shell">
   {_sidebar(role=role, user_email=user_email, credits=credits)}
 
-  <main class="content">
+  <main class="content" id="main-content" tabindex="-1">
     {header}
     {banner(msg, err)}
     {body_html}
@@ -360,6 +405,12 @@ def page_public(
     actions_html: str = "",
     msg: str = "",
     err: str = "",
+    description: str = "",
+    canonical_path: str = "",
+    robots: str = "index,follow",
+    structured_data: dict | list[dict] | None = None,
+    *,
+    wide_layout: bool = False,
 ) -> str:
     if not actions_html:
         actions_html = (
@@ -369,6 +420,37 @@ def page_public(
         )
 
     header = _public_topbar(actions_html=actions_html)
+    wrap_class = "publicWrap publicWrapWide" if wide_layout else "publicWrap"
+
+    description = (
+        description.strip()
+        or "QRFACILE aiuta cantine e studi grafici a creare etichette digitali vino, QR dinamici e file pronti per la stampa."
+    )
+    canonical_url = ""
+    if canonical_path:
+        safe_path = canonical_path if canonical_path.startswith("/") else f"/{canonical_path}"
+        canonical_url = f"https://www.qrfacile.it{safe_path}"
+
+    canonical_html = (
+        f'<link rel="canonical" href="{esc(canonical_url)}">'
+        if canonical_url
+        else ""
+    )
+    social_url_html = (
+        f'<meta property="og:url" content="{esc(canonical_url)}">'
+        if canonical_url
+        else ""
+    )
+    structured_html = ""
+    if structured_data:
+        payloads = structured_data if isinstance(structured_data, list) else [structured_data]
+        structured_html = "\n".join(
+            '<script type="application/ld+json">'
+            + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+            .replace("</", "<\\/")
+            + "</script>"
+            for payload in payloads
+        )
 
     return f"""<!doctype html>
 <html lang="it">
@@ -376,13 +458,27 @@ def page_public(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{esc(title)}</title>
+<meta name="description" content="{esc(description)}">
+<meta name="robots" content="{esc(robots)}">
+{canonical_html}
+<meta property="og:locale" content="it_IT">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="QRFACILE">
+<meta property="og:title" content="{esc(title)}">
+<meta property="og:description" content="{esc(description)}">
+{social_url_html}
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{esc(title)}">
+<meta name="twitter:description" content="{esc(description)}">
+{structured_html}
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-<div class="publicWrap">
+<a class="skipLink" href="#main-content">Vai al contenuto principale</a>
+<div class="{wrap_class}">
   {header}
 
-  <main class="publicMain">
+  <main class="publicMain" id="main-content" tabindex="-1">
     {banner(msg, err)}
     {body_html}
   </main>

@@ -4,9 +4,11 @@ from typing import Set
 
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
+from psycopg.errors import UniqueViolation
 from psycopg.rows import dict_row
 
 from qrfacile_app.db import pg
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.util import new_slug
 from qrfacile_app.auth_core import (
     require_any_role,
@@ -14,8 +16,11 @@ from qrfacile_app.auth_core import (
     winery_id_for_owner,
 )
 from qrfacile_app.ui_shell import page, top_actions, pill, esc
+from qrfacile_app.guided_flow import render_guided_stepper
 
 router = APIRouter()
+
+QR_WINES_QR_ITEM_UNIQUE_CONSTRAINT = "uq_qr_wines_qr_item_id"
 
 
 def now() -> int:
@@ -42,7 +47,7 @@ def _balances(cur, user_id: int) -> dict:
     cur.execute(
         """
         SELECT credit_type, COALESCE(SUM(delta),0) AS bal
-        FROM credit_ledger
+        FROM available_credit_ledger
         WHERE user_id=%s
         GROUP BY credit_type
         """,
@@ -128,7 +133,7 @@ def _connected_studios(cur, winery_id: int) -> list[dict]:
           sc.can_create,
           u.email,
           COALESCE(s.company_name, '') AS company_name
-        FROM studio_clients sc
+        FROM studio_clients sc /* security-review: selection-only */
         JOIN users u ON u.id = sc.studio_user_id
         LEFT JOIN studios s ON s.user_id = u.id
         WHERE sc.winery_id=%s
@@ -166,48 +171,51 @@ def _studio_assignment_box(
             </span>
           </label>
           <div class="newWineWorkNested">
-            <label>Email Studio Grafico</label>
-            <input class="input" name="invite_studio_email" type="email" placeholder="studio@example.com">
+            <label for="f-invite_studio_email">Email Studio Grafico</label>
+            <input id="f-invite_studio_email" class="input" name="invite_studio_email" type="email" placeholder="studio@example.com">
           </div>
         """
 
+    # Most wineries work alone: keep the studio options folded away.
     return f"""
-    <div class="newWineSectionTitle" style="margin-top:24px">
+    <details class="newWineStudioDetails">
+    <summary class="newWineSectionTitle" style="margin-top:24px;cursor:pointer">
       <span>{int(section_no)}</span>
       <div>
-        <b>Chi lavora su questa etichetta?</b>
-        <small>{esc(context)}</small>
+        <b>Lavori con uno studio grafico? (facoltativo)</b>
+        <small>Se fai tutto tu, salta questo passaggio. {esc(context)}</small>
       </div>
-    </div>
+    </summary>
 
     <div class="newWineWorkBox">
       <label class="newWineWorkOption">
         <input type="radio" name="studio_work_mode" value="self" checked>
         <span>
-          <b>Gestisco io</b>
-          <small>Nessuno studio viene assegnato ora.</small>
+          <b>La cantina gestisce direttamente il lavoro</b>
+          <small>Solo gli utenti autorizzati della cantina potranno modificare e pubblicare.</small>
         </span>
       </label>
 
       <label class="newWineWorkOption">
         <input type="radio" name="studio_work_mode" value="connected" {connected_disabled}>
         <span>
-          <b>Assegna a Studio già collegato</b>
-          <small>Lo studio deve essere collegato alla cantina e poi assegnato a questa etichetta.</small>
+          <b>Affida il lavoro a uno studio grafico collegato</b>
+          <small>Lo studio potrà modificare l’etichetta; la pubblicazione resta sotto il controllo della cantina.</small>
         </span>
       </label>
       <div class="newWineWorkNested">
-        <label>Studio collegato</label>
-        <select name="assigned_studio_user_id" {connected_disabled}>
+        <label for="f-assigned_studio_user_id">Studio collegato</label>
+        <select id="f-assigned_studio_user_id" name="assigned_studio_user_id" {connected_disabled}>
           {''.join(opts)}
         </select>
         <div class="note" style="margin-top:10px">
-          Il collegamento generale resta in <b>studio_clients</b>; l'assegnazione operativa usa <b>label_collaborators</b>.
+          Scegli lo studio che preparerà questa etichetta. Potrai cambiare assegnazione dalla dashboard.
         </div>
       </div>
 
       {invite_html}
     </div>
+    </details>
     """
 
 
@@ -224,35 +232,16 @@ def _create_studio_invite_for_context(
     if not studio_email or "@" not in studio_email or "." not in studio_email:
         return False
 
-    token = secrets.token_urlsafe(24)
-    ts = now()
-    exp = ts + 14 * 86400
-
-    cols = [
-        "token",
-        "winery_id",
-        "inviter_user_id",
-        "studio_email",
-        "can_view",
-        "can_edit",
-        "can_create",
-        "created_at",
-        "expires_at",
-    ]
-    vals = [token, int(winery_id), int(inviter_user_id), studio_email, True, True, False, ts, exp]
-
-    invite_cols = _columns(cur, "studio_invites")
-    if wine_id and "source_wine_id" in invite_cols:
-        cols.append("source_wine_id")
-        vals.append(int(wine_id))
-    if label_id and "source_label_id" in invite_cols:
-        cols.append("source_label_id")
-        vals.append(int(label_id))
-
-    placeholders = ",".join(["%s"] * len(vals))
+    import hashlib, json
+    token = secrets.token_urlsafe(32)
+    invite_type = "label" if label_id else ("wine" if wine_id else "studio")
     cur.execute(
-        f"INSERT INTO studio_invites ({','.join(cols)}) VALUES ({placeholders})",
-        tuple(vals),
+        """INSERT INTO invites(legacy_token,token_hash,invite_type,inviter_user_id,inviter_role,
+             invitee_email,target_role,winery_id,wine_id,label_id,permissions_json,status,expires_at,created_at,send_attempts)
+           VALUES(NULL,%s,%s,%s,'winery',%s,'studio',%s,%s,%s,%s::jsonb,'pending',now()+interval '14 days',now(),0)""",
+        (hashlib.sha256(token.encode()).hexdigest(),invite_type,int(inviter_user_id),studio_email,
+         int(winery_id),int(wine_id) if wine_id else None,int(label_id) if label_id else None,
+         json.dumps({"can_view":True,"can_edit":True,"can_create":False,"can_publish":False})),
     )
     return True
 
@@ -463,9 +452,12 @@ def new_wine_get(
 
     selected_master_id = int(wine_master_id or 0)
     master_ids = {int(wm["id"]) for wm in (wine_masters or [])}
+    if not selected_master_id and len(master_ids) == 1:
+        # A winery with a single wine should not have to pick it from a list.
+        selected_master_id = next(iter(master_ids))
     keep_master_selection = selected_master_id in master_ids
     master_placeholder_selected = "" if keep_master_selection else "selected"
-    master_opts = [f"<option value='0' {master_placeholder_selected}>— Seleziona etichetta esistente —</option>"]
+    master_opts = [f"<option value='0' {master_placeholder_selected}>— Scegli il vino —</option>"]
 
     for wm in (wine_masters or []):
         mid = int(wm["id"])
@@ -487,8 +479,8 @@ def new_wine_get(
         """
     else:
         winery_field_html = f"""
-            <label>Cantina</label>
-            <select name="winery_id" required onchange="newWineReloadForWinery(this)">
+            <label for="f-winery_id">Cantina</label>
+            <select id="f-winery_id" name="winery_id" required onchange="newWineReloadForWinery(this)">
               {''.join(opts)}
             </select>
             <div class="note" style="margin-top:10px">
@@ -504,8 +496,7 @@ def new_wine_get(
         winery_hint = "La cantina è già preselezionata. Scegli una etichetta/prodotto esistente a cui collegare il lotto."
 
     actions = (
-        pill(f"wine: {balances.get('wine', 0)}", "green") + " " +
-        pill(f"generic: {balances.get('generic', 0)}") + " " +
+        pill(f"QR vino disponibili: {balances.get('wine', 0)}", "green") + " " +
         top_actions(
             ("/app/start", "Menu"),
             ("/app/dashboard", "Dashboard"),
@@ -554,18 +545,21 @@ def new_wine_get(
           <div class="newWineEyebrow">Lotti QR</div>
           <div class="h1">{subtitle}</div>
           <div class="p">
-            Crea un lotto collegandolo a una etichetta/prodotto esistente.
-            La creazione genera il QR definitivo e scala <b>1 credito wine</b> per QR 10 anni oppure <b>2 crediti wine</b> per QR 25 anni.
+            Il lotto è la singola produzione del vino (annata e codice lotto).
+            Creandolo ottieni subito il QR definitivo: usa <b>1 dei tuoi QR vino</b>
+            (2 se scegli la durata di 25 anni).
           </div>
           {msg_html}
         </div>
 
         <div class="newWineHeroCard">
-          <div class="newWineHeroCardTitle">Crediti richiesti</div>
-          <div class="newWineCreditValue">1/2</div>
-          <div class="newWineHeroCardText">1 credito per 10 anni · 2 crediti per 25 anni</div>
+          <div class="newWineHeroCardTitle">QR vino disponibili</div>
+          <div class="newWineCreditValue">{int((balances or {}).get("wine", 0) or 0)}</div>
+          <div class="newWineHeroCardText">Questo lotto ne usa 1 (2 per la durata di 25 anni)</div>
         </div>
       </div>
+
+      {render_guided_stepper(0, "wine")}
 
       <form class="card newWineForm" method="post" action="/app/new-wine">
         <div class="newWineSectionTitle">
@@ -582,14 +576,13 @@ def new_wine_get(
           </div>
 
           <div>
-            <label>Etichetta esistente</label>
-            <select name="wine_master_id">
+            <label for="wine-master-id">Vino</label>
+            <select id="wine-master-id" name="wine_master_id">
               {''.join(master_opts)}
             </select>
             <div class="note" style="margin-top:10px">
-              Seleziona l’etichetta/prodotto a cui collegare questo lotto.
-              Se non esiste ancora, creala da
-              <a class="dashboardInlineLink" href="/app/new-wine-master">Nuova etichetta</a>.
+              I dati del vino scelto vengono copiati nel lotto. Il vino non è nell’elenco?
+              <a class="dashboardInlineLink" href="/app/new-wine-master">Aggiungilo qui</a>.
             </div>
           </div>
         </div>
@@ -598,41 +591,38 @@ def new_wine_get(
           <span>2</span>
           <div>
             <b>Dati lotto</b>
-            <small>Compila i dati principali. Potrai completare compliance e immagini dopo la creazione.</small>
+            <small>Compila i dati principali. Potrai completare i dati obbligatori e le immagini dopo la creazione.</small>
           </div>
         </div>
 
         <div class="newWineGrid3">
-          <div style="grid-column:1 / -1">
-            <label>Etichetta selezionata</label>
-            <input class="input" name="wine_name" placeholder="Compilata automaticamente dall’etichetta scelta" readonly>
+          <input type="hidden" name="wine_name">
+
+          <div>
+            <label for="f-vintage">Annata (se dichiarata in etichetta)</label>
+            <input id="f-vintage" class="input" name="vintage" placeholder="2023">
           </div>
 
           <div>
-            <label>Annata opzionale</label>
-            <input class="input" name="vintage" placeholder="2023">
+            <label for="f-lot">Codice lotto</label>
+            <input id="f-lot" class="input" name="lot" placeholder="L001/7">
           </div>
 
           <div>
-            <label>Lotto opzionale</label>
-            <input class="input" name="lot" placeholder="L001/7">
+            <label for="wine-volume-ml">Volume ml</label>
+            <input class="input" id="wine-volume-ml" name="volume_ml" value="750" inputmode="numeric">
           </div>
 
           <div>
-            <label>Volume ml</label>
-            <input class="input" name="volume_ml" value="750" inputmode="numeric">
+            <label for="f-alcohol">Grado alcolico (% vol)</label>
+            <input id="f-alcohol" class="input" name="alcohol" placeholder="13.5">
           </div>
 
           <div>
-            <label>Grado alcolico opzionale</label>
-            <input class="input" name="alcohol" placeholder="13.5">
-          </div>
-
-          <div>
-            <label>Durata QR vino</label>
-            <select name="qr_duration_years">
-              <option value="10" selected>10 anni · 1 credito wine</option>
-              <option value="25">25 anni · 2 crediti wine</option>
+            <label for="wine-qr-duration">Durata QR vino</label>
+            <select id="wine-qr-duration" name="qr_duration_years">
+              <option value="10" selected>10 anni · usa 1 QR vino</option>
+              <option value="25">25 anni · usa 2 QR vino</option>
             </select>
             <div class="note" style="margin-top:10px">
               Puoi creare un QR standard da 10 anni oppure un QR esteso da 25 anni.
@@ -650,7 +640,7 @@ def new_wine_get(
 
         <div class="note" style="margin-top:16px">
           Dopo la creazione entrerai nella scheda del lotto, dove potrai caricare immagini,
-          completare i dati obbligatori, gestire la compliance ed esportare il QR.
+          completare i dati obbligatori ed esportare il QR.
         </div>
       </form>
 
@@ -913,7 +903,7 @@ def _subscription_gate_for_new_wine(cur, user: dict, owner_user_id: int, winery_
     - admin: può creare sempre.
     - se non esiste subscription active: non blocca qui; decide il saldo crediti.
       Questo permette l'uso dei 3 crediti QR vino gratuiti iniziali.
-    - se esiste subscription active ma scaduta: blocca nuovi QR.
+    - subscription legacy scaduta: i crediti ancora disponibili consentono nuovi QR.
     - se subscription active valida: ok.
     """
     role = (user.get("role") or "").lower().strip()
@@ -941,7 +931,10 @@ def _subscription_gate_for_new_wine(cur, user: dict, owner_user_id: int, winery_
     expires_at = int(sub.get("expires_at") or 0)
 
     if expires_at and expires_at < now():
-        return False, "Piano scaduto: rinnova il piano per creare nuovi QR vino."
+        # New annual allowances and perpetual credits survive a legacy subscription.
+        cur.execute("SELECT COALESCE(SUM(delta),0) AS balance FROM available_credit_ledger WHERE user_id=%s AND credit_type='wine'", (int(owner_user_id),))
+        if int((cur.fetchone() or {}).get('balance') or 0) <= 0:
+            return False, "Unità esaurite o scadute: acquista un pacchetto per creare nuovi QR vino."
 
     return True, ""
 
@@ -961,6 +954,7 @@ def new_wine_post(
     studio_work_mode: str = Form("self"),
     invite_studio_email: str = Form(""),
 ):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery", "studio", "admin"))
 
     require_any_role(
@@ -994,7 +988,8 @@ def new_wine_post(
     credit_cost = 2 if duration_years == 25 else 1
 
     ts = now()
-    expires_at = ts + (60 * 60 * 24 * 365 * duration_years)
+    from qrfacile_app.annual_packages import anniversary
+    expires_at = anniversary(ts, duration_years)
 
     with pg() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -1047,7 +1042,7 @@ def new_wine_post(
             cur.execute(
                 """
                 SELECT COALESCE(SUM(delta), 0) AS balance
-                FROM credit_ledger
+                FROM available_credit_ledger
                 WHERE user_id=%s AND credit_type='wine'
                 """,
                 (owner_user_id,),
@@ -1142,10 +1137,22 @@ def new_wine_post(
             placeholders = ",".join(["%s"] * len(values))
             cols_sql = ",".join(col_names)
 
-            cur.execute(
-                f"INSERT INTO qr_wines({cols_sql}) VALUES ({placeholders}) RETURNING id",
-                tuple(values),
-            )
+            try:
+                cur.execute(
+                    f"INSERT INTO qr_wines({cols_sql}) VALUES ({placeholders}) RETURNING id",
+                    tuple(values),
+                )
+            except UniqueViolation as exc:
+                conn.rollback()
+                if exc.diag.constraint_name == QR_WINES_QR_ITEM_UNIQUE_CONSTRAINT:
+                    return RedirectResponse(
+                        url=(
+                            f"/app/new-wine?winery_id={int(winery_id)}"
+                            "&err=Esiste%20gi%C3%A0%20un%20vino%20per%20questo%20QR"
+                        ),
+                        status_code=303,
+                    )
+                raise
             wine_id = int(cur.fetchone()["id"])
 
             cur.execute(
@@ -1292,8 +1299,7 @@ def new_label_get(request: Request, msg: str = "", wine_id: int = 0):
         subtitle = f"Etichetta per {esc(selected_wine.get('wine_name') or '')}"
 
     actions = (
-        pill(f"wine: {balances.get('wine', 0)}", "green") + " " +
-        pill(f"generic: {balances.get('generic', 0)}") + " " +
+        pill(f"QR vino disponibili: {balances.get('wine', 0)}", "green") + " " +
         top_actions(
             ("/app/start", "Menu"),
             ("/app/dashboard", "Dashboard"),
@@ -1350,8 +1356,8 @@ def new_label_get(request: Request, msg: str = "", wine_id: int = 0):
           </div>
         </div>
 
-        <label>Lotto</label>
-        <select name="wine_id" required>
+        <label for="f-wine_id">Lotto</label>
+        <select id="f-wine_id" name="wine_id" required>
           {''.join(options) if options else "<option value=''>Nessun lotto disponibile</option>"}
         </select>
 
@@ -1365,16 +1371,16 @@ def new_label_get(request: Request, msg: str = "", wine_id: int = 0):
 
         <div class="newWineGrid3">
           <div>
-            <label>Tipo etichetta</label>
-            <select name="label_type">
+            <label for="f-label_type">Tipo etichetta</label>
+            <select id="f-label_type" name="label_type">
               <option value="front">Fronte</option>
               <option value="back">Retro</option>
             </select>
           </div>
 
           <div>
-            <label>Lingua</label>
-            <select name="language">
+            <label for="f-language">Lingua</label>
+            <select id="f-language" name="language">
               <option value="it">Italiano</option>
               <option value="en">English</option>
               <option value="de">Deutsch</option>
@@ -1384,8 +1390,8 @@ def new_label_get(request: Request, msg: str = "", wine_id: int = 0):
           </div>
 
           <div>
-            <label>Nome interno opzionale</label>
-            <input class="input" name="title_override" placeholder="es. Back export UK">
+            <label for="f-title_override">Nome interno opzionale</label>
+            <input id="f-title_override" class="input" name="title_override" placeholder="es. Back export UK">
           </div>
         </div>
 
@@ -1611,6 +1617,7 @@ def new_label_create(
     assigned_studio_user_id: int = Form(0),
     invite_studio_email: str = Form(""),
 ):
+    require_csrf_or_same_origin(request)
     user = require_any_role(request, ("winery", "studio", "admin"))
 
     with pg() as conn:

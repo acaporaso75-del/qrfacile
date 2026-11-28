@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse
 from psycopg.rows import dict_row
 
 from qrfacile_app.auth_core import require_any_role
+from qrfacile_app.csrf_core import require_csrf_or_same_origin
 from qrfacile_app.db import pg
 from qrfacile_app import ui
 
@@ -90,6 +91,7 @@ def admin_credits(request: Request):
 
 @router.post("/admin/credits/apply")
 def admin_apply_credits(request: Request):
+    require_csrf_or_same_origin(request)
     user, conn = require_any_role(request, ["admin"])
 
     form = request.form()
