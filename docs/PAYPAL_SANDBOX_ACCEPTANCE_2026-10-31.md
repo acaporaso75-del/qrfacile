@@ -31,6 +31,10 @@ Questo documento registra il collaudo end-to-end del webhook firmato sul runtime
 - [x] Un tentativo non verificabile o non correlabile resta fail-closed e osservabile.
   Un POST non verificabile ha restituito HTTP `400`, con ledger invariato e nessun credito erogato.
 - [ ] Eventi diversi da `PAYMENT.CAPTURE.COMPLETED` non hanno erogato crediti e restano auditabili.
+  La suite PostgreSQL isolata copre `PAYMENT.CAPTURE.PENDING`, `PAYMENT.CAPTURE.DENIED`,
+  `PAYMENT.CAPTURE.REFUNDED`, `CHECKOUT.PAYMENT-APPROVAL.REVERSED` e `CUSTOMER.DISPUTE.CREATED`:
+  evento e audit registrati, ordine invariato, nessun credito e nessun invio Danea.
+  Sono eventi sintetici con verifica PayPal simulata; non attestano la consegna da PayPal sul runtime.
 - [ ] Ledger, coda di revisione e alert non espongono payload, event ID, PII o credenziali.
   Readback e probe aggregato sanitizzati. Ricezione dell'alert sintetico sanitizzato confermata dal titolare: vedere `OPERATIONAL_ACCEPTANCE_2026-10-31.md`. La prova di consegna non chiude da sola il controllo complessivo.
 

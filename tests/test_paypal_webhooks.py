@@ -315,6 +315,53 @@ def test_pending_sandbox_webhook_grants_annual_credits_once_on_postgres(webhook_
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize(("event_type", "status", "failure_code"), [
+    ("PAYMENT.CAPTURE.PENDING", "verified", None),
+    ("PAYMENT.CAPTURE.DENIED", "manual_review", "payment_state_requires_review"),
+    ("PAYMENT.CAPTURE.REFUNDED", "manual_review", "payment_state_requires_review"),
+    ("CHECKOUT.PAYMENT-APPROVAL.REVERSED", "manual_review", "payment_state_requires_review"),
+    ("CUSTOMER.DISPUTE.CREATED", "manual_review", "payment_state_requires_review"),
+])
+def test_non_completed_webhook_is_audited_without_fulfillment_on_postgres(
+    webhook_postgres, monkeypatch, event_type, status, failure_code,
+):
+    conn = webhook_postgres
+    monkeypatch.setattr(
+        paypal_ui, "handoff_after_payment", lambda *a: pytest.fail("Non-completed event triggered Danea")
+    )
+    conn.execute("""
+        INSERT INTO orders (id, user_id, status, payment_environment, paypal_order_id, amount_cents, currency)
+        VALUES (77, 21, 'pending', 'sandbox', 'PP-77', 12078, 'EUR')
+    """)
+    conn.commit()
+    # Keep the capture resource and matching order intact: the event type must
+    # prevent fulfillment even if the rest of the event looks like a completion.
+    event = _event()
+    event["event_type"] = event_type
+    response = _post_webhook(event, _headers())
+
+    assert response.status_code == 200
+    assert json.loads(response.body) == {"ok": True, "status": status}
+    assert conn.execute("""
+        SELECT status, paypal_capture_id, paid_at FROM orders WHERE id = 77
+    """).fetchone() == ("pending", None, None)
+    assert conn.execute("SELECT COUNT(*) FROM credit_ledger").fetchone() == (0,)
+    assert conn.execute("""
+        SELECT verification_status, failure_code, order_id, verified_at IS NOT NULL, processed_at IS NOT NULL
+        FROM paypal_webhook_events
+    """).fetchall() == [(status, failure_code, None, True, True)]
+    assert conn.execute("SELECT action, entity_id, meta FROM audit_log").fetchall() == [
+        ("paypal_webhook_processed", None, {
+            "event_id": "WH-1",
+            "event_type": event_type,
+            "payment_environment": "sandbox",
+            "status": status,
+            "failure_code": failure_code,
+        }),
+    ]
+
+
+@pytest.mark.integration
 def test_paid_sandbox_webhook_persists_audit_and_deduplicates_on_postgres(webhook_postgres, monkeypatch):
     conn = webhook_postgres
     monkeypatch.setenv("QRFACILE_INVOICE_TO", "billing@example.test")
